@@ -10,7 +10,16 @@
 #include "gost.h"
 #include "MuCrypto.h"
 
+#ifdef __ANDROID__
+#ifndef VM_START
+#define VM_START
+#endif
+#ifndef VM_END
+#define VM_END
+#endif
+#else
 #include "ThemidaSDK.h"
+#endif
 
 MuCrypto gMuCrypto;
 

@@ -1,4 +1,53 @@
 #pragma once
+#ifdef __ANDROID__
+// ─────────────────────────────────────────────────────────────────────────────
+// WINHANDLE.h — Android stub
+// On Android, CWINHANDLE is replaced by android_main.cpp + AndroidEglWindow.
+// We provide the minimal interface that the rest of the code references.
+// ─────────────────────────────────────────────────────────────────────────────
+#include "Platform/AndroidWin32Compat.h"
+typedef bool          mu_boolean;
+typedef signed char   mu_int8;
+typedef signed short  mu_int16;
+typedef signed int    mu_int32;
+typedef signed long long mu_int64;
+typedef unsigned char  mu_uint8;
+typedef unsigned short mu_uint16;
+typedef unsigned int   mu_uint32;
+typedef unsigned long long mu_uint64;
+typedef float  mu_float;
+typedef double mu_double;
+#include "Resolutions.h"
+class CWINHANDLE
+{
+public:
+    static CWINHANDLE* Instance() { static CWINHANDLE inst; return &inst; }
+    mu_boolean CheckWndActive()   { return true; }
+    mu_boolean CheckWndMode()     { return true; }
+    mu_boolean CheckWndIconic()   { return false; }
+    mu_boolean CheckPerformance() { return true; }
+    void SetWndActive(mu_boolean) {}
+    void SetWndMode(mu_boolean)   {}
+    void Check_State()            {}
+    void Change_State(mu_boolean) {}
+    void Resize(mu_uint32, mu_uint32) {}
+    mu_float GetScreenX();
+    mu_float GetScreenY();
+    ResolutionConfig* LoadCurrentConfig() { return nullptr; }
+    void SetDisplayIndex(mu_uint8, mu_boolean = true) {}
+    mu_uint8 GetDisplayIndex()    { return 0; }
+    void SendWindowMessage(const char*, bool, ...) {}
+    void SendNowMessage(UINT, WPARAM, LPARAM)  {}
+    void SendPostMessage(UINT, WPARAM, LPARAM) {}
+    HWND GethWnd();
+};
+extern int   g_iInactiveWarning;
+extern BOOL  g_bMinimizedEnabled;
+extern float g_iMousePopPosition_x;
+extern float g_iMousePopPosition_y;
+#define gwinhandle (CWINHANDLE::Instance())
+
+#else // Windows below
 typedef bool					mu_boolean;
 typedef signed char				mu_int8;
 typedef signed short			mu_int16;
@@ -80,3 +129,5 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 #endif // IMPLEMENT_IMGUI_WIN32
 
 #define gwinhandle			(CWINHANDLE::Instance())
+
+#endif // __ANDROID__ / Windows

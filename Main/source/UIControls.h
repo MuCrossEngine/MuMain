@@ -3,6 +3,7 @@
 
 #include "zzzinfomation.h"
 #include "MultiLanguage.h"
+#include "QuestMng.h"
 
 #ifdef KJH_ADD_INGAMESHOP_UI_SYSTEM
 #define UIMAX_TEXT_LINE					150
@@ -647,8 +648,6 @@ protected:
 	virtual BOOL DoLineMouseAction(int nLine);
 	virtual int GetRenderLinePos_y(int nLine);
 };
-
-enum REQUEST_REWARD_CLASSIFY;
 
 struct SQuestContents
 {

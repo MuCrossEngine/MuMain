@@ -7,7 +7,9 @@
 
 #include "stdafx.h"
 #include "_enum.h"
+#ifndef __ANDROID__
 #include <eh.h>
+#endif
 #include "UIManager.h"
 #include "GuildCache.h"
 #include "ZzzOpenglUtil.h"

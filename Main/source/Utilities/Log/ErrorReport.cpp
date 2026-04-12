@@ -2,14 +2,18 @@
 //
 //////////////////////////////////////////////////////////////////////
 
+#ifndef __ANDROID__
 #define DIRECTINPUT_VERSION 0x0800
+#endif
 
 #include "stdafx.h"
+#ifndef __ANDROID__
 #include <ddraw.h>
 #include <dinput.h>
 #include <dmusicc.h>
 #include <windows.h>
 #include <eh.h>
+#endif
 #include <imagehlp.h>
 #include "ErrorReport.h"
 
@@ -712,6 +716,7 @@ void GetCPUInfo(ER_SystemInfo* si)
 }
 
 
+#ifndef __ANDROID__
 typedef HRESULT(WINAPI* DIRECTDRAWCREATE)(GUID*, LPDIRECTDRAW*, IUnknown*);
 typedef HRESULT(WINAPI* DIRECTDRAWCREATEEX)(GUID*, VOID**, REFIID, IUnknown*);
 typedef HRESULT(WINAPI* DIRECTINPUTCREATE)(HINSTANCE, DWORD, LPDIRECTINPUT*,
@@ -990,4 +995,6 @@ void GetSystemInfo(ER_SystemInfo* si)
 	DWORD dwDX = GetDXVersion();
 	wsprintf(si->m_lpszDxVersion, "Direct-X %d.%d", dwDX >> 8, dwDX & 0xFF);
 }
+
+#endif // !__ANDROID__ (DirectDraw/DirectInput section)
 

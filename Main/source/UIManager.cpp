@@ -107,7 +107,7 @@ POINT CUIManager::RenderWindowBase(int nHeight, int nOriginX, int nOriginY)
 		fPosY = nOriginY;
 	}
 
-	POINT ptPos = { fPosX, fPosY };
+	POINT ptPos = { (long)fPosX, (long)fPosY };
 
 #if MAIN_UPDATE > 303
 	RenderBitmap(BITMAP_INTERFACE + 22, fPosX, fPosY, nWidth, 5, 0.f, 0.f, nWidth / 256.f, 5.f / 8.f);

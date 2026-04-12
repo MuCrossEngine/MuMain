@@ -55,8 +55,8 @@
 #include "SkillManager.h"
 
 #ifdef KJH_ADD_INGAMESHOP_UI_SYSTEM	
-#include "GameShop\InGameShopSystem.h"
-#include "GameShop\MsgBoxIGSCommon.h"
+#include "GameShop/InGameShopSystem.h"
+#include "GameShop/MsgBoxIGSCommon.h"
 #endif // KJH_ADD_INGAMESHOP_UI_SYSTEM
 #include "DuelMgr.h"
 #include "QuestMng.h"

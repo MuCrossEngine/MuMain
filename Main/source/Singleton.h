@@ -6,6 +6,8 @@
 #ifndef __SINGLETON_H__
 #define __SINGLETON_H__
 
+#include <stdint.h>
+
 /*+++++++++++++++++++++++++++++++++++++
 	CLASS.
 +++++++++++++++++++++++++++++++++++++*/
@@ -18,8 +20,10 @@ public:
 	{
 		if (_Singleton == 0)
 		{
-			int offset = (int)(T*)1 - (int)(Singleton <T>*)(T*)1;
-			_Singleton = (T*)((int)this + offset);
+			const intptr_t base = reinterpret_cast<intptr_t>(static_cast<Singleton<T>*>((T*)1));
+			const intptr_t derived = reinterpret_cast<intptr_t>(static_cast<T*>((Singleton<T>*)(T*)1));
+			const intptr_t offset = derived - base;
+			_Singleton = reinterpret_cast<T*>(reinterpret_cast<intptr_t>(this) + offset);
 		}
 	}
 

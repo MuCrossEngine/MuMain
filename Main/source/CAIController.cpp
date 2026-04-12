@@ -736,11 +736,11 @@ int CAIController::RateItem(ITEM_t* item)
 
 bool CAIController::PickupItem(ITEM_t* item)
 {
-	if (item != nullptr)
-	{
-		vec3_t vLength;
-		SelectedItem = ((int)item - (int)&Items[0]) / sizeof(ITEM_t);
-		sCharacter->MovementType = MOVEMENT_GET;
+		if (item != nullptr)
+		{
+			vec3_t vLength;
+			SelectedItem = static_cast<int>(item - &Items[0]);
+			sCharacter->MovementType = MOVEMENT_GET;
 
 		int tx = (int)(Items[SelectedItem].Object.Position[0] / TERRAIN_SCALE);
 		int ty = (int)(Items[SelectedItem].Object.Position[1] / TERRAIN_SCALE);

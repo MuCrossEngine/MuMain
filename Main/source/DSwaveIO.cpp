@@ -1,3 +1,4 @@
+#ifndef __ANDROID__
 #include "stdafx.h"
 #include "DSwaveIO.h"
 
@@ -242,3 +243,5 @@ bool waveIO::WriteWaveHeader(char *szFilename, PCMWAVEFORMAT wf, int nWaveDataSi
 
 	return true;
 }
+
+#endif // !__ANDROID__

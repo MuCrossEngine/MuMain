@@ -125,7 +125,15 @@ WZResult 			FileDownloader::CreateConnection()
     {
         unsigned int ThreadID = 0;
 
+#ifdef __ANDROID__
+        // On Android use std::thread instead of _beginthreadex
+        std::thread([this](){
+            FileDownloader::RunConnectThread(this);
+        }).detach();
+        HANDLE hHandle = (HANDLE)1; // non-invalid sentinel
+#else
         HANDLE hHandle = (HANDLE)_beginthreadex(0,0,FileDownloader::RunConnectThread,this,0,&ThreadID);
+#endif
 
         if(hHandle==INVALID_HANDLE_VALUE)
         {

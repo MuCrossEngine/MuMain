@@ -7,8 +7,8 @@
 
 #pragma once
 
-#include "GameShop\ShopListManager\interface\IConnecter.h"
-#include "GameShop\ShopListManager\interface\IDownloaderStateEvent.h"
+#include "GameShop/ShopListManager/interface/IConnecter.h"
+#include "GameShop/ShopListManager/interface/IDownloaderStateEvent.h"
 
 class FileDownloader
 {

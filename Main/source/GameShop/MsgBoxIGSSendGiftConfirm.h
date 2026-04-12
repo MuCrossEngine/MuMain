@@ -67,7 +67,7 @@ public:
 	bool Update();
 	bool Render();
 
-	void CMsgBoxIGSSendGiftConfirm::Initialize(int iPackageSeq, int iDisplaySeq, int iPriceSeq, DWORD wItemCode, int iCashType, unicode::t_char* pszID, unicode::t_char* pszMessage, unicode::t_char* pszName, unicode::t_char* pszPrice, unicode::t_char* pszPeriod);
+	void Initialize(int iPackageSeq, int iDisplaySeq, int iPriceSeq, DWORD wItemCode, int iCashType, unicode::t_char* pszID, unicode::t_char* pszMessage, unicode::t_char* pszName, unicode::t_char* pszPrice, unicode::t_char* pszPeriod);
 	
 	static CALLBACK_RESULT LButtonUp(class CNewUIMessageBoxBase* pOwner, const leaf::xstreambuf& xParam);
 	static CALLBACK_RESULT OKButtonDown(class CNewUIMessageBoxBase* pOwner, const leaf::xstreambuf& xParam);

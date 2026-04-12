@@ -1,0 +1,122 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    package="com.mucrossengine.client"
+4    android:versionCode="1"
+5    android:versionName="1.0" >
+6
+7    <uses-sdk
+8        android:minSdkVersion="26"
+9        android:targetSdkVersion="34" />
+10
+11    <uses-permission android:name="android.permission.INTERNET" />
+11-->/Users/bramante/Downloads/MuMain/Main/android/app/src/main/AndroidManifest.xml:4:5-67
+11-->/Users/bramante/Downloads/MuMain/Main/android/app/src/main/AndroidManifest.xml:4:22-64
+12    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+12-->/Users/bramante/Downloads/MuMain/Main/android/app/src/main/AndroidManifest.xml:5:5-79
+12-->/Users/bramante/Downloads/MuMain/Main/android/app/src/main/AndroidManifest.xml:5:22-76
+13    <uses-permission
+13-->/Users/bramante/Downloads/MuMain/Main/android/app/src/main/AndroidManifest.xml:6:5-7:38
+14        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+14-->/Users/bramante/Downloads/MuMain/Main/android/app/src/main/AndroidManifest.xml:6:22-78
+15        android:maxSdkVersion="28" />
+15-->/Users/bramante/Downloads/MuMain/Main/android/app/src/main/AndroidManifest.xml:7:9-35
+16    <uses-permission
+16-->/Users/bramante/Downloads/MuMain/Main/android/app/src/main/AndroidManifest.xml:8:5-9:38
+17        android:name="android.permission.READ_EXTERNAL_STORAGE"
+17-->/Users/bramante/Downloads/MuMain/Main/android/app/src/main/AndroidManifest.xml:8:22-77
+18        android:maxSdkVersion="32" />
+18-->/Users/bramante/Downloads/MuMain/Main/android/app/src/main/AndroidManifest.xml:9:9-35
+19
+20    <!-- OpenGL ES 3.0 requirement -->
+21    <uses-feature
+21-->/Users/bramante/Downloads/MuMain/Main/android/app/src/main/AndroidManifest.xml:12:5-78
+22        android:glEsVersion="0x00030000"
+22-->/Users/bramante/Downloads/MuMain/Main/android/app/src/main/AndroidManifest.xml:12:19-51
+23        android:required="true" />
+23-->/Users/bramante/Downloads/MuMain/Main/android/app/src/main/AndroidManifest.xml:12:52-75
+24
+25    <permission
+25-->[androidx.core:core:1.9.0] /Users/bramante/.gradle/caches/transforms-3/f49c561996396247ab48acbe4f1c2f2f/transformed/core-1.9.0/AndroidManifest.xml:22:5-24:47
+26        android:name="com.mucrossengine.client.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+26-->[androidx.core:core:1.9.0] /Users/bramante/.gradle/caches/transforms-3/f49c561996396247ab48acbe4f1c2f2f/transformed/core-1.9.0/AndroidManifest.xml:23:9-81
+27        android:protectionLevel="signature" />
+27-->[androidx.core:core:1.9.0] /Users/bramante/.gradle/caches/transforms-3/f49c561996396247ab48acbe4f1c2f2f/transformed/core-1.9.0/AndroidManifest.xml:24:9-44
+28
+29    <uses-permission android:name="com.mucrossengine.client.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
+29-->[androidx.core:core:1.9.0] /Users/bramante/.gradle/caches/transforms-3/f49c561996396247ab48acbe4f1c2f2f/transformed/core-1.9.0/AndroidManifest.xml:26:5-97
+29-->[androidx.core:core:1.9.0] /Users/bramante/.gradle/caches/transforms-3/f49c561996396247ab48acbe4f1c2f2f/transformed/core-1.9.0/AndroidManifest.xml:26:22-94
+30
+31    <application
+31-->/Users/bramante/Downloads/MuMain/Main/android/app/src/main/AndroidManifest.xml:14:5-40:19
+32        android:allowBackup="false"
+32-->/Users/bramante/Downloads/MuMain/Main/android/app/src/main/AndroidManifest.xml:15:9-36
+33        android:appComponentFactory="androidx.core.app.CoreComponentFactory"
+33-->[androidx.core:core:1.9.0] /Users/bramante/.gradle/caches/transforms-3/f49c561996396247ab48acbe4f1c2f2f/transformed/core-1.9.0/AndroidManifest.xml:28:18-86
+34        android:debuggable="true"
+35        android:extractNativeLibs="false"
+36        android:hasCode="true"
+36-->/Users/bramante/Downloads/MuMain/Main/android/app/src/main/AndroidManifest.xml:18:9-31
+37        android:icon="@android:drawable/sym_def_app_icon"
+37-->/Users/bramante/Downloads/MuMain/Main/android/app/src/main/AndroidManifest.xml:16:9-58
+38        android:label="MU Cross Engine"
+38-->/Users/bramante/Downloads/MuMain/Main/android/app/src/main/AndroidManifest.xml:17:9-40
+39        android:theme="@android:style/Theme.NoTitleBar.Fullscreen" >
+39-->/Users/bramante/Downloads/MuMain/Main/android/app/src/main/AndroidManifest.xml:19:9-67
+40        <activity
+40-->/Users/bramante/Downloads/MuMain/Main/android/app/src/main/AndroidManifest.xml:21:9-38:20
+41            android:name="com.mucrossengine.client.MainActivity"
+41-->/Users/bramante/Downloads/MuMain/Main/android/app/src/main/AndroidManifest.xml:22:13-65
+42            android:configChanges="orientation|screenSize|keyboardHidden|keyboard|navigation"
+42-->/Users/bramante/Downloads/MuMain/Main/android/app/src/main/AndroidManifest.xml:24:13-94
+43            android:exported="true"
+43-->/Users/bramante/Downloads/MuMain/Main/android/app/src/main/AndroidManifest.xml:27:13-36
+44            android:label="MU Cross Engine"
+44-->/Users/bramante/Downloads/MuMain/Main/android/app/src/main/AndroidManifest.xml:23:13-44
+45            android:launchMode="singleTop"
+45-->/Users/bramante/Downloads/MuMain/Main/android/app/src/main/AndroidManifest.xml:26:13-43
+46            android:screenOrientation="landscape" >
+46-->/Users/bramante/Downloads/MuMain/Main/android/app/src/main/AndroidManifest.xml:25:13-50
+47            <intent-filter>
+47-->/Users/bramante/Downloads/MuMain/Main/android/app/src/main/AndroidManifest.xml:29:13-32:29
+48                <action android:name="android.intent.action.MAIN" />
+48-->/Users/bramante/Downloads/MuMain/Main/android/app/src/main/AndroidManifest.xml:30:17-69
+48-->/Users/bramante/Downloads/MuMain/Main/android/app/src/main/AndroidManifest.xml:30:25-66
+49
+50                <category android:name="android.intent.category.LAUNCHER" />
+50-->/Users/bramante/Downloads/MuMain/Main/android/app/src/main/AndroidManifest.xml:31:17-77
+50-->/Users/bramante/Downloads/MuMain/Main/android/app/src/main/AndroidManifest.xml:31:27-74
+51            </intent-filter>
+52
+53            <!-- NativeActivity metadata -->
+54            <meta-data
+54-->/Users/bramante/Downloads/MuMain/Main/android/app/src/main/AndroidManifest.xml:35:13-37:49
+55                android:name="android.app.lib_name"
+55-->/Users/bramante/Downloads/MuMain/Main/android/app/src/main/AndroidManifest.xml:36:17-52
+56                android:value="mucrossengine" />
+56-->/Users/bramante/Downloads/MuMain/Main/android/app/src/main/AndroidManifest.xml:37:17-46
+57        </activity>
+58
+59        <provider
+59-->[androidx.emoji2:emoji2:1.2.0] /Users/bramante/.gradle/caches/transforms-3/70c0c576b576747164db74d3aeccd75d/transformed/emoji2-1.2.0/AndroidManifest.xml:24:9-32:20
+60            android:name="androidx.startup.InitializationProvider"
+60-->[androidx.emoji2:emoji2:1.2.0] /Users/bramante/.gradle/caches/transforms-3/70c0c576b576747164db74d3aeccd75d/transformed/emoji2-1.2.0/AndroidManifest.xml:25:13-67
+61            android:authorities="com.mucrossengine.client.androidx-startup"
+61-->[androidx.emoji2:emoji2:1.2.0] /Users/bramante/.gradle/caches/transforms-3/70c0c576b576747164db74d3aeccd75d/transformed/emoji2-1.2.0/AndroidManifest.xml:26:13-68
+62            android:exported="false" >
+62-->[androidx.emoji2:emoji2:1.2.0] /Users/bramante/.gradle/caches/transforms-3/70c0c576b576747164db74d3aeccd75d/transformed/emoji2-1.2.0/AndroidManifest.xml:27:13-37
+63            <meta-data
+63-->[androidx.emoji2:emoji2:1.2.0] /Users/bramante/.gradle/caches/transforms-3/70c0c576b576747164db74d3aeccd75d/transformed/emoji2-1.2.0/AndroidManifest.xml:29:13-31:52
+64                android:name="androidx.emoji2.text.EmojiCompatInitializer"
+64-->[androidx.emoji2:emoji2:1.2.0] /Users/bramante/.gradle/caches/transforms-3/70c0c576b576747164db74d3aeccd75d/transformed/emoji2-1.2.0/AndroidManifest.xml:30:17-75
+65                android:value="androidx.startup" />
+65-->[androidx.emoji2:emoji2:1.2.0] /Users/bramante/.gradle/caches/transforms-3/70c0c576b576747164db74d3aeccd75d/transformed/emoji2-1.2.0/AndroidManifest.xml:31:17-49
+66            <meta-data
+66-->[androidx.lifecycle:lifecycle-process:2.4.1] /Users/bramante/.gradle/caches/transforms-3/d1ef2943de8827ac5434bbec18f08ee5/transformed/lifecycle-process-2.4.1/AndroidManifest.xml:31:13-33:52
+67                android:name="androidx.lifecycle.ProcessLifecycleInitializer"
+67-->[androidx.lifecycle:lifecycle-process:2.4.1] /Users/bramante/.gradle/caches/transforms-3/d1ef2943de8827ac5434bbec18f08ee5/transformed/lifecycle-process-2.4.1/AndroidManifest.xml:32:17-78
+68                android:value="androidx.startup" />
+68-->[androidx.lifecycle:lifecycle-process:2.4.1] /Users/bramante/.gradle/caches/transforms-3/d1ef2943de8827ac5434bbec18f08ee5/transformed/lifecycle-process-2.4.1/AndroidManifest.xml:33:17-49
+69        </provider>
+70    </application>
+71
+72</manifest>

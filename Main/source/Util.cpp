@@ -1,17 +1,21 @@
 #include "StdAfx.h"
 #include "Util.h"
+#ifndef __ANDROID__
 #include <Rpc.h>
+#endif
 #include <locale>
 #include <codecvt>
 
+#ifndef __ANDROID__
 #pragma comment(lib,"Rpcrt4.lib")
+#endif
 
 static BYTE bBuxCode[3] = { 0xfc, 0xcf, 0xab };
 std::string path_global;
 
 std::string GetFileNameWithExtension(const std::string& filePath)
 {
-	size_t slashPos = filePath.find_last_of("\\/"); // Encuentra la última barra inclinada.
+	size_t slashPos = filePath.find_last_of("\\/"); // Encuentra la ï¿½ltima barra inclinada.
 
 	if (slashPos != std::string::npos)
 	{
@@ -295,6 +299,11 @@ std::string WStringToString(const std::wstring& wstr)
 
 void create_hwid_system(char* ComputerHardwareId)
 {
+#ifdef __ANDROID__
+    // On Android generate a deterministic ID from the Android device serial / Build.FINGERPRINT
+    // For now produce a fixed placeholder; replace with JNI call to android.os.Build if needed
+    sprintf(ComputerHardwareId, "ANDROID-00000000-00000000-00000000");
+#else
 	DWORD VolumeSerialNumber;
 
 	if (GetVolumeInformation("C:\\", 0, 0, &VolumeSerialNumber, 0, 0, 0, 0) == 0)
@@ -319,6 +328,7 @@ void create_hwid_system(char* ComputerHardwareId)
 	DWORD ComputerHardwareId4 = ((SystemInfo.wProcessorLevel & 0xFFFF) | (SystemInfo.wProcessorRevision << 16)) ^ 0xB542D8E1;
 
 	sprintf(ComputerHardwareId, "%08X-%08X-%08X-%08X", ComputerHardwareId1, ComputerHardwareId2, ComputerHardwareId3, ComputerHardwareId4);
+#endif // __ANDROID__
 }
 
 void textwrite(std::string& buffer, bool line, FILE* fp)

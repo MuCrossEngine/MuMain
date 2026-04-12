@@ -1,11 +1,15 @@
 #pragma once
 
 #include "stdafx.h"
+#ifndef __ANDROID__
 #include <windows.h>
 #include <mmsystem.h>
+#endif
 #include "LauncherHelper.h"
 
+#ifndef __ANDROID__
 #pragma comment(lib, "Winmm.lib")
+#endif
 
 class CRegKey{
 public:

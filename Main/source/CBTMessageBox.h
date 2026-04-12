@@ -1,6 +1,7 @@
 #ifndef _CBTMESSAGEBOX_H_
 #define _CBTMESSAGEBOX_H_
 
+#ifndef __ANDROID__
 #include <windows.h>
 
 #pragma warning(disable : 4786)
@@ -39,5 +40,7 @@ namespace leaf {
 		static LRESULT CALLBACK CBTProc(INT nCode, WPARAM wParam, LPARAM lParam);
 	};
 }
+
+#endif // !__ANDROID__
 
 #endif // _CBTMESSAGEBOX_H_

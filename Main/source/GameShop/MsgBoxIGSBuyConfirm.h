@@ -71,7 +71,7 @@ public:
 	bool Update();
 	bool Render();
 
-	void CMsgBoxIGSBuyConfirm::Initialize(WORD wItemCode, int iPackageSeq, int iDisplaySeq, int iPriceSeq, int iCashType,unicode::t_char* pszName, unicode::t_char* pszPrice, unicode::t_char* pszPeriod);
+	void Initialize(WORD wItemCode, int iPackageSeq, int iDisplaySeq, int iPriceSeq, int iCashType,unicode::t_char* pszName, unicode::t_char* pszPrice, unicode::t_char* pszPeriod);
 	static CALLBACK_RESULT LButtonUp(class CNewUIMessageBoxBase* pOwner, const leaf::xstreambuf& xParam);
 	static CALLBACK_RESULT OKButtonDown(class CNewUIMessageBoxBase* pOwner, const leaf::xstreambuf& xParam);
 	static CALLBACK_RESULT CancelButtonDown(class CNewUIMessageBoxBase* pOwner, const leaf::xstreambuf& xParam);

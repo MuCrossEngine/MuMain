@@ -3,8 +3,10 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "stdafx.h"
+#ifndef __ANDROID__
 #include <gl\gl.h>
 #include <gl\glu.h>
+#endif
 #include <math.h>
 #include "ZzzOpenglUtil.h"
 #include "ZzzBMD.h"

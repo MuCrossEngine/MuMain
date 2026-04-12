@@ -1,3 +1,4 @@
+#ifndef __ANDROID__
 #include "stdafx.h"
 #include "Uploader.h"
 
@@ -133,5 +134,7 @@ int CUploader::UploadFTP(LPCTSTR szLocalFile, LPCTSTR szServerFile)
 		return GetLastError();
 	return 0;
 }
+
+#endif // !__ANDROID__
 
 #pragma comment(lib, "wininet")

@@ -235,7 +235,7 @@ void CMsgBoxIGSBuyConfirm::UnloadImages()
 bool CMsgBoxIGSBuyConfirmLayout::SetLayout()
 {
 	CMsgBoxIGSBuyConfirm* pMsgBox = GetMsgBox();
-	if(false == pMsgBox)
+	if(NULL == pMsgBox)
 		return false;
 	
 	if(false == pMsgBox->Create())

@@ -663,7 +663,7 @@ void M39Kanturu3rd::RenderKanturu3rdAfterObjectMesh(OBJECT* o, BMD* b, bool Extr
 CHARACTER* M39Kanturu3rd::CreateKanturu3rdMonster(int iType, int PosX, int PosY, int Key)
 {
 	if (!IsInKanturu3rd())
-		return false;
+		return nullptr;
 
 	CHARACTER* c = NULL;
 

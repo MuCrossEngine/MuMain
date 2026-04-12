@@ -24,7 +24,7 @@
 #include "CGMProtect.h"
 #include "NewUISystem.h"
 #include "CGMItemEffect.h"
-#include ".\Utilities\Log\muConsoleDebug.h"
+#include "Utilities/Log/muConsoleDebug.h"
 
 int EnableEvent = 0;
 

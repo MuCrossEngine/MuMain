@@ -216,8 +216,8 @@ public:
 	void SetBlockCur(bool Delay);
 	void	DrawBarForm(float PosX, float PosY, float Width, float Height, GLfloat red, GLfloat green, GLfloat blue, GLfloat alpha);
 	bool BtnProcess();
-	bool CB_Interface::CheckWindow(int WindowID);
-	bool CB_Interface::DrawButton(float PosX, float PosY, float SizeButton, int FontSize, const char* ButtonText, float mSizeButtonW = 0.0f, bool IsEnter = false);
+	bool CheckWindow(int WindowID);
+	bool DrawButton(float PosX, float PosY, float SizeButton, int FontSize, const char* ButtonText, float mSizeButtonW = 0.0f, bool IsEnter = false);
 	virtual int DrawFormat(DWORD Color, int PosX, int PosY, int Width, int Align, LPCSTR Text, ...);
 	virtual char* NumberFormat(int Vaule);
 	bool		DrawButtonGUI(int IDGUID, float PosX, float PosY, float SizeW, float SizeH, int TypeButton = 0);

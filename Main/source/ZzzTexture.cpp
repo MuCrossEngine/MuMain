@@ -7,7 +7,7 @@
 #include "./Utilities/Log/ErrorReport.h"
 #include "WSclient.h"
 #include "DSPlaySound.h"
-#include "Jpeglib.h"
+#include <turbojpeg/jpeglib.h>
 #include "ProtocolSend.h"
 
 CGlobalBitmap Bitmaps;

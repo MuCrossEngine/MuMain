@@ -28,8 +28,9 @@
 #pragma warning( disable : 26819 )
 
 // Exclude rarely-used stuff from Windows headers
-#define WIN32_LEAN_AND_MEAN	
-	
+#ifndef __ANDROID__
+#define WIN32_LEAN_AND_MEAN
+
 #ifndef _USE_32BIT_TIME_T
 	#define _USE_32BIT_TIME_T
 #endif //_USE_32BIT_TIME_T
@@ -45,19 +46,22 @@
 #include <WinSock2.h>
 #include <mmsystem.h>
 #include <shellapi.h>
+#endif // __ANDROID__
 
 //c runtime
 #include <stdio.h>
 #include <stdlib.h>
 #include <malloc.h>
 #include <memory.h>
+#ifndef __ANDROID__
 #include <tchar.h>
-#include <assert.h>
 #include <mbstring.h>
+#include <conio.h>
+#endif // __ANDROID__
+#include <assert.h>
 #include <time.h>
 #include <math.h>
 #include <stdarg.h>
-#include <conio.h>
 
 #include <string>
 #include <list>
@@ -74,21 +78,33 @@
 #include <cmath>
 #include <fstream>
 #include <unordered_map>
+#ifndef __ANDROID__
 #pragma warning( pop )
-
+#endif
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
+
 //opengl
+#ifdef __ANDROID__
+#include "Platform/GLFixedFunctionStubs.h"
+#else
 #include <gl/glew.h>
 #include <gl/gl.h>
+#endif // __ANDROID__
 
 #ifndef MAIN_UPDATE
 #define MAIN_UPDATE 603
 #endif //_USE_32BIT_TIME_T
 //patch
 //winmain
+#ifndef __ANDROID__
 #include "Winmain.h"
+#else
+#include "Platform/AndroidWin32Compat.h"
+#include "Platform/WinsockAndroidCompat.h"
+#include "Winmain.h"
+#endif
 #include "Defined_Global.h"
 
 //client
@@ -101,7 +117,12 @@
 #include "_GlobalFunctions.h"
 
 #include "imgui.h"
+#ifndef __ANDROID__
 #include "WINHANDLE.h"
+#else
+#include "WINHANDLE.h"
+#include "Platform/Win32SecondaryStubs.h"
+#endif
 
 #include "_TextureIndex.h"
 #include "InfoHelperFunctions.h"

@@ -45,7 +45,7 @@ CHARACTER* CGM_PK_Field::CreateMonster(int iType, int PosX, int PosY, int Key)
 {
 	if (!gMapManager->IsPKField())
 	{
-		return false;
+		return nullptr;
 	}
 
 	CHARACTER* pCharacter = NULL;

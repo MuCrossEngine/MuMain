@@ -206,9 +206,9 @@ namespace SEASON3B
 
 		template<typename T>
 		void ClearMap(T& map) {
-			for (T::iterator& pair = map.begin(); pair != map.end(); pair++)
+			for (typename T::iterator it = map.begin(); it != map.end(); ++it)
 			{
-				SAFE_DELETE(pair->second);
+				SAFE_DELETE(it->second);
 			}
 			map.clear();
 		};

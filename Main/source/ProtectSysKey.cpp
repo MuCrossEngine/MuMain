@@ -1,3 +1,17 @@
+#ifdef __ANDROID__
+#include "stdafx.h"
+#include "ProtectSysKey.h"
+
+bool ProtectSysKey::AttachProtectSysKey(HINSTANCE, HWND)
+{
+	return true;
+}
+
+void ProtectSysKey::DetachProtectSysKey()
+{
+}
+
+#else
 #include "stdafx.h"
 #include "ProtectSysKey.h"
 
@@ -81,3 +95,5 @@ LRESULT CALLBACK ProtectSysKey::CProtectSysKey::LowLevelKeyHookProc(int nCode, W
 
 	return CallNextHookEx(NULL, nCode, wParam, lParam);
 }
+
+#endif // __ANDROID__

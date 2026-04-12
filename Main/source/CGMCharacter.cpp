@@ -43,5 +43,5 @@ CHARACTER* CGMCharacter::GetDummyCharacter()
 
 int CGMCharacter::GetCharacterIndex(CHARACTER* pCha)
 {
-	return ((int)pCha - (int)&CharactersClient[0]) / sizeof(CHARACTER);
+	return static_cast<int>(pCha - &CharactersClient[0]);
 }

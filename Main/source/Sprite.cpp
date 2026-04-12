@@ -9,7 +9,9 @@
 
 #include "ZzzOpenglUtil.h"
 
+#ifndef __ANDROID__
 #include <crtdbg.h>
+#endif
 
 CSprite::CSprite()
 {

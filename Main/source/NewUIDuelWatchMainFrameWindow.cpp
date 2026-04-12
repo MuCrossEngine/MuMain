@@ -105,7 +105,7 @@ bool CNewUIDuelWatchMainFrameWindow::Render()
 		return true;
 
 #if MAIN_UPDATE > 303
-	POINT ptOrigin = { ((gwinhandle->GetScreenX() - 640.0) / 2.0), (long)(gwinhandle->GetScreenY() - 51.f) };
+	POINT ptOrigin = { (long)((gwinhandle->GetScreenX() - 640.0) / 2.0), (long)(gwinhandle->GetScreenY() - 51.f) };
 
 	g_pRenderText->SetFont(g_hFontBold);
 	g_pRenderText->RenderText(ptOrigin.x + 320 - 80, ptOrigin.y + 36, g_DuelMgr.GetDuelPlayerID(DUEL_HERO), 55, 0, RT3_SORT_CENTER);
@@ -364,7 +364,7 @@ void CNewUIDuelWatchMainFrameWindow::RenderFrame()
 		x = 0.f;
 		width = 256.f; height = 51.f;
 
-		POINT ptOrigin = { ((gwinhandle->GetScreenX() - 640.0) / 2.0), (long)(gwinhandle->GetScreenY() - 51.f) };
+		POINT ptOrigin = { (long)((gwinhandle->GetScreenX() - 640.0) / 2.0), (long)(gwinhandle->GetScreenY() - 51.f) };
 
 		SEASON3B::RenderImage(IMAGE_DUELWATCH_MAINFRAME_BACK1, ptOrigin.x + x, ptOrigin.y, width, height);
 		width = 128.f;

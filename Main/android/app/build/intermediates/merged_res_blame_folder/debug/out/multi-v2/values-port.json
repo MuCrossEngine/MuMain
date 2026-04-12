@@ -1,0 +1,19 @@
+{
+    "logs": [
+        {
+            "outputFile": "com.mucrossengine.client.app-mergeDebugResources-18:/values-port/values-port.xml",
+            "map": [
+                {
+                    "source": "/Users/bramante/.gradle/caches/transforms-3/3c138dc996c1c9ed9736cbf328ef5a0d/transformed/appcompat-1.6.1/res/values-port/values-port.xml",
+                    "from": {
+                        "startLines": "2",
+                        "startColumns": "4",
+                        "startOffsets": "55",
+                        "endColumns": "55",
+                        "endOffsets": "106"
+                    }
+                }
+            ]
+        }
+    ]
+}

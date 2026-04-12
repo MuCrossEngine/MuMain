@@ -4,7 +4,9 @@
 
 #pragma once
 
+#ifndef __ANDROID__
 #include <windows.h>
+#endif
 
 namespace SEASON3B
 {

@@ -413,7 +413,7 @@ CQueue<T>::~CQueue()
 template <class T>
 BOOL CQueue<T>::Insert( T NewElement)
 {
-	if ( NULL == AddTail( NewElement))
+	if ( NULL == this->AddTail( NewElement))
 	{	// 실패하면
 		return ( FALSE);
 	}
@@ -424,19 +424,19 @@ BOOL CQueue<T>::Insert( T NewElement)
 template <class T>
 T CQueue<T>::Remove( void)
 {
-	return( RemoveHead());
+	return( this->RemoveHead());
 }
 
 template <class T>
 void CQueue<T>::CleanUp( void)
 {
-	RemoveAll();
+	this->RemoveAll();
 }
 
 template <class T>
 BOOL CQueue<T>::Find( T Element)
 {
-	if ( NULL == FindNode( Element))
+	if ( NULL == this->FindNode( Element))
 	{	// 찾지 못하면
 		return ( FALSE);
 	}
@@ -506,8 +506,8 @@ class CBTree
 		CBNode<T, S>* m_pHead;
 
 		void RemoveFrom( CBNode<T, S>* pNode);
-		void CycleFrom( CBNode<T, S>* pNode, DWORD dwParam);
-		void ( *m_Process)( T Data, S CompValue, DWORD dwParam);
+		void CycleFrom( CBNode<T, S>* pNode, UINT_PTR dwParam);
+		void ( *m_Process)( T Data, S CompValue, UINT_PTR dwParam);
 
 	public:
 		CBTree();	// Constructor
@@ -535,7 +535,7 @@ class CBTree
 		T& GetData( CBNode<T, S>* pNode);
 		S GetValue( CBNode<T, S>* pNode);
 
-		void Cycle( void ( *Process)( T Data, S CompValue, DWORD dwParam), DWORD dwParam);
+		void Cycle( void ( *Process)( T Data, S CompValue, UINT_PTR dwParam), UINT_PTR dwParam);
 
 	protected:
 		void CopyFrom( CBNode<T, S>* pNode);
@@ -884,7 +884,7 @@ S CBTree<T, S>::GetValue( CBNode<T, S>* pNode)
 }
 
 template <class T, class S>
-void CBTree<T, S>::Cycle( void ( *Process)( T Data, S CompValue, DWORD dwParam), DWORD dwParam)
+void CBTree<T, S>::Cycle( void ( *Process)( T Data, S CompValue, UINT_PTR dwParam), UINT_PTR dwParam)
 {
 	m_Process = Process;
 
@@ -907,7 +907,7 @@ void CBTree<T, S>::Cycle( void ( *Process)( T Data, S CompValue, DWORD dwParam),
 }
 
 template <class T, class S>
-void CBTree<T, S>::CycleFrom( CBNode<T, S>* pNode, DWORD dwParam)
+void CBTree<T, S>::CycleFrom( CBNode<T, S>* pNode, UINT_PTR dwParam)
 {
 	if ( pNode->GetLeft() != NULL)
 	{
@@ -944,12 +944,12 @@ BOOL CBTree<T, S>::Optimize( void)
 }
 
 template <class T, class S>
-void ProcessGetOptimizeList( T Data, S CompValue, DWORD dwParam)
+void ProcessGetOptimizeList( T Data, S CompValue, UINT_PTR dwParam)
 {
-	DWORD *pdwParam = ( DWORD *)dwParam;
-	long *pCount = ( long*)pdwParam[0];
-	T *pData = ( T *)pdwParam[1];
-	S *pCompValue = ( S *)pdwParam[2];
+	UINT_PTR* pdwParam = (UINT_PTR*)dwParam;
+	long* pCount = (long*)pdwParam[0];
+	T* pData = (T*)pdwParam[1];
+	S* pCompValue = (S*)pdwParam[2];
 	pData[*pCount] = Data;
 	pCompValue[( *pCount)++] = CompValue;
 }
@@ -958,8 +958,8 @@ template <class T, class S>
 BOOL CBTree<T, S>::GetOptimizeList( T *pData, S *pCompValue)
 {
 	long lOptimizeCount = 0;
-	DWORD dwOptimizeData[3] = { ( DWORD)&lOptimizeCount, ( DWORD)pData, ( DWORD)pCompValue};
-	Cycle( ProcessGetOptimizeList, ( DWORD)dwOptimizeData);
+	UINT_PTR dwOptimizeData[3] = { (UINT_PTR)&lOptimizeCount, (UINT_PTR)pData, (UINT_PTR)pCompValue};
+	Cycle( ProcessGetOptimizeList, (UINT_PTR)dwOptimizeData);
 	if ( GetCount() != lOptimizeCount)
 	{
 		return ( FALSE);
@@ -1035,11 +1035,12 @@ void CDimension<T>::CheckDimensionSize( int nIndex)
 {
 	if ( nIndex >= m_nSize)
 	{
-		for ( int nNewSize = m_nSize; nNewSize <= nIndex; nNewSize *= 2)
+		int nNewSize = m_nSize;
+		for ( ; nNewSize <= nIndex; nNewSize *= 2)
 		{
 		}
 
-		T *pTempBuffer = new T [m_nSize];
+		T* pTempBuffer = new T [m_nSize];
 		memcpy( pTempBuffer, m_pData, m_nSize * sizeof ( T));
 		delete [] m_pData;
 		m_pData = new T [nNewSize];

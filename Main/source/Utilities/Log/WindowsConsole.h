@@ -3,6 +3,7 @@
 
 #pragma once
 
+#ifndef __ANDROID__
 #include <windows.h>
 #include "./Time/Timer.h"
 
@@ -104,5 +105,7 @@ namespace leaf {
 	};
 	
 }
+
+#endif // !__ANDROID__
 
 #endif	// _WINDOWSCONSOLE_H_

@@ -4,8 +4,10 @@
 #include "CGMEffectHandle.h"
 #include "MonkSystem.h"
 
+#ifndef __ANDROID__
 #include "imgui_impl_win32.h"
 #include "imgui_impl_opengl2.h"
+#endif
 
 #ifdef EFFECT_MNG_HANDLE
 
@@ -134,8 +136,10 @@ void SEASON3B::CGFxEffectHandle::SetButtonInfo()
 void SEASON3B::CGFxEffectHandle::RenderFrame()
 {
 	// Iniciar frame de ImGui
+#ifndef __ANDROID__
 	ImGui_ImplOpenGL2_NewFrame();
 	ImGui_ImplWin32_NewFrame();
+#endif
 	// Iniciar frame de ImGui
 	ImGui::NewFrame();
 
@@ -172,7 +176,9 @@ void SEASON3B::CGFxEffectHandle::RenderFrame()
 
 	ImGui::Render();
 
+#ifndef __ANDROID__
 	ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());
+#endif
 
 	//------------------
 	if (selectedItem != -1)

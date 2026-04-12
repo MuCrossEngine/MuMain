@@ -42,7 +42,7 @@ public:
 		if (!initialize) return 0.0f;
 		auto currentTime = std::chrono::steady_clock::now();
 		auto elapsedTime = std::chrono::duration<float>(currentTime - lastCheckTime).count();
-		return min((elapsedTime / interval.count()), 1.0f);
+		return (std::min)((elapsedTime / interval.count()), 1.0f);
 	}
 
 	bool hasElapsed() {

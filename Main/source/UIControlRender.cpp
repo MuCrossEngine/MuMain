@@ -102,9 +102,27 @@ void CUICheckBox::SetChecked(bool checked)
 bool render_widget_color(float RenderFrameX, float RenderFrameY, float RenderSizeX, DWORD* col)
 {
 	ImGui::SetCursorPos(ImVec2(RenderFrameX * g_fScreenRate_x, RenderFrameY * g_fScreenRate_y));
-	if(RenderSizeX != 0)
+	if (RenderSizeX != 0)
 		ImGui::PushItemWidth(RenderSizeX * g_fScreenRate_x);
-	return ImGui::ColorEdit3("##", col, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_PickerMask_);
+
+	float rgb[3] =
+	{
+		(float)(*col & 0xFF) / 255.0f,
+		(float)((*col >> 8) & 0xFF) / 255.0f,
+		(float)((*col >> 16) & 0xFF) / 255.0f
+	};
+
+	const bool changed = ImGui::ColorEdit3("##", rgb, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_PickerMask_);
+	if (changed)
+	{
+		const DWORD a = (*col & 0xFF000000);
+		const DWORD r = (DWORD)(rgb[0] * 255.0f) & 0xFF;
+		const DWORD g = (DWORD)(rgb[1] * 255.0f) & 0xFF;
+		const DWORD b = (DWORD)(rgb[2] * 255.0f) & 0xFF;
+		*col = a | r | (g << 8) | (b << 16);
+	}
+
+	return changed;
 }
 
 void RenderLabel(float RenderFrameX, float RenderFrameY, bool bullet, ImU32 col_black, const char* fmt, ...)

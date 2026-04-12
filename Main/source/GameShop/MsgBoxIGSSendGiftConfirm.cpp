@@ -244,7 +244,7 @@ void CMsgBoxIGSSendGiftConfirm::UnloadImages()
 bool CMsgBoxIGSSendGiftConfirmLayout::SetLayout()
 {
 	CMsgBoxIGSSendGiftConfirm* pMsgBox = GetMsgBox();
-	if(false == pMsgBox)
+	if(NULL == pMsgBox)
 		return false;
 	
 	if(false == pMsgBox->Create())

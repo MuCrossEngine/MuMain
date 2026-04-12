@@ -1,3 +1,4 @@
+#ifndef __ANDROID__  // Windows exception handler not applicable on Android
 #include "stdafx.h"
 
 #include "ExceptionHandler.h"
@@ -478,4 +479,7 @@ const DMPCALLSTACKFRAME* CDmpFileLoader::GetCallStackFrame(int index) const
 	if(index >=0 && index < (int)GetStackDepth())
 		return m_listStackFrame[index];
 	return NULL;
+}
+
+#endif // !__ANDROID__
 }

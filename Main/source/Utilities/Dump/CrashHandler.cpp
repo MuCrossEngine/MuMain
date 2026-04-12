@@ -1,3 +1,4 @@
+#ifndef __ANDROID__
 #include "stdafx.h"
 
 #include "CrashHandler.h"
@@ -766,4 +767,6 @@ void CCrashHandler::WriteCrashLog(LPCTSTR szFormat, ...)
 
 		m_pLogger->Write(szLine);
 	}
+
+#endif // !__ANDROID__
 }

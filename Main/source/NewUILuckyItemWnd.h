@@ -25,7 +25,7 @@ namespace SEASON3B
 		float	s_fWid;
 		float	s_fHgt;
 		int		s_nImgIndex;
-		void sImgList::Set( int _nIndex, float _fWid, float _fHgt )
+		void Set( int _nIndex, float _fWid, float _fHgt )
 		{
 			s_nImgIndex	= _nIndex;
 			s_fWid		= _fWid;

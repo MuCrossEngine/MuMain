@@ -87,6 +87,14 @@ bool isKoreanChar(FT_ULong charcode)
 
 void CGMFontLayer::runtime_font_property(HDC hdc, HFONT hFont, DWORD dwTable, FT_Library library, BitmapFont* FontType, int FontIndex, int PixelSize)
 {
+#ifdef __ANDROID__
+	// On Android there is no GDI; fall back to the file-based FreeType path.
+	// NotoSans-Regular.ttf must be bundled in assets/fonts/ and copied to the
+	// data directory on first run (or loaded via AAssetManager if needed).
+	const char* fallbackFont = "Data/Interface/HUD/fonts/NotoSans-Regular.ttf";
+	runtime_font_property(fallbackFont, library, FontType, FontIndex, PixelSize);
+	return;
+#else
 	TEXTMETRICW tm;
 
 	SelectObject(hdc, hFont);
@@ -289,6 +297,7 @@ void CGMFontLayer::runtime_font_property(const char* file_base, FT_Library libra
 	runtime_load_bitmap(&FontType->BitmapIndex, FontType->output_width, FontType->output_hight, FontType->PakBuffer.data());
 
 	FT_Done_Face(face);
+#endif // __ANDROID__
 }
 
 void CGMFontLayer::runtime_font_property(HFONT hFont, int PixelSize)
@@ -304,7 +313,11 @@ void CGMFontLayer::runtime_font_property(HFONT hFont, int PixelSize)
 
 	bool font_chinase = GetPrivateProfileInt("SettingsFont", "font-chinase", 0, ".\\config.ini");
 
+#ifndef __ANDROID__
 	HDC hdc = GetDC(NULL);
+#else
+	HDC hdc = (HDC)nullptr; // unused on Android
+#endif
 
 	Characters.clear();
 
@@ -336,7 +349,9 @@ void CGMFontLayer::runtime_font_property(HFONT hFont, int PixelSize)
 
 	FT_Done_FreeType(library);
 
+#ifndef __ANDROID__
 	DeleteDC(hdc);
+#endif
 }
 
 BOOL CGMFontLayer::_GetTextExtentPoint32(std::wstring wstrText, LPSIZE lpSize)

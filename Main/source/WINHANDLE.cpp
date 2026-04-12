@@ -1,3 +1,4 @@
+#ifndef __ANDROID__
 #include "stdafx.h"
 #include "resource.h"
 #include "ThemidaSDK.h"
@@ -94,15 +95,15 @@ HWND CWINHANDLE::Create(HINSTANCE hCurrentInst, mu_uint32 RenderSizeX, mu_uint32
 
 		this->hWnd = CreateWindow(
 			windowName,                    // Nombre de la clase
-			windowName,         // Título de la ventana
-			WS_POPUP | WS_VISIBLE,        // Estilo de la ventana (sin bordes, ni título)
-			0, 0,                         // Posición de la ventana (top-left corner)
+			windowName,         // Tï¿½tulo de la ventana
+			WS_POPUP | WS_VISIBLE,        // Estilo de la ventana (sin bordes, ni tï¿½tulo)
+			0, 0,                         // Posiciï¿½n de la ventana (top-left corner)
 			RenderSizeX,
-			RenderSizeY,    // Tamaño de la ventana (ancho y alto)
+			RenderSizeY,    // Tamaï¿½o de la ventana (ancho y alto)
 			NULL,                         // Handle de la ventana padre
-			NULL,                         // Handle del menú
+			NULL,                         // Handle del menï¿½
 			hCurrentInst,                    // Handle de la instancia
-			NULL                          // Parámetros de creación
+			NULL                          // Parï¿½metros de creaciï¿½n
 		);
 	}
 
@@ -475,7 +476,7 @@ LONG CWINHANDLE::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 				gwinhandle->Change_State(false);
 				break;
 			case WM_RBUTTONDOWN:
-				// Mostrar menú contextual si lo necesitas
+				// Mostrar menï¿½ contextual si lo necesitas
 				break;
 			}
 		}
@@ -705,4 +706,7 @@ LONG CWINHANDLE::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	}
 
 	return DefWindowProc(hwnd, msg, wParam, lParam);
+}
+
+#endif // !__ANDROID__
 }

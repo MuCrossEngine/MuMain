@@ -69,7 +69,7 @@ namespace SEASON3A
 		void Reset();
 		void SetItem(ITEM * pItem, DWORD dwMixValue);
 
-		bool IsSameItem(CMixItem & rhs)
+		bool IsSameItem(const CMixItem & rhs) const
 		{
 			return (m_sType == rhs.m_sType && m_iLevel == rhs.m_iLevel &&
 				(m_bCanStack || m_iDurability == rhs.m_iDurability) && m_iOption == rhs.m_iOption &&

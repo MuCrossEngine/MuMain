@@ -5,8 +5,10 @@
 #include "ZzzInterface.h"
 #include "NewUICommonMessageBox.h"
 #include "UIControlRender.h"
+#ifndef __ANDROID__
 #include "imgui_impl_win32.h"
 #include "imgui_impl_opengl2.h"
+#endif
 #include "CGMRenderGroupMesh.h"
 #include "NewUISystem.h"
 #include "Utilities/Log/muConsoleDebug.h"
@@ -684,8 +686,10 @@ void CGMRenderGroupMesh::runtime_make_interface()
 
 	SEASON3B::RenderLocalItem3D(RenderFrameX + 44.f, RenderFrameY + 108.f, 84.f, 117.f, (&edit_mesh)->Index, (item_level << 3));
 
+#ifndef __ANDROID__
 	ImGui_ImplOpenGL2_NewFrame();
 	ImGui_ImplWin32_NewFrame();
+#endif
 
 	ImGui::NewFrame();
 	ImGui::SetNextWindowPos(ImVec2(RenderFrameX * g_fScreenRate_x, RenderFrameY * g_fScreenRate_y));
@@ -695,13 +699,15 @@ void CGMRenderGroupMesh::runtime_make_interface()
 
 	ImGui::Begin("RenderMesh", &GraphicImage, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBackground);
 
-	render_widget_color(202.f, 136.f, 76.0, &(&edit_mesh)->BodyLight);
+	render_widget_color(202.f, 136.f, 76.0, &((&edit_mesh)->BodyLight));
 
 	ImGui::End();
 
 	ImGui::Render();
 
+#ifndef __ANDROID__
 	ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());
+#endif
 }
 
 void CGMRenderGroupMesh::runtime_make_text(float RenderFrameX, float RenderFrameY)

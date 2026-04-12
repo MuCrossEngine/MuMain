@@ -124,7 +124,7 @@ bool M34CryingWolf2nd::RenderCryingWolf2ndObjectMesh(OBJECT* pObject, BMD* pMode
 CHARACTER* M34CryingWolf2nd::CreateCryingWolf2ndMonster(int iType, int PosX, int PosY, int Key)
 {
 	if(!IsCyringWolf2nd())
-		return false;
+		return nullptr;
 	CHARACTER* pCharacter = NULL;
 	
 	switch(iType)

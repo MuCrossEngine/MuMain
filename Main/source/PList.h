@@ -5,7 +5,9 @@
 #ifndef _PLIST_H_
 #define _PLIST_H_
 
+#ifndef __ANDROID__
 #include <windows.h>
+#endif
 
 struct NODE
 {

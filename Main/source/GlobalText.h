@@ -5,6 +5,7 @@
 #pragma once
 
 #include "stringset.h"
+extern void BuxConvert(BYTE* pbyBuffer, int Size);
 
 template <class T>
 class TGlobalText
@@ -101,7 +102,7 @@ public:
 
 			if( CheckLoadDisposition(GTStringHeader.dwKey, dwLoadDisposition) || GTStringHeader.dwKey < MAX_NUMBER_OF_TEXTS)
 			{
-				BuxConvert((BYTE*)pStringBuffer, sizeof(T)*GTStringHeader.dwSizeOfString);		//. decoding
+					::BuxConvert((BYTE*)pStringBuffer, sizeof(T)*GTStringHeader.dwSizeOfString);		//. decoding
 				pStringBuffer[GTStringHeader.dwSizeOfString] = '\0';
 				m_StringSet.Add(GTStringHeader.dwKey, pStringBuffer);
 			}
@@ -140,7 +141,7 @@ public:
 			T* pStringBuffer = new T[GTStringHeader.dwSizeOfString];
 			memcpy(pStringBuffer, m_StringSet[key], sizeof(T)*GTStringHeader.dwSizeOfString);
 			
-			BuxConvert((BYTE*)pStringBuffer, sizeof(T)*GTStringHeader.dwSizeOfString);		//. encoding
+			::BuxConvert((BYTE*)pStringBuffer, sizeof(T)*GTStringHeader.dwSizeOfString);		//. encoding
 			fwrite(pStringBuffer, sizeof(T), GTStringHeader.dwSizeOfString, fp);
 			
 			delete [] pStringBuffer;

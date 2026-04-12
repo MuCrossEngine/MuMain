@@ -328,7 +328,7 @@ void CMsgBoxIGSBuyPackageItem::ReleaseListBox()
 bool CMsgBoxBuyPackageItemLayout::SetLayout()
 {
 	CMsgBoxIGSBuyPackageItem* pMsgBox = GetMsgBox();
-	if(false == pMsgBox)
+	if(NULL == pMsgBox)
 		return false;
 	
 	if(false == pMsgBox->Create())

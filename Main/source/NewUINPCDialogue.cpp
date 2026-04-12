@@ -5,7 +5,9 @@
 #include "stdafx.h"
 #include "NewUINPCDialogue.h"
 #include "wsclientinline.h"
+#ifndef __ANDROID__
 #include "CRTDBG.h"
+#endif
 
 using namespace SEASON3B;
 

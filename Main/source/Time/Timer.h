@@ -7,17 +7,31 @@
 
 #pragma once
 
+#ifndef __ANDROID__
 #include <windows.h>
+#else
+#include <stdint.h>
+typedef int     BOOL;
+typedef unsigned int DWORD;
+#define TRUE  1
+#define FALSE 0
+#endif
 
-class CTimer  
+class CTimer
 {
-	BOOL	m_bUsePerformanceCounter;	// use performance counter or multimedia timer?
-	DWORD	m_mmTimerStart;		// Multimedia timer variables for start times
-	DWORD	m_mmAbsTimerStart;	// 최초로 MM Timer가 생성된 시간
-	float	m_resolution;		// Timer resolution for performance counter timer
-	__int64	m_pcTimerStart;		// Performance counter timer variables for start times
-	__int64	m_pcAbsTimerStart;	// 최초로 PC Timer가 생성된 시간
-	__int64	m_frequency;		// Time frequency for performance counter timer
+	BOOL	m_bUsePerformanceCounter;
+	DWORD	m_mmTimerStart;
+	DWORD	m_mmAbsTimerStart;
+	float	m_resolution;
+#ifdef __ANDROID__
+	int64_t	m_pcTimerStart;
+	int64_t	m_pcAbsTimerStart;
+	int64_t	m_frequency;
+#else
+	__int64	m_pcTimerStart;
+	__int64	m_pcAbsTimerStart;
+	__int64	m_frequency;
+#endif
 
 public:
 	CTimer();

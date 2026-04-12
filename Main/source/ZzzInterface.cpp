@@ -3,7 +3,9 @@
 
 #include "stdafx.h"
 #include "CGMProtect.h"
+#ifndef __ANDROID__
 #include <imm.h>
+#endif
 #include "UIManager.h"
 #include "ZzzOpenglUtil.h"
 #include "ZzzBMD.h"
@@ -1357,8 +1359,8 @@ int	getTargetCharacterKey(CHARACTER* c, int selected, int Key)
 
 void LetHeroStop(CHARACTER* pCharacter, BOOL bSetMovementFalse)
 {
-	BYTE PathX[1] = { (Hero->PositionX) };
-	BYTE PathY[1] = { (Hero->PositionY) };
+	BYTE PathX[1] = { (BYTE)(Hero->PositionX) };
+	BYTE PathY[1] = { (BYTE)(Hero->PositionY) };
 
 	SendCharacterMove(Hero->Key, Hero->Object.Angle[2], 1, PathX, PathY, TargetX, TargetY);
 
@@ -3710,7 +3712,7 @@ bool CheckCommand(char* Text, bool bMacroText)
 			}
 			return true;
 		}
-		if (strstr(Text, GlobalText[1118]) > 0 || strstr(Text, "/purchase") > 0)
+		if (strstr(Text, GlobalText[1118]) != NULL || strstr(Text, "/purchase") != NULL)
 		{
 			if (gMapManager->InChaosCastle() == true)
 			{
@@ -4959,8 +4961,8 @@ void AttackKnight(CHARACTER* c, int Skill, float Distance)
 
 						if (CheckTile(c, TargetX, TargetY, Distance))
 						{
-							BYTE PathX[1] = { (c->PositionX) };
-							BYTE PathY[1] = { (c->PositionY) };
+							BYTE PathX[1] = { (BYTE)(c->PositionX) };
+							BYTE PathY[1] = { (BYTE)(c->PositionY) };
 							SendCharacterMove(c->Key, o->Angle[2], 1, &PathX[0], &PathY[0], TargetX, TargetY);
 
 							BYTE byValue = GetDestValue(c->PositionX, c->PositionY, TargetX, TargetY);
@@ -4988,8 +4990,8 @@ void AttackKnight(CHARACTER* c, int Skill, float Distance)
 					o->Angle[2] = CreateAngle(o->Position[0], o->Position[1], c->TargetPosition[0], c->TargetPosition[1]);
 					if (CheckTile(c, TargetX, TargetY, Distance))
 					{
-						BYTE PathX[1] = { (c->PositionX) };
-						BYTE PathY[1] = { (c->PositionY) };
+						BYTE PathX[1] = { (BYTE)(c->PositionX) };
+						BYTE PathY[1] = { (BYTE)(c->PositionY) };
 						SendCharacterMove(c->Key, o->Angle[2], 1, &PathX[0], &PathY[0], TargetX, TargetY);
 
 						BYTE byValue = GetDestValue(c->PositionX, c->PositionY, TargetX, TargetY);
@@ -5222,8 +5224,8 @@ void AttackKnight(CHARACTER* c, int Skill, float Distance)
 			{
 			LABEL_93:
 				o->Angle[2] = CreateAngle(o->Position[0], o->Position[1], c->TargetPosition[0], c->TargetPosition[1]);
-				BYTE PathX[1] = { (c->PositionX) };
-				BYTE PathY[1] = { (c->PositionY) };
+				BYTE PathX[1] = { (BYTE)(c->PositionX) };
+				BYTE PathY[1] = { (BYTE)(c->PositionY) };
 				SendCharacterMove(c->Key, o->Angle[2], 1, &PathX[0], &PathY[0], TargetX, TargetY);
 
 				WORD TKey = 0xffff;
@@ -5253,8 +5255,8 @@ void AttackKnight(CHARACTER* c, int Skill, float Distance)
 					o->Angle[2] = CreateAngle(o->Position[0], o->Position[1], c->TargetPosition[0], c->TargetPosition[1]);
 					if (CheckTile(c, TargetX, TargetY, Distance))
 					{
-						BYTE PathX[1] = { (c->PositionX) };
-						BYTE PathY[1] = { (c->PositionY) };
+						BYTE PathX[1] = { (BYTE)(c->PositionX) };
+						BYTE PathY[1] = { (BYTE)(c->PositionY) };
 						SendCharacterMove(c->Key, o->Angle[2], 1, &PathX[0], &PathY[0], TargetX, TargetY);
 
 						BYTE byValue = GetDestValue(c->PositionX, c->PositionY, TargetX, TargetY);
@@ -5275,8 +5277,8 @@ void AttackKnight(CHARACTER* c, int Skill, float Distance)
 
 					if (CheckTile(c, TargetX, TargetY, Distance))
 					{
-						BYTE PathX[1] = { (c->PositionX) };
-						BYTE PathY[1] = { (c->PositionY) };
+						BYTE PathX[1] = { (BYTE)(c->PositionX) };
+						BYTE PathY[1] = { (BYTE)(c->PositionY) };
 						SendCharacterMove(c->Key, o->Angle[2], 1, &PathX[0], &PathY[0], TargetX, TargetY);
 
 						BYTE byValue = GetDestValue(c->PositionX, c->PositionY, TargetX, TargetY);

@@ -1,0 +1,20 @@
+{
+    "logs": [
+        {
+            "outputFile": "com.mucrossengine.client.app-mergeDebugResources-18:/values-watch-v21/values-watch-v21.xml",
+            "map": [
+                {
+                    "source": "/Users/bramante/.gradle/caches/transforms-3/3c138dc996c1c9ed9736cbf328ef5a0d/transformed/appcompat-1.6.1/res/values-watch-v21/values-watch-v21.xml",
+                    "from": {
+                        "startLines": "2,6,10",
+                        "startColumns": "4,4,4",
+                        "startOffsets": "55,271,499",
+                        "endLines": "5,9,13",
+                        "endColumns": "12,12,12",
+                        "endOffsets": "266,494,724"
+                    }
+                }
+            ]
+        }
+    ]
+}

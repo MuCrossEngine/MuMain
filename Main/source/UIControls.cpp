@@ -539,7 +539,7 @@ void CUITextListBox<T>::Clear()
 template <class T>
 void CUITextListBox<T>::ResetCheckedLine(BOOL bFlag)
 {
-	std::deque<T>::iterator EndIter = m_TextList.end();
+	typename std::deque<T>::iterator EndIter = m_TextList.end();
 	for (m_TextListIter = m_TextList.begin(); m_TextListIter != EndIter; ++m_TextListIter)
 	{
 		m_TextListIter->m_bIsSelected = bFlag;
@@ -549,7 +549,7 @@ void CUITextListBox<T>::ResetCheckedLine(BOOL bFlag)
 template <class T>
 BOOL CUITextListBox<T>::HaveCheckedLine()
 {
-	std::deque<T>::iterator EndIter = m_TextList.end();
+	typename std::deque<T>::iterator EndIter = m_TextList.end();
 	for (m_TextListIter = m_TextList.begin(); m_TextListIter != EndIter; ++m_TextListIter)
 	{
 		if (m_TextListIter->m_bIsSelected == TRUE) return TRUE;
@@ -561,7 +561,7 @@ template <class T>
 int CUITextListBox<T>::GetCheckedLines(std::deque<T*>* pSelectLineList)
 {
 	int iSelectLineNum = 0;
-	std::deque<T>::iterator EndIter = m_TextList.end();
+	typename std::deque<T>::iterator EndIter = m_TextList.end();
 	for (m_TextListIter = m_TextList.begin(); m_TextListIter != EndIter; ++m_TextListIter)
 	{
 		if (m_TextListIter->m_bIsSelected == TRUE)
@@ -620,7 +620,7 @@ typename std::deque<T>::iterator CUITextListBox<T>::SLGetSelectLine()
 	else if (m_iSelectLineNum == 0) return m_TextList.end();
 
 	int iLineCount = 1;
-	for (std::deque<T>::iterator resultIter = m_TextList.begin(); resultIter != m_TextList.end(); ++resultIter, ++iLineCount)
+	for (typename std::deque<T>::iterator resultIter = m_TextList.begin(); resultIter != m_TextList.end(); ++resultIter, ++iLineCount)
 	{
 		if (iLineCount == m_iSelectLineNum) return resultIter;
 	}

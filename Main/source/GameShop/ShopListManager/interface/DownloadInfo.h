@@ -6,7 +6,11 @@
 
 #pragma once
 
+#ifdef __ANDROID__
+#include "Platform/AndroidWin32Compat.h"
+#else
 #include <Wininet.h>
+#endif
 #define DL_DEFAULT_BUFFER_SIZE			4096
 
 typedef enum _DownloaderType

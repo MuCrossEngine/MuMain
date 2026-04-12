@@ -306,7 +306,7 @@ void CMsgBoxIGSSendGift::UnloadImages()
 bool CMsgBoxIGSSendGiftLayout::SetLayout()
 {
 	CMsgBoxIGSSendGift* pMsgBox = GetMsgBox();
-	if(false == pMsgBox)
+	if(NULL == pMsgBox)
 		return false;
 	
 	if(false == pMsgBox->Create())

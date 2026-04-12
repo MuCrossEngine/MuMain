@@ -35,16 +35,21 @@
 #define ERROR_LOAD_SCRIPT					0x07
 #define ERROR_THREAD						0x08
 
+#ifdef __ANDROID__
+#include "Platform/AndroidWin32Compat.h"
+#include "Platform/WinsockAndroidCompat.h"
+#else
 #include <Windows.h>
 #include <Wininet.h>
-#include <vector>
-#include <string>
 #include <tchar.h>
 #include <crtdbg.h>
 #include <strsafe.h>
-#include "GameShop\ShopListManager\interface\WZResult\WZResult.h"
-#include "GameShop\ShopListManager\interface\DownloadInfo.h"
-#include "GameShop\ShopListManager\interface\FileDownloader.h"
+#endif
+#include <vector>
+#include <string>
+#include "GameShop/ShopListManager/interface/WZResult/WZResult.h"
+#include "GameShop/ShopListManager/interface/DownloadInfo.h"
+#include "GameShop/ShopListManager/interface/FileDownloader.h"
 
 #if !defined (INVALID_FILE_ATTRIBUTES) 
 #define INVALID_FILE_ATTRIBUTES ((DWORD)-1) 
@@ -88,4 +93,3 @@ public:
 
 	CListVersionInfo	m_Version;
 };
-

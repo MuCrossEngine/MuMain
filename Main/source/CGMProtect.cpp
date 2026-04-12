@@ -140,6 +140,15 @@ bool CGMProtect::ReadMainFile()
 
 bool CGMProtect::ReadTextFile(char* name) // OK
 {
+#ifdef __ANDROID__
+	FILE* file = fopen(name, "rb");
+	if (!file) return false;
+	fseek(file, 0, SEEK_END);
+	long sz = ftell(file); rewind(file);
+	if ((size_t)sz != sizeof(TEXT_FILE_INFO)) { fclose(file); return false; }
+	fread(&this->m_TextInfo, 1, sizeof(TEXT_FILE_INFO), file);
+	fclose(file);
+#else
 	HANDLE file = CreateFile(name, GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING, FILE_ATTRIBUTE_ARCHIVE, 0);
 
 	if (file == INVALID_HANDLE_VALUE)
@@ -162,6 +171,7 @@ bool CGMProtect::ReadTextFile(char* name) // OK
 		MessageBox(0, "ReadTextFile 2", "Error", MB_OK | MB_ICONERROR);
 		return 0;
 	}
+#endif // __ANDROID__
 
 	for (int n = 0; n < sizeof(TEXT_FILE_INFO); n++)
 	{
@@ -169,8 +179,9 @@ bool CGMProtect::ReadTextFile(char* name) // OK
 		((BYTE*)&this->m_TextInfo)[n] ^= (BYTE)(0xCA ^ LOBYTE(n));
 	}
 
+#ifndef __ANDROID__
 	CloseHandle(file);
-
+#endif
 
 	return 1;
 }
@@ -828,7 +839,7 @@ bool CGMProtect::runtime_create_mutex()
 
 			if (m_hMutex && GetLastError() != ERROR_ALREADY_EXISTS)
 			{
-				return true; // Permitimos ejecutar la aplicación
+				return true; // Permitimos ejecutar la aplicaciï¿½n
 			}
 		}
 	}
@@ -877,7 +888,7 @@ DWORD CGMProtect::GetProcessIDFromMutex(const std::string& mutexName)
 				{
 					if (hDupMutex)
 					{
-						ownerPID = pe.th32ProcessID; // Se encontró el proceso que posee el mutex
+						ownerPID = pe.th32ProcessID; // Se encontrï¿½ el proceso que posee el mutex
 						CloseHandle(hDupMutex);
 						CloseHandle(hProcess);
 						break;
@@ -935,7 +946,7 @@ bool CGMProtect::IsWindows7OrLower()
 			return rovi.dwMajorVersion < 8; // Windows 7 o menor
 		}
 	}
-	return false; // No se pudo obtener la versión, asumimos Windows 8 o superior
+	return false; // No se pudo obtener la versiï¿½n, asumimos Windows 8 o superior
 }
 
 bool CGMProtect::IsWindows11()
@@ -961,7 +972,7 @@ bool CGMProtect::IsRunningInVM()
 {
 	/*int cpuInfo[4] = { 0 };
 
-	// Verificar si Hypervisor está presente
+	// Verificar si Hypervisor estï¿½ presente
 	__cpuid(cpuInfo, 1);
 	if (!(cpuInfo[2] & (1 << 31))) {
 		return false; // No hay hipervisor, no es una VM
@@ -982,7 +993,7 @@ bool CGMProtect::IsRunningInVM()
 		GetSystemInfo(&sysInfo);
 
 		int logicalProcessors = sysInfo.dwNumberOfProcessors;
-		int physicalCores = cpuInfo[1] >> 16 & 0xFF; // Cantidad de núcleos físicos según CPUID
+		int physicalCores = cpuInfo[1] >> 16 & 0xFF; // Cantidad de nï¿½cleos fï¿½sicos segï¿½n CPUID
 
 		if (logicalProcessors > physicalCores * 2)
 		{

@@ -6,8 +6,8 @@
 
 #pragma once
 
-#include "GameShop\ShopListManager\interface\WZResult\WZResult.h"
-#include "GameShop\ShopListManager\interface\DownloadInfo.h"
+#include "GameShop/ShopListManager/interface/WZResult/WZResult.h"
+#include "GameShop/ShopListManager/interface/DownloadInfo.h"
 
 class IConnecter
 {

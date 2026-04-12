@@ -5021,7 +5021,7 @@ void CUITextInputWindow::ReturnText()
 	m_TextInputBox.SetText(NULL);
 	if (pszReturnText[0] == '\0') return;
 
-	g_pWindowMgr->SendUIMessageToWindow(m_dwReturnWindowUIID, UI_MESSAGE_TXTRETURN, GetUIID(), (DWORD)pszReturnText);
+	g_pWindowMgr->SendUIMessageToWindow(m_dwReturnWindowUIID, UI_MESSAGE_TXTRETURN, GetUIID(), (int)(INT_PTR)pszReturnText);
 	g_pWindowMgr->SendUIMessage(UI_MESSAGE_CLOSE, GetUIID(), 0);
 }
 

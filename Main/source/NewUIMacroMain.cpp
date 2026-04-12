@@ -942,35 +942,35 @@ void SEASON3B::CNewUIMacroMain::EventOrderWindows(double WindowsX, double Window
 
 	RenderFrameX -= (WindowsX - m_Pos.x);
 
-	for (MAPE_CHECKBOX::iterator& pair = m_checkBox.begin(); pair != m_checkBox.end(); pair++)
+	for (MAPE_CHECKBOX::iterator pair = m_checkBox.begin(); pair != m_checkBox.end(); pair++)
 	{
 		CCheckBox* element = pair->second;
 		int x = RenderFrameX + (element->GetPos().x - m_Pos.x);
 		element->SetPos(x, element->GetPos().y);
 	}
 
-	for (MAPE_BUTTON::iterator& pair = m_Buttons.begin(); pair != m_Buttons.end(); pair++)
+	for (MAPE_BUTTON::iterator pair = m_Buttons.begin(); pair != m_Buttons.end(); pair++)
 	{
 		CNewUIButton* element = pair->second;
 		int x = RenderFrameX + (element->GetPos().x - m_Pos.x);
 		element->SetPos(x, element->GetPos().y);
 	}
 
-	for (MAPE_TXTINPUT::iterator& pair = m_InputBox.begin(); pair != m_InputBox.end(); pair++)
+	for (MAPE_TXTINPUT::iterator pair = m_InputBox.begin(); pair != m_InputBox.end(); pair++)
 	{
 		CUITextInputBox* element = pair->second;
 		int x = RenderFrameX + (element->GetPosition_x() - m_Pos.x);
 		element->SetPosition(x, element->GetPosition_y());
 	}
 
-	for (MAPE_MACROTXT::iterator& pair = m_stMacroUIText.begin(); pair != m_stMacroUIText.end(); pair++)
+	for (MAPE_MACROTXT::iterator pair = m_stMacroUIText.begin(); pair != m_stMacroUIText.end(); pair++)
 	{
 		stMacroUIText* element = pair->second;
 		int x = RenderFrameX + (element->GetPos().x - m_Pos.x);
 		element->SetPos(x, element->GetPos().y);
 	}
 
-	for (MAPE_MACROIMG::iterator& pair = m_stMacroUIImage.begin(); pair != m_stMacroUIImage.end(); pair++)
+	for (MAPE_MACROIMG::iterator pair = m_stMacroUIImage.begin(); pair != m_stMacroUIImage.end(); pair++)
 	{
 		stMacroUIImage* element = pair->second;
 		int x = RenderFrameX + (element->GetPos().x - m_Pos.x);

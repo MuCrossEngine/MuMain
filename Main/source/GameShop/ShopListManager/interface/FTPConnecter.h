@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "GameShop\ShopListManager\interface\IConnecter.h"
+#include "GameShop/ShopListManager/interface/IConnecter.h"
 
 class FTPConnecter : public IConnecter
 {

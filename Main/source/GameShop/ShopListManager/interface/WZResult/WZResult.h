@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "GameShop\ShopListManager\interface\WZResult\ErrorCodeDefine.h"
+#include "GameShop/ShopListManager/interface/WZResult/ErrorCodeDefine.h"
 #define	MAX_ERROR_MESSAGE	1024
 
 class WZResult
