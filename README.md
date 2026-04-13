@@ -21,13 +21,14 @@ O projeto ja possui base Android com:
 - Build nativo via CMake.
 - Backend OpenGL ES 3.0.
 - Camada de compatibilidade Win32 para grande parte do cliente legado.
+- Build `debug` Android concluido localmente com geracao de APK.
 
 Os principais bloqueios conhecidos no momento sao:
 
-- `JAVA_HOME` nao configurado no ambiente atual, impedindo rodar `gradlew assembleDebug`.
 - Downloader de assets ainda sem transporte HTTP final.
 - Integracao completa de teclado virtual/IME Android ainda pendente.
-- O port ainda depende de iteracoes de compatibilidade em partes da UI legada e de modulos Win32 restantes.
+- Validacao funcional em runtime no dispositivo Android ainda pendente.
+- Ajustes adicionais de UX mobile, entrada de texto e distribuicao de assets ainda sao necessarios para considerar o port pronto para uso final.
 
 ## Build
 
@@ -41,8 +42,25 @@ Os principais bloqueios conhecidos no momento sao:
 - Projeto Gradle: `Main/android`
 - Entrada nativa: `Main/android/app/src/main/cpp/android_main.cpp`
 - Manifesto: `Main/android/app/src/main/AndroidManifest.xml`
+- APK debug gerado: `Main/android/app/build/outputs/apk/debug/app-debug.apk`
+
+Para reproduzir o build local usado nesta etapa:
+
+- `JAVA_HOME`: `D:\Projetos\MuCrossEngine\MuMain\.tools\jdk17\jdk-17.0.18+8`
+- `GRADLE_USER_HOME`: `D:\Projetos\MuCrossEngine\MuMain\Main\android\.gradle-user`
+- `ANDROID_USER_HOME`: `D:\Projetos\MuCrossEngine\MuMain\Main\android\.android-user`
+- `ANDROID_SDK_ROOT`: instalacao local do Android SDK
+- Comando: `gradlew.bat assembleDebug --stacktrace`
 
 ## Changelog
+
+### 2026-04-13
+
+- Atualizado o `.gitignore` para bloquear caches de IDE, Gradle, CMake Android, ferramentas locais e artefatos de build.
+- Registrada a limpeza de artefatos locais em `docs/gitignore-artefatos-locais-2026-04-13.md`.
+- Incluidos no `.gitignore` os novos artefatos locais `Main/android/.android-user/` e `analytics.settings` para evitar poluicao na branch colaborativa.
+- Validado o build Android completo com `assembleDebug`.
+- Confirmada a geracao do APK `Main/android/app/build/outputs/apk/debug/app-debug.apk`.
 
 ### 2026-04-12
 

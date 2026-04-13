@@ -115,3 +115,19 @@ Correcao aplicada em `Main/source/Platform/AndroidWin32Compat.h`:
 Resultado:
 
 - O build Android continua progredindo por blocos de compatibilidade concretos, reduzindo gradualmente as dependencias diretas de Win32.
+
+## Atualizacao complementar: build Android concluido
+
+Na continuidade desta etapa, o ambiente local de build foi estabilizado com diretórios locais para JDK, cache do Gradle e preferencias Android dentro do workspace. Isso eliminou os bloqueios do sandbox e permitiu fechar o pipeline completo do app Android.
+
+Resultado validado:
+
+- `assembleDebug` executado com sucesso.
+- Bibliotecas nativas geradas para `arm64-v8a` e `armeabi-v7a`.
+- APK debug gerado em `Main/android/app/build/outputs/apk/debug/app-debug.apk`.
+
+Estado atual depois da validacao:
+
+- O port Android agora compila e empacota localmente.
+- Os bloqueios restantes deixaram de ser de compilacao e passaram a ser principalmente de runtime, UX mobile e distribuicao de assets.
+- O proximo passo mais importante e testar o APK em dispositivo ou emulador Android para validar inicializacao, entrada de texto, carregamento de dados e estabilidade geral.

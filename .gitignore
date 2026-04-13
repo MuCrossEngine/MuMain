@@ -53,6 +53,9 @@
 .gradle/
 **/.gradle/
 **/.gradle-user/
+**/.android-user/
+analytics.settings
+**/analytics.settings
 local.properties
 
 # Build Android
