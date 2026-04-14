@@ -123,19 +123,21 @@ WZResult 			FileDownloader::CreateConnection()
 {
     DWORD dwMilliseconds = this->m_pServerInfo->GetConnectTimeout();
 
+#ifdef __ANDROID__
+    if(dwMilliseconds > 0)
+    {
+        // Android compat layer does not provide waitable thread HANDLEs.
+        // Keep connection deterministic by using direct synchronous connect.
+        return this->Connection();
+    }
+#endif
+
     if(dwMilliseconds>0)
     {
+#ifndef __ANDROID__
         unsigned int ThreadID = 0;
 
-#ifdef __ANDROID__
-        // On Android use std::thread instead of _beginthreadex
-        std::thread([this](){
-            FileDownloader::RunConnectThread(this);
-        }).detach();
-        HANDLE hHandle = (HANDLE)1; // non-invalid sentinel
-#else
         HANDLE hHandle = (HANDLE)_beginthreadex(0,0,FileDownloader::RunConnectThread,this,0,&ThreadID);
-#endif
 
         if(hHandle==INVALID_HANDLE_VALUE)
         {
@@ -159,6 +161,9 @@ WZResult 			FileDownloader::CreateConnection()
                 CloseHandle(hHandle);
             }
         }
+#else
+        this->m_Result = this->Connection();
+#endif
     }
     else
     {
@@ -214,6 +219,12 @@ WZResult 			FileDownloader::TransferRemoteFile()
 
                 TotalSize += ReadSize;
                 this->SendProgressDownloadFileEvent(TotalSize);
+
+                ReadSize = 0;
+                this->m_Result = this->m_pConnecter->ReadRemoteFile(this->m_hRemoteFile,buffer,&ReadSize);
+
+                if(!this->CanBeContinue())
+                    break;
             }
 
             if(ReadSize==0||this->m_bBreak)

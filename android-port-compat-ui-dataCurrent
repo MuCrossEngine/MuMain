@@ -1,0 +1,52 @@
+ANDROID PORT COMPAT/UI/DATA - CURRENT SNAPSHOT
+Date: 2026-04-14
+
+Build status
+- Native build: ./gradlew ':app:buildCMakeDebug[arm64-v8a]' --no-daemon -> SUCCESS
+- APK build: ./gradlew assembleDebug --no-daemon -> SUCCESS (arm64-v8a + armeabi-v7a)
+
+Compatibility status (current)
+- Android Win32 compat: WinINet HTTP path active (InternetOpen/InternetConnect/HttpOpenRequest/HttpSendRequest/HttpQueryInfo/InternetReadFile).
+- Input bridge: touch->mouse + soft keyboard focus integration active.
+- Game downloader path: reusing original GameShop downloader code path (FileDownloader + HTTPConnecter).
+
+UI/Data status (current)
+- First-run downloader screen is active (basic GLES clear/progress tick).
+- Required files source order:
+  1) remote manifest `Data/assets-manifest.txt` when available,
+  2) local cached manifest,
+  3) fallback minimal list.
+- Manifest parser now accepts legacy/common formats (`path|crc`, `crc path`, `path=...`, `crc=...`) and tolerates extra columns.
+- Remote manifest persistence is now safe: download to `.tmp` and promote only after successful parse.
+- Manifest cache refresh policy active: if local manifest age exceeds 6h, app re-enters downloader flow to recheck remote assets.
+- Package mode active: manifest entries ending in `.zip` (or marked `archive=...`) are downloaded and extracted.
+- Package extraction path is configurable by manifest token `extract=...` and executed via JNI (`MainActivity.extractZipArchive`).
+- Package extraction completion marker active: `<package>.extracted`.
+- Production manifest template published in repo: `docs/assets-server/Data/assets-manifest.txt`.
+- Production manifest generator available: `tools/generate_assets_manifest.sh`.
+- Download writes directly to game data destination under getExternalFilesDir().
+- Optional integrity validation active: if `<arquivo>.crc32` exists on server, app validates CRC32 and rejects mismatches.
+- Asset server URL override active via `MU_ASSET_SERVER`.
+
+Runtime override wiring
+- run_adb_debug.sh passes MU_ASSET_SERVER to activity launch intent extra.
+- MainActivity exposes getAssetServerUrl() to native code.
+- android_main.cpp reads getAssetServerUrl() and calls GameDownloader::SetServerURL().
+
+Pending to continue implementation
+1. Run `tools/generate_assets_manifest.sh` on the real asset tree and publish the generated `Data/assets-manifest.txt`.
+2. Define production policy for mandatory CRC manifests (today sidecar remains optional by design).
+3. Validate package extraction in real device restart/failure scenarios.
+4. Optional: richer downloader UI (text/progress bar).
+5. Optional: in-app fallback settings UI for asset server URL.
+
+Files touched in this cycle
+- Main/source/Platform/GameDownloader.cpp
+- Main/android/app/src/main/cpp/android_main.cpp
+- Main/android/app/src/main/java/com/mucrossengine/client/MainActivity.java
+- tools/generate_assets_manifest.cpp
+- tools/generate_assets_manifest.sh
+- docs/assets-server/Data/assets-manifest.txt
+- ANDROID_PORT.md
+- README.md
+- docs/android-port-compat-ui-2026-04-13.md

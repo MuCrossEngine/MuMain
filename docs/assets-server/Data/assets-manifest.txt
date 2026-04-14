@@ -1,0 +1,28 @@
+# MU Android asset manifest (production example)
+# Path is relative to asset server base URL (MU_ASSET_SERVER).
+# Supported formats by parser:
+#   Data/file.ext|CRC32
+#   Data/file.ext,CRC32
+#   CRC32 Data/file.ext
+#   path=Data/file.ext crc=CRC32
+# Optional keys:
+#   archive=true|1    -> mark as package archive
+#   extract=Data      -> extraction target relative to game base dir
+#   size=...          -> optional metadata (ignored by current parser)
+#
+# IMPORTANT:
+# - CRC can be decimal or hexadecimal (ex: 0x1A2B3C4D).
+# - Keep assets-manifest.txt at Data/assets-manifest.txt on the server.
+# - For package mode, use .zip files and archive=1.
+
+# Minimal required files (non-package)
+Data/av-code45.pak|0x00000000
+Data/Local/Connect.msil|0x00000000
+
+# Example package entries (zip + extraction)
+Data/packs/core-data.zip|0x00000000|archive=1|extract=Data|size=0
+Data/packs/effects.zip,0x00000000,archive=true,extract=Data/Effect,size=0
+0x00000000 Data/packs/models.zip archive=1 extract=Data
+
+# Example with keyed style
+path=Data/packs/sounds.zip crc=0x00000000 archive=1 extract=Data/Sound size=0

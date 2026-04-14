@@ -89,7 +89,7 @@ public:
 	long GetScreenHeight(){ return m_lScreenHeight; }
 	void SetLeftHandMode(bool bLeftHand){ m_bLeftHand = bLeftHand; }
 	bool IsLeftHandMode(){ return m_bLeftHand; }
-	void SetTextEditMode(bool bTextEditMode){ m_bTextEditMode = bTextEditMode; }
+	void SetTextEditMode(bool bTextEditMode);
 	bool IsTextEditMode(){ return m_bTextEditMode; }
 };
 

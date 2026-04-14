@@ -1,4 +1,4 @@
-# Continuidade do Port Android: Verificação pós-git pull (2026-04-13)
+# Continuidade do Port Android: Verificação pós-git pull (2026-04-14)
 
 ## Resumo
 
@@ -9,6 +9,42 @@ Após o `git pull` no branch `mobile`, foi realizada uma auditoria de consistên
 - e o relatório anterior de compatibilidade de UI/texto.
 
 O objetivo foi confirmar o que realmente já está implementado no port Android e atualizar o status sem marcar itens de forma prematura.
+
+## Atualização do dia (2026-04-14)
+
+Nesta continuidade foi concluída a integração do downloader Android com o código original do game:
+
+- `Platform/GameDownloader.cpp` agora usa o pipeline legado `FileDownloader` + `HTTPConnecter` para transporte HTTP.
+- O loop de transferência em `GameShop/FileDownloader/FileDownloader.cpp` foi ajustado para leitura incremental real a cada bloco.
+- Foi adicionada validação CRC32 no downloader Android com sidecar opcional `<arquivo>.crc32` (download, parse e comparação).
+- O override de servidor de assets foi ligado de ponta a ponta:
+  - `MU_ASSET_SERVER` no `run_adb_debug.sh`;
+  - intent extra na `MainActivity`;
+  - leitura em `android_main.cpp` com `GameDownloader::SetServerURL`.
+- Foi adicionado suporte a manifesto de assets:
+  - download opcional de `Data/assets-manifest.txt` do servidor;
+  - fallback para manifesto local já baixado;
+  - fallback final para lista mínima hardcoded quando não houver manifesto.
+- O parser de manifesto foi ampliado para aceitar formatos legados/comuns:
+  - `path|crc`, `crc path`, `path=...`, `crc=...`;
+  - tolerância a colunas extras (ex.: tamanho) sem abortar o parse.
+- O download de manifesto remoto passou a usar arquivo temporário (`assets-manifest.txt.tmp`) e só promove para o arquivo final após parse válido, evitando corromper cache local.
+- `IsDataReady()` agora força rechecagem do downloader quando o manifesto local está envelhecido (refresh periódico de 6 horas).
+- Foi implementado fluxo de pacote compactado `.zip` com extração no Android:
+  - `GameDownloader` detecta entradas de pacote por extensão `.zip` e tokens de manifesto (`archive=...`, `extract=...`);
+  - extração é feita via JNI em `MainActivity.extractZipArchive(...)` (ZipInputStream);
+  - proteção contra path traversal por canonical path no lado Java;
+  - marcador local `.extracted` controla se a extração já foi concluída para o pacote.
+- Foi adicionado template de manifesto para publicação no servidor:
+  - `docs/assets-server/Data/assets-manifest.txt`;
+  - inclui exemplos de formatos suportados, entradas `.zip`, `archive=1`, `extract=...` e CRC.
+- Foi adicionada ferramenta para gerar manifesto de produção automaticamente:
+  - `tools/generate_assets_manifest.cpp` + `tools/generate_assets_manifest.sh`;
+  - varre `Data/`, calcula CRC32 e escreve `Data/assets-manifest.txt`;
+  - marca arquivos `.zip` com `archive=1` e `extract=...` no manifesto.
+- Builds validados:
+  - `./gradlew ':app:buildCMakeDebug[arm64-v8a]' --no-daemon`
+  - `./gradlew assembleDebug --no-daemon`
 
 ## Evidências verificadas no código
 
@@ -61,7 +97,7 @@ Conclusão: item de verificação de includes para `ZzzOpenglUtil.cpp` pode ser 
 
 ### Build / toolchain
 
-- Build limpo `./gradlew assembleDebug` ainda não comprovado como verde fim-a-fim nesta auditoria.
+- Build limpo `./gradlew assembleDebug` comprovado como verde nesta rodada.
 
 ### Render e gameplay visual
 
@@ -71,8 +107,8 @@ Conclusão: item de verificação de includes para `ZzzOpenglUtil.cpp` pode ser 
 
 ### Input / texto
 
-- `Input.cpp` ainda usa `GetCursorPos/ScreenToClient` (não migrado para caminho Android explícito no arquivo).
-- soft keyboard (`ANativeActivity_showSoftInput`) não encontrado no código auditado.
+- Caminho Android de `Input.cpp` e atualização por frame estão ativos.
+- Bridge de teclado virtual Android (`showSoftKeyboard/hideSoftKeyboard`) está ativa via foco dos controles `edit`.
 - `CGMFontLayer.cpp` ainda contém trecho GDI (`GetTextMetricsW`, `GetFontData`) como pendência do checklist.
 
 ### Assets/áudio
@@ -93,10 +129,15 @@ Arquivos existem:
 
 Status funcional atual do downloader:
 
-- há estrutura básica (`IsDataReady`, `DownloadAll`, `SetServerURL`),
-- há lista mínima de arquivos obrigatórios,
-- porém o método de download HTTP ainda está em placeholder e retorna falha,
-- validação CRC/extracão completa ainda não finalizada.
+- há estrutura funcional (`IsDataReady`, `DownloadAll`, `SetServerURL`),
+- há lista mínima de arquivos obrigatórios com download real via `HTTPConnecter`,
+- há suporte a manifesto remoto/local de assets com fallback,
+- há parser de manifesto robusto para variações de formato e colunas extras,
+- há escrita segura do manifesto remoto via `.tmp` + promoção após parse válido,
+- há refresh periódico do manifesto local (6h) para forçar checagem remota,
+- há validação CRC32 opcional por sidecar (`.crc32`),
+- há fluxo de pacote `.zip` com extração JNI e marcador `.extracted`,
+- manifesto completo de assets ainda não finalizado.
 
 Conclusão: manter Fase 7 como em andamento.
 
@@ -110,11 +151,11 @@ Foram ajustados:
 - marcação concluída de `DSplaysound.cpp` guardado para Android;
 - inclusão explícita dos shims UI/IME e dos shims residuais (`OffsetRect`, `_vsntprintf`, `GetKeyState`) como concluídos em Win32 replacements;
 - inclusão da remoção de `CBTMessageBox.cpp` no `CMakeLists.txt` Android como concluída;
-- atualização da linha de "Última atualização" para `2026-04-13`.
+- atualização da linha de "Última atualização" para `2026-04-14`.
 
 ## Próximo passo recomendado
 
-1. Rodar `./gradlew assembleDebug` e capturar o primeiro erro atual (se houver).
-2. Fechar pendências de `Input.cpp` + soft keyboard.
-3. Fechar `CGMFontLayer.cpp` Android path + bundle da fonte TTF.
-4. Avançar no `GameDownloader.cpp` substituindo o placeholder HTTP por implementação real e integrando CRC.
+1. Fechar `CGMFontLayer.cpp` Android path + bundle da fonte TTF.
+2. Rodar `tools/generate_assets_manifest.sh` sobre a árvore real de assets e publicar o `Data/assets-manifest.txt` gerado.
+3. Definir política final para CRC obrigatório em produção (hoje está opcional via sidecar quando presente).
+4. Validar fluxo de 1ª execução em dispositivo real (download, extração de pacote e retomada após falha).

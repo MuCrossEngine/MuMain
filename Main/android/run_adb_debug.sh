@@ -33,7 +33,12 @@ echo "[MU] Installing $APK..."
 adb install -r "$APK"
 
 echo "[MU] Launching..."
-adb shell am start -n "$PACKAGE/$PACKAGE$ACTIVITY"
+if [ -n "${MU_ASSET_SERVER:-}" ]; then
+    echo "[MU] Using asset server override: $MU_ASSET_SERVER"
+    adb shell am start -n "$PACKAGE/$PACKAGE$ACTIVITY" --es MU_ASSET_SERVER "$MU_ASSET_SERVER"
+else
+    adb shell am start -n "$PACKAGE/$PACKAGE$ACTIVITY"
+fi
 
 echo "[MU] Streaming logcat (Ctrl+C to stop)..."
 adb logcat -c

@@ -22,9 +22,13 @@
 #include <ctype.h>
 #include <algorithm>
 #include <string>
+#include <vector>
 #include <unordered_map>
 #include <unordered_set>
 #include <mutex>
+#include <sys/socket.h>
+#include <netdb.h>
+#include <unistd.h>
 #include <android/log.h>
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -151,6 +155,9 @@ typedef unsigned short INTERNET_PORT;
 #ifndef INTERNET_DEFAULT_FTP_PORT
 #  define INTERNET_DEFAULT_FTP_PORT 21
 #endif
+#ifndef INTERNET_DEFAULT_HTTP_PORT
+#  define INTERNET_DEFAULT_HTTP_PORT 80
+#endif
 #ifndef INTERNET_MAX_URL_LENGTH
 #  define INTERNET_MAX_URL_LENGTH 2084
 #endif
@@ -265,6 +272,9 @@ inline HWND& AndroidCompatFocusedWindow()
     static HWND s_focusedWindow = nullptr;
     return s_focusedWindow;
 }
+
+void AndroidShowSoftKeyboard();
+void AndroidHideSoftKeyboard();
 
 inline AndroidCompatWindowState* AndroidCompatGetWindowState(HWND hWnd)
 {
@@ -1419,22 +1429,50 @@ inline BOOL DestroyWindow(HWND hWnd)
     }
 
     AndroidCompatWindowState* state = reinterpret_cast<AndroidCompatWindowState*>(hWnd);
+    const bool focusedEdit = (AndroidCompatFocusedWindow() == hWnd && state && state->className == L"edit");
     windowMap.erase(it);
     delete state;
 
     if (AndroidCompatFocusedWindow() == hWnd)
     {
         AndroidCompatFocusedWindow() = nullptr;
+        if (focusedEdit)
+        {
+            AndroidHideSoftKeyboard();
+        }
     }
 
     return TRUE;
 }
 inline BOOL InvalidateRect(HWND, const RECT*, BOOL)  { return TRUE; }
 inline HWND GetFocus()                               { return AndroidCompatFocusedWindow(); }
+inline bool AndroidCompatIsEditControl(HWND hWnd)
+{
+    if (!hWnd)
+    {
+        return false;
+    }
+
+    std::lock_guard<std::mutex> lock(AndroidCompatWindowMutex());
+    AndroidCompatWindowState* state = AndroidCompatGetWindowState(hWnd);
+    return (state && state->className == L"edit");
+}
 inline HWND SetFocus(HWND h)
 {
     HWND previous = AndroidCompatFocusedWindow();
     AndroidCompatFocusedWindow() = h;
+
+    const bool wasEdit = AndroidCompatIsEditControl(previous);
+    const bool isEdit = AndroidCompatIsEditControl(h);
+    if (!wasEdit && isEdit)
+    {
+        AndroidShowSoftKeyboard();
+    }
+    else if (wasEdit && !isEdit)
+    {
+        AndroidHideSoftKeyboard();
+    }
+
     return previous;
 }
 inline BOOL IsWindow(HWND h)
@@ -2178,80 +2216,513 @@ static inline DWORD GetFileAttributes(const char* path)
     return FILE_ATTRIBUTE_NORMAL;
 }
 
-// WinINet API stubs used by the legacy in-game shop downloader.
-// On Android we keep them as no-op success paths to preserve flow.
-static inline HINTERNET InternetOpen(const char*, DWORD, const char*, const char*, DWORD)
+// WinINet compatibility layer used by legacy download modules.
+// Android implementation supports the HTTP path used by HTTPConnecter.
+enum AndroidInternetHandleType
 {
-    return (HINTERNET)1;
+    ANDROID_INET_SESSION = 1,
+    ANDROID_INET_CONNECTION = 2,
+    ANDROID_INET_REQUEST = 3,
+};
+
+struct AndroidInternetBaseHandle
+{
+    AndroidInternetHandleType type;
+    virtual ~AndroidInternetBaseHandle() = default;
+};
+
+struct AndroidInternetSessionHandle : AndroidInternetBaseHandle
+{
+    std::string agent;
+    AndroidInternetSessionHandle() { type = ANDROID_INET_SESSION; }
+};
+
+struct AndroidInternetConnectionHandle : AndroidInternetBaseHandle
+{
+    std::string host;
+    INTERNET_PORT port;
+    AndroidInternetConnectionHandle() : port(INTERNET_DEFAULT_HTTP_PORT)
+    {
+        type = ANDROID_INET_CONNECTION;
+    }
+};
+
+struct AndroidInternetRequestHandle : AndroidInternetBaseHandle
+{
+    std::string method;
+    std::string host;
+    INTERNET_PORT port;
+    std::string path;
+    int statusCode;
+    size_t contentLength;
+    std::vector<BYTE> body;
+    size_t readOffset;
+    bool sent;
+
+    AndroidInternetRequestHandle()
+        : port(INTERNET_DEFAULT_HTTP_PORT),
+          statusCode(0),
+          contentLength(0),
+          readOffset(0),
+          sent(false)
+    {
+        type = ANDROID_INET_REQUEST;
+    }
+};
+
+static inline std::string AndroidHttpTrim(const std::string& value)
+{
+    size_t begin = 0;
+    while (begin < value.size() && (value[begin] == ' ' || value[begin] == '\t' || value[begin] == '\r' || value[begin] == '\n'))
+    {
+        ++begin;
+    }
+
+    size_t end = value.size();
+    while (end > begin && (value[end - 1] == ' ' || value[end - 1] == '\t' || value[end - 1] == '\r' || value[end - 1] == '\n'))
+    {
+        --end;
+    }
+
+    return value.substr(begin, end - begin);
 }
 
-static inline HINTERNET InternetConnectA(HINTERNET, const char*, INTERNET_PORT, const char*,
+static inline std::string AndroidHttpLower(const std::string& value)
+{
+    std::string out = value;
+    std::transform(out.begin(), out.end(), out.begin(), [](unsigned char c) { return (char)std::tolower(c); });
+    return out;
+}
+
+static inline std::vector<BYTE> AndroidHttpDecodeChunked(const BYTE* data, size_t size)
+{
+    std::vector<BYTE> decoded;
+    size_t cursor = 0;
+
+    while (cursor < size)
+    {
+        size_t lineEnd = cursor;
+        while (lineEnd + 1 < size && !(data[lineEnd] == '\r' && data[lineEnd + 1] == '\n'))
+        {
+            ++lineEnd;
+        }
+        if (lineEnd + 1 >= size)
+        {
+            return std::vector<BYTE>();
+        }
+
+        std::string sizeLine((const char*)data + cursor, lineEnd - cursor);
+        size_t semicolon = sizeLine.find(';');
+        if (semicolon != std::string::npos)
+        {
+            sizeLine = sizeLine.substr(0, semicolon);
+        }
+        sizeLine = AndroidHttpTrim(sizeLine);
+        if (sizeLine.empty())
+        {
+            return std::vector<BYTE>();
+        }
+
+        char* endPtr = nullptr;
+        unsigned long chunkSize = std::strtoul(sizeLine.c_str(), &endPtr, 16);
+        if (!endPtr || *endPtr != '\0')
+        {
+            return std::vector<BYTE>();
+        }
+
+        cursor = lineEnd + 2;
+        if (chunkSize == 0)
+        {
+            return decoded;
+        }
+
+        if (cursor + chunkSize + 2 > size)
+        {
+            return std::vector<BYTE>();
+        }
+
+        decoded.insert(decoded.end(), data + cursor, data + cursor + chunkSize);
+        cursor += chunkSize;
+
+        if (!(data[cursor] == '\r' && data[cursor + 1] == '\n'))
+        {
+            return std::vector<BYTE>();
+        }
+        cursor += 2;
+    }
+
+    return std::vector<BYTE>();
+}
+
+static inline bool AndroidHttpFetch(const std::string& host,
+                                    INTERNET_PORT port,
+                                    const std::string& method,
+                                    const std::string& path,
+                                    int& outStatusCode,
+                                    size_t& outContentLength,
+                                    std::vector<BYTE>& outBody)
+{
+    outStatusCode = 0;
+    outContentLength = 0;
+    outBody.clear();
+
+    if (host.empty())
+    {
+        errno = EINVAL;
+        return false;
+    }
+
+    struct addrinfo hints;
+    std::memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+
+    char portStr[16];
+    std::snprintf(portStr, sizeof(portStr), "%u", (unsigned)port);
+
+    struct addrinfo* result = nullptr;
+    if (getaddrinfo(host.c_str(), portStr, &hints, &result) != 0 || !result)
+    {
+        return false;
+    }
+
+    int sock = -1;
+    for (struct addrinfo* it = result; it; it = it->ai_next)
+    {
+        sock = (int)socket(it->ai_family, it->ai_socktype, it->ai_protocol);
+        if (sock < 0)
+        {
+            continue;
+        }
+
+        if (connect(sock, it->ai_addr, it->ai_addrlen) == 0)
+        {
+            break;
+        }
+
+        close(sock);
+        sock = -1;
+    }
+    freeaddrinfo(result);
+
+    if (sock < 0)
+    {
+        return false;
+    }
+
+    const std::string reqPath = path.empty() ? "/" : path;
+    std::string request =
+        method + " " + reqPath + " HTTP/1.1\r\n" +
+        "Host: " + host + "\r\n" +
+        "Connection: close\r\n" +
+        "User-Agent: MuAndroid/1.0\r\n" +
+        "Accept: */*\r\n\r\n";
+
+    size_t sent = 0;
+    while (sent < request.size())
+    {
+        ssize_t n = send(sock, request.data() + sent, request.size() - sent, 0);
+        if (n <= 0)
+        {
+            close(sock);
+            return false;
+        }
+        sent += (size_t)n;
+    }
+
+    std::vector<BYTE> response;
+    BYTE chunk[8192];
+    for (;;)
+    {
+        ssize_t n = recv(sock, chunk, sizeof(chunk), 0);
+        if (n < 0)
+        {
+            close(sock);
+            return false;
+        }
+        if (n == 0)
+        {
+            break;
+        }
+        response.insert(response.end(), chunk, chunk + n);
+    }
+    close(sock);
+
+    if (response.empty())
+    {
+        errno = EIO;
+        return false;
+    }
+
+    size_t headerEnd = std::string::npos;
+    for (size_t i = 0; i + 3 < response.size(); ++i)
+    {
+        if (response[i] == '\r' && response[i + 1] == '\n' &&
+            response[i + 2] == '\r' && response[i + 3] == '\n')
+        {
+            headerEnd = i;
+            break;
+        }
+    }
+    if (headerEnd == std::string::npos)
+    {
+        errno = EPROTO;
+        return false;
+    }
+
+    std::string headers((const char*)response.data(), headerEnd);
+    size_t firstLineEnd = headers.find("\r\n");
+    std::string statusLine = (firstLineEnd == std::string::npos) ? headers : headers.substr(0, firstLineEnd);
+
+    size_t firstSpace = statusLine.find(' ');
+    size_t secondSpace = (firstSpace == std::string::npos) ? std::string::npos : statusLine.find(' ', firstSpace + 1);
+    if (firstSpace != std::string::npos)
+    {
+        std::string code = (secondSpace == std::string::npos)
+            ? statusLine.substr(firstSpace + 1)
+            : statusLine.substr(firstSpace + 1, secondSpace - firstSpace - 1);
+        outStatusCode = std::atoi(code.c_str());
+    }
+    if (outStatusCode <= 0)
+    {
+        outStatusCode = 500;
+    }
+
+    bool chunked = false;
+    size_t cursor = (firstLineEnd == std::string::npos) ? headers.size() : firstLineEnd + 2;
+    while (cursor < headers.size())
+    {
+        size_t lineEnd = headers.find("\r\n", cursor);
+        std::string line = (lineEnd == std::string::npos) ? headers.substr(cursor) : headers.substr(cursor, lineEnd - cursor);
+        cursor = (lineEnd == std::string::npos) ? headers.size() : lineEnd + 2;
+
+        if (line.empty())
+        {
+            continue;
+        }
+
+        size_t sep = line.find(':');
+        if (sep == std::string::npos)
+        {
+            continue;
+        }
+
+        std::string name = AndroidHttpLower(AndroidHttpTrim(line.substr(0, sep)));
+        std::string value = AndroidHttpTrim(line.substr(sep + 1));
+
+        if (name == "content-length")
+        {
+            outContentLength = (size_t)std::strtoull(value.c_str(), nullptr, 10);
+        }
+        else if (name == "transfer-encoding")
+        {
+            std::string lowerValue = AndroidHttpLower(value);
+            if (lowerValue.find("chunked") != std::string::npos)
+            {
+                chunked = true;
+            }
+        }
+    }
+
+    const BYTE* bodyStart = response.data() + headerEnd + 4;
+    size_t bodySize = response.size() - (headerEnd + 4);
+    if (chunked)
+    {
+        std::vector<BYTE> decoded = AndroidHttpDecodeChunked(bodyStart, bodySize);
+        if (!decoded.empty())
+        {
+            outBody.swap(decoded);
+            outContentLength = outBody.size();
+            return true;
+        }
+    }
+
+    outBody.assign(bodyStart, bodyStart + bodySize);
+    if (outContentLength == 0)
+    {
+        outContentLength = outBody.size();
+    }
+    return true;
+}
+
+static inline HINTERNET InternetOpen(const char* agent, DWORD, const char*, const char*, DWORD)
+{
+    AndroidInternetSessionHandle* h = new AndroidInternetSessionHandle();
+    h->agent = (agent ? agent : "");
+    return reinterpret_cast<HINTERNET>(h);
+}
+
+static inline HINTERNET InternetConnectA(HINTERNET hSession, const char* serverName, INTERNET_PORT port, const char*,
                                          const char*, DWORD, DWORD, DWORD_PTR)
 {
-    return (HINTERNET)1;
+    AndroidInternetBaseHandle* base = reinterpret_cast<AndroidInternetBaseHandle*>(hSession);
+    if (!base || base->type != ANDROID_INET_SESSION || !serverName)
+    {
+        errno = EINVAL;
+        return nullptr;
+    }
+
+    AndroidInternetConnectionHandle* h = new AndroidInternetConnectionHandle();
+    h->host = serverName;
+    h->port = (port != 0 ? port : INTERNET_DEFAULT_HTTP_PORT);
+    return reinterpret_cast<HINTERNET>(h);
 }
 
 static inline HINTERNET FtpFindFirstFileA(HINTERNET, const char*, WIN32_FIND_DATAA* findData, DWORD, DWORD_PTR)
 {
     if (findData)
     {
-        memset(findData, 0, sizeof(*findData));
+        std::memset(findData, 0, sizeof(*findData));
     }
-    return (HINTERNET)1;
+    errno = ENOTSUP;
+    return nullptr;
 }
 
 static inline HINTERNET FtpOpenFileA(HINTERNET, const char*, DWORD, DWORD, DWORD_PTR)
 {
-    return (HINTERNET)1;
+    errno = ENOTSUP;
+    return nullptr;
 }
 
-static inline HINTERNET HttpOpenRequest(HINTERNET, const char*, const char*, const char*, const char*,
+static inline HINTERNET HttpOpenRequest(HINTERNET hConnection, const char* method, const char* objectName, const char*, const char*,
                                         const char* const*, DWORD, DWORD_PTR)
 {
-    return (HINTERNET)1;
+    AndroidInternetBaseHandle* base = reinterpret_cast<AndroidInternetBaseHandle*>(hConnection);
+    if (!base || base->type != ANDROID_INET_CONNECTION)
+    {
+        errno = EINVAL;
+        return nullptr;
+    }
+
+    AndroidInternetConnectionHandle* conn = reinterpret_cast<AndroidInternetConnectionHandle*>(base);
+    AndroidInternetRequestHandle* req = new AndroidInternetRequestHandle();
+    req->method = (method && method[0]) ? method : "GET";
+    req->host = conn->host;
+    req->port = conn->port;
+
+    std::string path = (objectName ? objectName : "/");
+    size_t schemePos = path.find("://");
+    if (schemePos != std::string::npos)
+    {
+        size_t slashPos = path.find('/', schemePos + 3);
+        path = (slashPos == std::string::npos) ? "/" : path.substr(slashPos);
+    }
+    if (path.empty() || path[0] != '/')
+    {
+        path = "/" + path;
+    }
+    req->path = path;
+    return reinterpret_cast<HINTERNET>(req);
 }
 
-static inline BOOL HttpSendRequest(HINTERNET, const char*, DWORD, LPVOID, DWORD)
+static inline BOOL HttpSendRequest(HINTERNET hRequest, const char*, DWORD, LPVOID, DWORD)
 {
-    return TRUE;
-}
+    AndroidInternetBaseHandle* base = reinterpret_cast<AndroidInternetBaseHandle*>(hRequest);
+    if (!base || base->type != ANDROID_INET_REQUEST)
+    {
+        errno = EINVAL;
+        return FALSE;
+    }
 
-static inline BOOL HttpQueryInfo(HINTERNET, DWORD infoLevel, LPVOID buffer, LPDWORD bufferLength, LPDWORD)
-{
-    if (!buffer || !bufferLength || *bufferLength == 0)
+    AndroidInternetRequestHandle* req = reinterpret_cast<AndroidInternetRequestHandle*>(base);
+    req->body.clear();
+    req->readOffset = 0;
+    req->contentLength = 0;
+    req->statusCode = 0;
+
+    if (!AndroidHttpFetch(req->host, req->port, req->method, req->path, req->statusCode, req->contentLength, req->body))
     {
         return FALSE;
     }
 
-    char* out = (char*)buffer;
-    const char* value = "0";
-    if (infoLevel == HTTP_QUERY_STATUS_CODE)
+    req->sent = true;
+    return TRUE;
+}
+
+static inline BOOL HttpQueryInfo(HINTERNET hRequest, DWORD infoLevel, LPVOID buffer, LPDWORD bufferLength, LPDWORD)
+{
+    AndroidInternetBaseHandle* base = reinterpret_cast<AndroidInternetBaseHandle*>(hRequest);
+    if (!base || base->type != ANDROID_INET_REQUEST || !buffer || !bufferLength || *bufferLength == 0)
     {
-        value = "200";
+        errno = EINVAL;
+        return FALSE;
     }
-    else if (infoLevel == HTTP_QUERY_CONTENT_LENGTH)
+
+    AndroidInternetRequestHandle* req = reinterpret_cast<AndroidInternetRequestHandle*>(base);
+    const DWORD query = (infoLevel & 0xFFFFu);
+    char out[64];
+    out[0] = '\0';
+
+    if (query == HTTP_QUERY_STATUS_CODE)
     {
-        value = "0";
+        std::snprintf(out, sizeof(out), "%d", req->statusCode > 0 ? req->statusCode : 500);
+    }
+    else if (query == HTTP_QUERY_CONTENT_LENGTH)
+    {
+        std::snprintf(out, sizeof(out), "%llu", (unsigned long long)req->contentLength);
+    }
+    else
+    {
+        errno = ENOTSUP;
+        return FALSE;
     }
 
-    snprintf(out, *bufferLength, "%s", value);
+    std::snprintf((char*)buffer, *bufferLength, "%s", out);
     return TRUE;
 }
 
-static inline BOOL InternetQueryDataAvailable(HINTERNET, LPDWORD available, DWORD, DWORD_PTR)
+static inline BOOL InternetQueryDataAvailable(HINTERNET hRequest, LPDWORD available, DWORD, DWORD_PTR)
 {
-    if (available) *available = 0;
+    AndroidInternetBaseHandle* base = reinterpret_cast<AndroidInternetBaseHandle*>(hRequest);
+    if (!base || base->type != ANDROID_INET_REQUEST)
+    {
+        errno = EINVAL;
+        return FALSE;
+    }
+
+    AndroidInternetRequestHandle* req = reinterpret_cast<AndroidInternetRequestHandle*>(base);
+    size_t remaining = (req->readOffset < req->body.size()) ? (req->body.size() - req->readOffset) : 0;
+    if (available)
+    {
+        *available = (DWORD)remaining;
+    }
     return TRUE;
 }
 
-static inline BOOL InternetReadFile(HINTERNET, LPVOID, DWORD, LPDWORD bytesRead)
+static inline BOOL InternetReadFile(HINTERNET hRequest, LPVOID outBuffer, DWORD bytesToRead, LPDWORD bytesRead)
 {
-    if (bytesRead) *bytesRead = 0;
+    AndroidInternetBaseHandle* base = reinterpret_cast<AndroidInternetBaseHandle*>(hRequest);
+    if (!base || base->type != ANDROID_INET_REQUEST || !outBuffer)
+    {
+        errno = EINVAL;
+        return FALSE;
+    }
+
+    AndroidInternetRequestHandle* req = reinterpret_cast<AndroidInternetRequestHandle*>(base);
+    size_t remaining = (req->readOffset < req->body.size()) ? (req->body.size() - req->readOffset) : 0;
+    size_t toCopy = std::min<size_t>((size_t)bytesToRead, remaining);
+    if (toCopy > 0)
+    {
+        std::memcpy(outBuffer, req->body.data() + req->readOffset, toCopy);
+        req->readOffset += toCopy;
+    }
+
+    if (bytesRead)
+    {
+        *bytesRead = (DWORD)toCopy;
+    }
     return TRUE;
 }
 
-static inline BOOL InternetCloseHandle(HINTERNET)
+static inline BOOL InternetCloseHandle(HINTERNET hInternet)
 {
+    if (!hInternet)
+    {
+        return TRUE;
+    }
+
+    AndroidInternetBaseHandle* base = reinterpret_cast<AndroidInternetBaseHandle*>(hInternet);
+    delete base;
     return TRUE;
 }
 

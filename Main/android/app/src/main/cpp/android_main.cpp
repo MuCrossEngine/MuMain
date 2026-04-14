@@ -79,6 +79,137 @@ static std::string GetExternalFilesDir(android_app* app)
     return path;
 }
 
+static std::string GetAssetServerUrl(android_app* app)
+{
+    JNIEnv* env = nullptr;
+    app->activity->vm->AttachCurrentThread(&env, nullptr);
+
+    jclass cls = env->GetObjectClass(app->activity->clazz);
+    jmethodID method = env->GetMethodID(cls, "getAssetServerUrl", "()Ljava/lang/String;");
+    if (!method)
+    {
+        env->DeleteLocalRef(cls);
+        app->activity->vm->DetachCurrentThread();
+        return std::string();
+    }
+
+    jstring jurl = (jstring)env->CallObjectMethod(app->activity->clazz, method);
+    std::string url;
+    if (jurl)
+    {
+        const char* cUrl = env->GetStringUTFChars(jurl, nullptr);
+        if (cUrl)
+        {
+            url = cUrl;
+            env->ReleaseStringUTFChars(jurl, cUrl);
+        }
+        env->DeleteLocalRef(jurl);
+    }
+
+    env->DeleteLocalRef(cls);
+    app->activity->vm->DetachCurrentThread();
+    return url;
+}
+
+static void CallMainActivityVoidMethod(const char* methodName)
+{
+    if (!g_app || !g_app->activity || !methodName)
+    {
+        return;
+    }
+
+    JNIEnv* env = nullptr;
+    if (g_app->activity->vm->AttachCurrentThread(&env, nullptr) != JNI_OK || !env)
+    {
+        LOGE("JNI AttachCurrentThread failed for %s", methodName);
+        return;
+    }
+
+    jclass cls = env->GetObjectClass(g_app->activity->clazz);
+    if (!cls)
+    {
+        LOGE("GetObjectClass failed for %s", methodName);
+        g_app->activity->vm->DetachCurrentThread();
+        return;
+    }
+
+    jmethodID method = env->GetMethodID(cls, methodName, "()V");
+    if (!method)
+    {
+        LOGE("GetMethodID failed: %s", methodName);
+        env->DeleteLocalRef(cls);
+        g_app->activity->vm->DetachCurrentThread();
+        return;
+    }
+
+    env->CallVoidMethod(g_app->activity->clazz, method);
+    env->DeleteLocalRef(cls);
+    g_app->activity->vm->DetachCurrentThread();
+}
+
+static bool CallMainActivityBoolMethod2Strings(const char* methodName,
+                                                const char* firstArg,
+                                                const char* secondArg)
+{
+    if (!g_app || !g_app->activity || !methodName || !firstArg || !secondArg)
+    {
+        return false;
+    }
+
+    JNIEnv* env = nullptr;
+    if (g_app->activity->vm->AttachCurrentThread(&env, nullptr) != JNI_OK || !env)
+    {
+        LOGE("JNI AttachCurrentThread failed for %s", methodName);
+        return false;
+    }
+
+    bool ok = false;
+    jclass cls = env->GetObjectClass(g_app->activity->clazz);
+    if (!cls)
+    {
+        LOGE("GetObjectClass failed for %s", methodName);
+        g_app->activity->vm->DetachCurrentThread();
+        return false;
+    }
+
+    jmethodID method = env->GetMethodID(cls, methodName, "(Ljava/lang/String;Ljava/lang/String;)Z");
+    if (!method)
+    {
+        LOGE("GetMethodID failed: %s", methodName);
+        env->DeleteLocalRef(cls);
+        g_app->activity->vm->DetachCurrentThread();
+        return false;
+    }
+
+    jstring arg0 = env->NewStringUTF(firstArg);
+    jstring arg1 = env->NewStringUTF(secondArg);
+    if (arg0 && arg1)
+    {
+        ok = (env->CallBooleanMethod(g_app->activity->clazz, method, arg0, arg1) == JNI_TRUE);
+    }
+
+    if (arg0) env->DeleteLocalRef(arg0);
+    if (arg1) env->DeleteLocalRef(arg1);
+    env->DeleteLocalRef(cls);
+    g_app->activity->vm->DetachCurrentThread();
+    return ok;
+}
+
+bool AndroidExtractZipArchive(const char* zipPath, const char* targetDir)
+{
+    return CallMainActivityBoolMethod2Strings("extractZipArchive", zipPath, targetDir);
+}
+
+void AndroidShowSoftKeyboard()
+{
+    CallMainActivityVoidMethod("showSoftKeyboard");
+}
+
+void AndroidHideSoftKeyboard()
+{
+    CallMainActivityVoidMethod("hideSoftKeyboard");
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Initialization — mirrors WinMain() init sequence
 // ─────────────────────────────────────────────────────────────────────────────
@@ -90,6 +221,14 @@ static bool InitGame(android_app* app)
     std::string dataPath = GetExternalFilesDir(app);
     GameAssetPath::Init(dataPath);
     LOGI("InitGame: asset path = %s", dataPath.c_str());
+
+    // 1.1 Optional downloader base URL from launch intent extra.
+    std::string assetServerUrl = GetAssetServerUrl(app);
+    if (!assetServerUrl.empty())
+    {
+        GameDownloader::SetServerURL(assetServerUrl.c_str());
+        LOGI("InitGame: asset server override = %s", assetServerUrl.c_str());
+    }
 
     // 2. First-run downloader: if game data is missing, download it
     if (!GameDownloader::IsDataReady())
@@ -148,6 +287,7 @@ static void RenderFrame()
 
     // Game logic + rendering — same function as on Windows
     MainScene(nullptr);
+    GameMouseInput::Update();
 
     g_eglWindow->SwapBuffers();
 }

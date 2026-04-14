@@ -14,7 +14,7 @@ Atualizar os checkboxes conforme cada item for concluído.
 
 | Fase | Componente | Status |
 |------|-----------|--------|
-| 0 | Build System (Gradle + CMake) | 🔄 Em andamento |
+| 0 | Build System (Gradle + CMake) | ✅ Completo |
 | 1 | Platform Abstraction Layer (PAL) | ✅ Completo |
 | 2 | OpenGL ES 3.0 Render Backend | 🔄 Em andamento |
 | 3 | Input System (Touch → Mouse) | 🔄 Em andamento |
@@ -36,7 +36,7 @@ Atualizar os checkboxes conforme cada item for concluído.
 - [x] `Main/android/app/src/main/cpp/CMakeLists.txt` (~1200 source files)
 - [x] `Main/android/app/src/main/cpp/android_main.cpp` (entry point)
 - [x] `Main/android/run_adb_debug.sh` (com fallback para `gradle` quando `gradlew` não existir)
-- [ ] Build limpo sem erros: `./gradlew assembleDebug` (requer NDK + 3rd-party libs)
+- [x] Build limpo sem erros: `./gradlew assembleDebug` (requer NDK + 3rd-party libs)
 
 ---
 
@@ -96,9 +96,9 @@ Atualizar os checkboxes conforme cada item for concluído.
   - Double-tap → DBClick
   - Drag → mouse move com botão pressed
   - Pinch (2 dedos) → zoom câmera
-- [ ] `Input.cpp` — `#ifdef __ANDROID__` substituir GetCursorPos()/ScreenToClient() por GameMouseInput globals
+- [x] `Input.cpp` — `#ifdef __ANDROID__` com cursor explícito via globals `MouseX/MouseY` (bridge GameMouseInput)
 - [x] `WINHANDLE.cpp` — `#ifndef __ANDROID__` em WndProc() e message loop
-- [ ] Soft keyboard — ANativeActivity_showSoftInput() quando campo de texto ativo
+- [x] Soft keyboard — bridge JNI `showSoftKeyboard()/hideSoftKeyboard()` acionado automaticamente via `SetFocus()` quando foco entra/sai de controles `edit`
 - [x] VK_* mapeados em AndroidWin32Compat.h para AKEYCODE_*
 
 ---
@@ -189,14 +189,20 @@ Atualizar os checkboxes conforme cada item for concluído.
 
 ## Fase 7 — Game Data Downloader (1ª Execução)
 
-- [ ] `Platform/GameDownloader.h/cpp`
-  - Detecta se game data existe em getExternalFilesDir()
-  - Exibe tela de download com progresso (renderizada via GLES3)
-  - Baixa arquivos do servidor de assets (reutilizar HTTPConnecter.cpp de GameShop/)
-  - Verifica integridade CRC32 (reutilizar Util/CCRC32.H)
-  - Extrai para `/sdcard/Android/data/<pkg>/files/`
-- [ ] Definir URL base do servidor de assets no config
-- [ ] Lista de arquivos a baixar: av-code45.pak, Player/*.bmd, textures, sounds
+- [x] `Platform/GameDownloader.h/cpp`
+  - [x] Detecta se game data existe em `getExternalFilesDir()`
+  - [x] Exibe tela de download com progresso (renderizada via GLES3)
+  - [x] Baixa arquivos do servidor de assets reutilizando `GameShop/FileDownloader` + `HTTPConnecter`
+  - [x] Suporta manifesto remoto/local de assets (`Data/assets-manifest.txt`) com fallback para lista mínima
+  - [x] Parser de manifesto tolerante a formatos legados/comuns (`path|crc`, `crc path`, `path=...`, `crc=...`) e colunas extras
+  - [x] Download de manifesto com escrita segura (arquivo temporário + troca para destino final após parse válido)
+  - [x] Verifica integridade CRC32 (sidecar opcional `<arquivo>.crc32` via `Util/CCRC32.H`)
+  - [x] Refresh periódico do manifesto local (6h) para forçar rechecagem remota de assets
+  - [x] Fluxo de pacote compactado `.zip` + extração para `getExternalFilesDir()` via JNI (`MainActivity.extractZipArchive`) com marcador `.extracted`
+- [x] Definir URL base do servidor de assets por parâmetro de execução (`MU_ASSET_SERVER` → intent extra `MU_ASSET_SERVER`)
+- [x] Publicar template de manifesto de produção no repositório (`docs/assets-server/Data/assets-manifest.txt`)
+- [x] Adicionar ferramenta para geração automática do manifesto de produção com CRC (`tools/generate_assets_manifest.sh`)
+- [ ] Publicar manifesto completo de arquivos (hoje: lista mínima + suporte a manifesto)
 
 ---
 
@@ -231,6 +237,9 @@ cd Main/android && ./gradlew assembleDebug
 # Build limpo com download de game data
 MU_ASSET_SERVER=http://seu-servidor.com ./Main/android/run_adb_debug.sh --clean
 
+# Gerar manifesto de produção (assets server)
+tools/generate_assets_manifest.sh --asset-root /caminho/asset-server-root --output /caminho/asset-server-root/Data/assets-manifest.txt --zip-extract Data
+
 # Logs
 adb logcat -s MUAndroid:V          # log geral
 adb logcat -s MURender:V           # render backend GLES3
@@ -252,4 +261,4 @@ adb logcat -s MUAssets:V           # download e carregamento de assets
 
 ---
 
-*Última atualização: 2026-04-13 — verificação pós-git pull: checklist reconciliado, compat UI/IME consolidada e correções de build Android documentadas*
+*Última atualização: 2026-04-14 — downloader Android integrado ao código original (`GameShop/FileDownloader` + `HTTPConnecter`) com progresso em tela, compat WinINet HTTP ativa no Android, ajuste no loop de transferência (`TransferRemoteFile`), suporte a manifesto remoto/local de assets (`assets-manifest.txt`) com parser robusto + escrita segura em `.tmp` e refresh periódico (6h), validação CRC32 por sidecar opcional (`.crc32`), fluxo de pacote `.zip` + extração JNI (`MainActivity.extractZipArchive`) com marcador `.extracted`, template de manifesto de produção publicado em `docs/assets-server/Data/assets-manifest.txt`, ferramenta de geração automática (`tools/generate_assets_manifest.sh`), override de servidor via `MU_ASSET_SERVER` (intent extra) e builds `buildCMakeDebug[arm64-v8a]` + `assembleDebug` validados*

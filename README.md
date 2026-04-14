@@ -25,7 +25,8 @@ O projeto ja possui base Android com:
 
 Os principais bloqueios conhecidos no momento sao:
 
-- Downloader de assets ainda sem transporte HTTP final.
+- Distribuicao de assets já suporta manifesto remoto/local e pacote `.zip` com extração no Android, mas ainda falta manifesto completo de produção.
+- Validacao CRC foi integrada com sidecar opcional (`.crc32`), mas falta politica final de integridade para todos os pacotes.
 - Integracao completa de teclado virtual/IME Android ainda pendente.
 - Validacao funcional em runtime no dispositivo Android ainda pendente.
 - Ajustes adicionais de UX mobile, entrada de texto e distribuicao de assets ainda sao necessarios para considerar o port pronto para uso final.
@@ -43,6 +44,12 @@ Os principais bloqueios conhecidos no momento sao:
 - Entrada nativa: `Main/android/app/src/main/cpp/android_main.cpp`
 - Manifesto: `Main/android/app/src/main/AndroidManifest.xml`
 - APK debug gerado: `Main/android/app/build/outputs/apk/debug/app-debug.apk`
+- Exemplo de manifesto de assets para servidor: `docs/assets-server/Data/assets-manifest.txt`
+- Gerador de manifesto de produção: `tools/generate_assets_manifest.sh`
+
+Exemplo de geração automática do manifesto a partir do diretório de assets do servidor:
+
+- `tools/generate_assets_manifest.sh --asset-root /caminho/asset-server-root --output /caminho/asset-server-root/Data/assets-manifest.txt --zip-extract Data`
 
 Para reproduzir o build local usado nesta etapa:
 
@@ -53,6 +60,24 @@ Para reproduzir o build local usado nesta etapa:
 - Comando: `gradlew.bat assembleDebug --stacktrace`
 
 ## Changelog
+
+### 2026-04-14
+
+- Integrado o fluxo de downloader Android ao codigo legado `GameShop/FileDownloader` + `HTTPConnecter`.
+- Corrigido o loop de transferencia em `FileDownloader::TransferRemoteFile()` para leitura incremental real do stream remoto.
+- Adicionado suporte de integridade CRC32 no downloader Android via sidecar opcional `<arquivo>.crc32` (download, parse e comparacao).
+- Conectado override de servidor de assets por runtime: `MU_ASSET_SERVER` em `run_adb_debug.sh` -> `intent extra` -> `MainActivity` -> `android_main.cpp` -> `GameDownloader::SetServerURL`.
+- Adicionado suporte a manifesto remoto/local de assets (`Data/assets-manifest.txt`) com fallback para lista minima hardcoded.
+- Parser de manifesto fortalecido para formatos legados/comuns (`path|crc`, `crc path`, `path=...`, `crc=...`) e tolerancia a colunas extras.
+- Download do manifesto remoto passou a usar arquivo temporario + troca atomica (`.tmp` -> final) para evitar corromper cache local em caso de falha de parse.
+- `IsDataReady()` agora aplica refresh periodico do manifesto local (intervalo de 6h), forçando nova verificacao remota de assets sem limpeza manual.
+- Implementado fluxo de pacote compactado `.zip` com extração no Android via JNI (`GameDownloader` -> `android_main.cpp` -> `MainActivity.extractZipArchive`).
+- Entradas de pacote no manifesto agora podem declarar extração por token (`extract=...`) e usam marcador local `.extracted` para confirmar extração concluída.
+- Adicionado template de manifesto de produção em `docs/assets-server/Data/assets-manifest.txt` (formatos aceitos, exemplos de `archive=1`, `extract=...` e CRC).
+- Adicionada ferramenta CLI para gerar manifesto completo com CRC32 automaticamente: `tools/generate_assets_manifest.cpp` + wrapper `tools/generate_assets_manifest.sh`.
+- Atualizado `ANDROID_PORT.md` com o status atual da Fase 7 e pendencias remanescentes.
+- Atualizado o relatorio diario `docs/android-port-compat-ui-2026-04-13.md` para refletir a rodada atual de implementacao.
+- Validado build Android com `./gradlew ':app:buildCMakeDebug[arm64-v8a]' --no-daemon` e `./gradlew assembleDebug --no-daemon`.
 
 ### 2026-04-13
 
