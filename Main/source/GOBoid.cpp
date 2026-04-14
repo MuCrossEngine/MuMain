@@ -52,7 +52,27 @@ bool isGoBoidItem(int ItemIndex)
 	{
 		return true;
 	}
-	return false;
+return false;
+}
+
+bool IsSafeZoneMiniature(OBJECT* o)
+{
+	if (!o || !o->Owner) return false;
+	int terrainIndex = TERRAIN_INDEX_REPEAT((int)(o->Owner->Position[0] / TERRAIN_SCALE), (int)(o->Owner->Position[1] / TERRAIN_SCALE));
+	return (TerrainWall[terrainIndex] & TW_SAFEZONE) == TW_SAFEZONE;
+}
+
+void CalculateMiniaturePosition(OBJECT* o)
+{
+	float fAngleRad = (o->Owner->Angle[2] + 45.0f) * (Q_PI / 180.0f);
+	float fDistance = 150.0f;
+
+	o->Position[0] = o->Owner->Position[0] - (sinf(fAngleRad) * fDistance);
+	o->Position[1] = o->Owner->Position[1] + (cosf(fAngleRad) * fDistance);
+	o->Position[2] = o->Owner->Position[2];
+
+	VectorCopy(o->Owner->Angle, o->Angle);
+	o->Alpha = 1.f;
 }
 
 void GoBoidREG(int ItemIndex, int nType, int Movement, float scale)
@@ -946,9 +966,28 @@ bool RenderBug(OBJECT* o, bool bForceRender)
 			{
 				o->Scale = (float)((to->Scale / 0.01) * (o->BackupScale * 0.01));
 			}
-			else
+else
 			{
 				o->Scale = (float)((to->Scale / 0.01) * (o->BackupScale * 0.01));
+			}
+
+			bool bIsSafeZone = IsSafeZoneMiniature(o);
+			if (bIsSafeZone && !bForceRender)
+			{
+				if (o->movementType == Movement::Fenrir ||
+					o->movementType == Movement::Horse ||
+					o->movementType == Movement::Uniria ||
+					o->movementType == Movement::Dinorant ||
+					o->Type == MODEL_FENRIR_BLACK ||
+					o->Type == MODEL_FENRIR_BLUE ||
+					o->Type == MODEL_FENRIR_RED ||
+					o->Type == MODEL_FENRIR_GOLD ||
+					o->Type == MODEL_DARK_HORSE ||
+					o->Type == MODEL_PEGASUS ||
+					o->Type == MODEL_UNICON)
+				{
+					o->Scale *= 0.6f;
+				}
 			}
 
 			int State = 0;
