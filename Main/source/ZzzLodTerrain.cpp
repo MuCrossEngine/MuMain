@@ -29,6 +29,7 @@
 #include "NewUISystem.h"
 #include "GMKarutan1.h"
 #include "CameraManager.h"
+#include "Platform/GameAssetPath.h"
 
 #ifdef PJH_NEW_SERVER_SELECT_MAP
 #include "CameraMove.h"
@@ -152,7 +153,7 @@ void ExitProgram()
 
 int OpenTerrainAttribute(char* FileName)
 {
-	FILE* fp = fopen(FileName, "rb");
+	FILE* fp = MU_FOPEN(FileName, "rb");
 
 	if (fp == NULL)
 	{
@@ -203,17 +204,14 @@ int OpenTerrainAttribute(char* FileName)
 	BYTE* blockchain = FileBuffer.data();
 	FileSize = FileBuffer.size();
 
-	if (FileSize != 131076 && FileSize != 65540)
+	if (FileSize < 65540)
 	{
 		return (-1);
 	}
 
-	bool extAtt = false;
-
-	if (FileSize == 131076)
-	{
-		extAtt = true;
-	}
+	// Some custom maps ship ATT files with extended payloads (larger than the
+	// classic fixed lengths). We only need the base terrain wall block.
+	bool extAtt = (FileSize >= 131076);
 
 	BYTE Version, Width, Height;
 
@@ -289,7 +287,7 @@ int OpenTerrainAttribute(char* FileName)
 
 bool SaveTerrainAttribute(char* FileName, int iMap)
 {
-	FILE* fp = fopen(FileName, "wb");
+	FILE* fp = MU_FOPEN(FileName, "wb");
 
 	BYTE Version = 0;
 	BYTE Width = 255;
@@ -366,7 +364,7 @@ int SaveCameraAngle(char* FileName, BYTE* pbySrc, int iSize)
 {
 	if (pbySrc != NULL && iSize != 0)
 	{
-		FILE* fp = fopen(FileName, "wb");
+		FILE* fp = MU_FOPEN(FileName, "wb");
 
 		if (fp != NULL)
 		{
@@ -386,7 +384,7 @@ int Open_Camera_Angle_Position(char* WorldName)
 	sprintf(FileName, "Data\\%s\\Camera_Angle_Position.bmd", WorldName);
 
 
-	FILE* fp = fopen(FileName, "rb");
+	FILE* fp = MU_FOPEN(FileName, "rb");
 
 	if (fp == NULL)
 	{
@@ -444,7 +442,7 @@ int OpenTerrainMapping(char* FileName)	//
 	InitTerrainMappingLayer();
 
 
-	FILE* fp = fopen(FileName, "rb");
+	FILE* fp = MU_FOPEN(FileName, "rb");
 
 	if (fp == NULL)
 	{
@@ -525,7 +523,7 @@ int OpenTerrainMapping(char* FileName)	//
 
 bool SaveTerrainMapping(char* FileName, int iMapNumber)	//
 {
-	FILE* fp = fopen(FileName, "wb");
+	FILE* fp = MU_FOPEN(FileName, "wb");
 
 	BYTE Version = 0;
 	fwrite(&Version, 1, 1, fp);
@@ -555,7 +553,7 @@ bool SaveTerrainMapping(char* FileName, int iMapNumber)	//
 	fclose(fp);
 
 	{
-		fp = fopen(FileName, "rb");
+		fp = MU_FOPEN(FileName, "rb");
 		if (fp == NULL)
 		{
 			return (false);
@@ -572,7 +570,7 @@ bool SaveTerrainMapping(char* FileName, int iMapNumber)	//
 		MapFileEncrypt(Data, EncData, EncBytes);	//
 		delete[] EncData;		//
 
-		fp = fopen(FileName, "wb");
+		fp = MU_FOPEN(FileName, "wb");
 		fwrite(Data, DataBytes, 1, fp);
 		fclose(fp);
 		delete[] Data;
@@ -730,7 +728,7 @@ BOOL ExistOZJ(std::string filename)
 	filename = "Data\\" + filename;
 
 	pull_extension(filename, "OZJ");
-	if ((fp = fopen(filename.c_str(), "rb")) != NULL)
+	if ((fp = MU_FOPEN(filename.c_str(), "rb")) != NULL)
 	{
 		fclose(fp);
 		return TRUE;
@@ -748,7 +746,7 @@ bool OpenBMPBuffer(std::string filename, float* BufferFloat)
 
 	pull_extension(filename, "OZB");
 
-	if ((fp = fopen(filename.c_str(), "rb")) != NULL)
+	if ((fp = MU_FOPEN(filename.c_str(), "rb")) != NULL)
 	{
 		fseek(fp, 0, SEEK_END);
 		int iBytes = ftell(fp);
@@ -896,7 +894,7 @@ bool OpenTerrainHeight(char* filename)
 	strcat(FileName, NewFileName);
 	strcat(FileName, "OZB");
 
-	FILE* fp = fopen(FileName, "rb");
+	FILE* fp = MU_FOPEN(FileName, "rb");
 
 	if (fp == NULL)
 	{
@@ -963,7 +961,7 @@ void SaveTerrainHeight(char* name)
 		}
 	}
 
-	FILE* fp = fopen(name, "wb");
+	FILE* fp = MU_FOPEN(name, "wb");
 	fwrite(BMPHeader, 1080, 1, fp);
 
 	for (int i = 0; i < 256; i++)
@@ -990,7 +988,7 @@ bool OpenTerrainHeightNew(const char* strFilename)
 	strcat(FileName, NewFileName);
 	strcat(FileName, "OZB");
 
-	FILE* fp = fopen(FileName, "rb");
+	FILE* fp = MU_FOPEN(FileName, "rb");
 	fseek(fp, 0, SEEK_END);
 	int iBytes = ftell(fp);
 	fseek(fp, 0, SEEK_SET);

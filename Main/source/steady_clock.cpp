@@ -46,7 +46,19 @@ double csteady_clock::GetDeltAccumulated()
 
 int csteady_clock::GetLimitFps()
 {
-	return gmProtect->ajust_fps_render;
+	int limitFps = static_cast<int>(gmProtect->ajust_fps_render);
+
+	if (limitFps <= 0)
+	{
+		limitFps = static_cast<int>(REFERENCE_FPS);
+	}
+
+	if (limitFps > 240)
+	{
+		limitFps = 240;
+	}
+
+	return limitFps;
 }
 
 int csteady_clock::Getframe_per_second()
@@ -138,21 +150,38 @@ std::chrono::steady_clock::time_point csteady_clock::GetthreadTime()
 
 uintmax_t csteady_clock::thread_sleep(const std::chrono::steady_clock::time_point thread_tick)
 {
-	const double frameavg = 1.0 / (double)this->GetLimitFps();
+	const double frameavg = 1.0 / static_cast<double>(this->GetLimitFps());
 
 	double frame_time = std::chrono::duration<double>(mainthread - thread_tick).count();
+	if (frame_time < 0.0)
+	{
+		frame_time = 0.0;
+	}
 
 	if (frame_time < frameavg)
 	{
-		int64_t sleepDuration = (frameavg - frame_time) * 1000;
+		double sleepDurationMs = (frameavg - frame_time) * 1000.0;
+		if (sleepDurationMs > 100.0)
+		{
+			sleepDurationMs = 100.0;
+		}
 
-		auto rest_ms = std::chrono::milliseconds(sleepDuration);
+		if (sleepDurationMs > 0.0)
+		{
+			auto rest_ms = std::chrono::milliseconds(static_cast<int64_t>(sleepDurationMs));
 
-		std::this_thread::sleep_for(rest_ms);
+			if (rest_ms.count() > 0)
+			{
+				std::this_thread::sleep_for(rest_ms);
+				mainthread += rest_ms;
+				frame_time += (rest_ms.count() / 1000.0);
+			}
+		}
 
-		frame_time = frameavg;
-
-		mainthread += rest_ms;
+		if (frame_time < frameavg)
+		{
+			frame_time = frameavg;
+		}
 	}
 
 	return static_cast<uintmax_t>(frame_time * 1000);

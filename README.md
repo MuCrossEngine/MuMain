@@ -31,6 +31,38 @@ Os principais bloqueios conhecidos no momento sao:
 - Validacao funcional em runtime no dispositivo Android ainda pendente.
 - Ajustes adicionais de UX mobile, entrada de texto e distribuicao de assets ainda sao necessarios para considerar o port pronto para uso final.
 
+## Roadmap de execucao
+
+Este roadmap e a visao de alto nivel do projeto. O detalhamento tecnico por arquivo/fase continua em `ANDROID_PORT.md`.
+
+### Politica de manutencao (obrigatoria)
+
+- Toda implementacao nova deve atualizar **os dois arquivos**: `README.md` (roadmap) e `ANDROID_PORT.md` (checklist tecnico).
+- Ao concluir uma tarefa, marcar checkbox no `ANDROID_PORT.md` e refletir o impacto no roadmap abaixo.
+- Ao iniciar uma tarefa grande, registrar como **Em andamento** no roadmap e detalhar subtarefas no `ANDROID_PORT.md`.
+- Nao fechar fase no roadmap sem evidencia de build e validacao runtime (quando aplicavel).
+
+### Fases do roadmap
+
+| Fase | Objetivo | Status atual | Proximo criterio de saida |
+|------|----------|--------------|----------------------------|
+| R0 | Build e bootstrap Android | ✅ Concluido | APK debug instala e inicia sem crash imediato |
+| R1 | Compatibilidade de plataforma (Win32/PAL) | 🔄 Em andamento | Cobrir APIs restantes usadas em runtime principal |
+| R2 | Render OpenGL ES (fixed-function emulacao) | 🔄 Em andamento | Login + Character + Main com render funcional basico |
+| R3 | Input/IME mobile | 🔄 Em andamento | Texto e foco funcionando em login/chat sem regressao |
+| R4 | Audio Android | 🔄 Em andamento | BGM e SFX estaveis em cenas principais |
+| R5 | Integracao por cena | 🔄 Em andamento | Fluxo completo: Boot -> Login -> Server Select -> Character -> Main |
+| R6 | Downloader/manifesto remoto | ⬜ Adiado (final) | Ativar apenas apos runtime render/input/audio estavel |
+| R7 | Hardening e release prep | ⬜ Pendente | FPS alvo, sem ANR/crash e validacao final |
+
+### Curto prazo (proximas iteracoes)
+
+- Consolidar compatibilidade de render legada (`ZzzBMD`, `ZzzLodTerrain`, `ZzzEffect*`).
+- Fluxo `WEBZEN_SCENE` -> `LOG_IN_SCENE` validado por log; foco atual em consolidar `server select` e progressao completa para `CHARACTER_SCENE`.
+- Fechar validacao funcional do caminho de login (request/receive de server list) com comportamento consistente no Android.
+- Avancar substituicoes pendentes de fonte/GDI para Android.
+- Somente depois reativar e estabilizar downloader HTTP remoto.
+
 ## Build
 
 ### Windows
@@ -61,7 +93,20 @@ Para reproduzir o build local usado nesta etapa:
 
 ## Changelog
 
+### 2026-04-15
+
+- Atualizado roadmap do `README.md`: Fase R5 (integração por cena) passou para **Em andamento**.
+- Endpoint Android de login fixado para `74.63.218.132:44404` no bootstrap (`LegacyBootstrapStubs.cpp`) e validado em runtime via log.
+- Rodada de paridade com `Main/sourceOld` aplicada no fluxo de login/server list, mantendo shim mínimo Android para confiabilidade de rede.
+- Fluxo de cena segue estável sem crash fatal imediato (`WEBZEN_SCENE` -> `LOG_IN_SCENE`) com build debug validado localmente.
+- Estado atual do bloqueio funcional: confirmar estabilidade do receive de server list em todas as execuções após limpeza de logs/instrumentação temporária.
+
 ### 2026-04-14
+
+- Adicionado roadmap de execucao neste `README.md` com politica obrigatoria de sincronizacao entre `README.md` e `ANDROID_PORT.md`.
+- Evoluida a compatibilidade de render para `GL_QUADS` com emulacao robusta em `glDrawArrays` e continuidade para `glDrawElements` com client arrays no Android.
+- Corrigido desligamento incorreto de estado de array em sombras de `ZzzBMD` (`glDisableClientState(GL_VERTEX_ARRAY)`).
+- Validado novo ciclo `assembleDebug` + install/launch em adb sem crash fatal imediato.
 
 - Integrado o fluxo de downloader Android ao codigo legado `GameShop/FileDownloader` + `HTTPConnecter`.
 - Corrigido o loop de transferencia em `FileDownloader::TransferRemoteFile()` para leitura incremental real do stream remoto.
@@ -85,6 +130,25 @@ Para reproduzir o build local usado nesta etapa:
 - Adicionada instrumentacao de diagnostico no downloader Android (`MUAssets`) para rastrear erro de transporte em runtime.
 - Investigado fallback Java HTTP (`HttpURLConnection`) e bridge JNI para o `MainActivity`; mantido desativado no fluxo final por nao resolver o bloqueio de transporte do arquivo `Data/Custom/NPC/Monster1000.bmd`.
 - Bloqueio atual de runtime permanece: abort/timeout de conexao no download de `Monster1000.bmd` no emulador, mesmo com retries.
+- Adicionada instrumentacao Android de cena em `ZzzScene.cpp` (`MUScene`) para registrar transicao de cena, primeira tentativa de render, primeiro render bem-sucedido e falhas de render com contagem.
+- Validada execucao Android com evidencia de transicao para `WEBZEN_SCENE` e tentativa de render sem crash fatal imediato.
+- Novo bloqueio rastreado por log: `Render*` da `WEBZEN_SCENE` retorna `false` no ciclo inicial (pendente correcao para avancar a Fase 8).
+- Corrigido fluxo Android para usar o dispatcher `Scene()` (em vez de chamar `MainScene()` direto), destravando a sequencia real de cenas no runtime.
+- Adicionado hardening em `CSprite::Create` para fallback sem textura quando `FindTexture` retorna ponteiro nulo no Android.
+- Ajustado carregamento de `.OZJ/.OZT` em `GlobalBitmap.cpp` para abrir via resolvedor de path Android (`GameAssetPath`).
+- Corrigida recursao de bind de textura no backend GLES (`glBindTexture` <-> `GLESFF::BindTexture`) com bind direto ao driver, removendo assinatura de stack overflow observada anteriormente.
+- Nova validacao adb (2026-04-14): bootstrap completo, entrada em `WEBZEN_SCENE` confirmada e processo permanece ativo (`pidof`), com proximo foco em avancar ate `LOG_IN_SCENE`.
+- Nova validacao adb (2026-04-14): transicao `WEBZEN_SCENE` -> `LOG_IN_SCENE` confirmada sem `SIGSEGV` imediato e processo estavel por janela de 45s.
+- Corrigidos null dereferences de bootstrap/login em `CGMCharacter`, `CDirection::HeroFallingDownInit` e criacao de login (`Hero` lazy-init).
+- Adicionados guards de null no `OptionWin` para evitar crash quando backend de opcoes do NewUI nao esta disponivel no caminho Android atual.
+- Bloqueio atual de UX: tela permanece preta no login apesar de processo vivo e sem crash fatal; proximo passo e instrumentar/renderizar heartbeat visual no `LOG_IN_SCENE`.
+- Corrigida causa principal de fechamento em tela preta no login Android: `CreateLogInScene()` agora forca `SceneLogin=1` em Android quando vier modo custom (`2/3/4/0`), evitando `LoadWorld()` de login custom que encerrava o app em falha de arquivo.
+- Validacao ADB em instalacao limpa (`pm clear`) confirmada apos patch: `WEBZEN_SCENE` -> `LOG_IN_SCENE`, primeiro render em login e processo vivo (`pidof`) sem `SIGSEGV`.
+- Corrigido caminho da tela de loading no Android: `RenderTitleSceneUI()` passou a renderizar sem `SwapBuffers(hDC)` quando `hDC` e nulo, e o `WebzenScene` voltou a chamar o render da tela de titulo no caminho Android.
+- Adicionado fallback visual no login Android para evitar tela preta sem janelas: `CreateLogInScene()` agora exibe inicialmente `LoginMainWin` e `ServerSelWin` logo apos `CreateLoginScene()`.
+- Melhorada robustez do socket não bloqueante Android em `wsctlc.cpp`: `sSend/FDWriteSend` agora tratam `WSAENOTCONN/WSAEINPROGRESS/WSAEALREADY` como estado transitório (sem fechar socket).
+- `CreateLogInScene()` agora também dispara `SendRequestServerList()` no sucesso de `ReconnectCreateConnection`, reduzindo janela de login sem lista quando a conexão demora.
+- Nova validacao adb (2026-04-14): logs confirmam `forced initial login UI visibility`, `ReconnectCreateConnection ... requested server list`, `First successful render in LOG_IN_SCENE` e processo vivo.
 
 ### 2026-04-13
 

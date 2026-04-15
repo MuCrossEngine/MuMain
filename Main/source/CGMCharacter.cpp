@@ -1,6 +1,12 @@
 #include "stdafx.h"
 #include "CGMCharacter.h"
 
+CGMCharacter* GetGMCharacter()
+{
+	static CGMCharacter s_character;
+	return &s_character;
+}
+
 CGMCharacter::CGMCharacter()
 {
 	CharactersClient = NULL;

@@ -321,6 +321,10 @@ void ReceiveServerList(BYTE* ReceiveBuffer)
 		rUIMng.ShowWin(&rUIMng.m_LoginMainWin);
 	}
 
+#ifdef __ANDROID__
+	__android_log_print(ANDROID_LOG_INFO, "MUAndroid", "ReceiveServerList total=%d", TotalServer);
+#endif
+
 	g_ErrorReport.Write("Success Receive Server List.\r\n");
 	g_ConsoleDebug->Write(MCD_RECEIVE, "0xF4 [ReceiveServerList]");
 }

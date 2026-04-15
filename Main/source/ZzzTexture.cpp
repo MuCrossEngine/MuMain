@@ -14,6 +14,9 @@
 #include <turbojpeg/stb_image.h>
 #endif
 #include "ProtocolSend.h"
+#ifdef __ANDROID__
+#include <android/log.h>
+#endif
 
 CGlobalBitmap Bitmaps;
 
@@ -322,6 +325,15 @@ bool LoadBitmap(const char* szFileName, GLuint uiTextureIndex, GLuint uiFilter, 
 	{
 		if (false == Bitmaps.LoadImage(uiTextureIndex, szFullPath, uiFilter, uiWrapMode))
 		{
+#ifdef __ANDROID__
+			__android_log_print(ANDROID_LOG_ERROR,
+				"MUTexture",
+				"LoadBitmap failed idx=%u path=%s filter=0x%x wrap=0x%x",
+				uiTextureIndex,
+				szFullPath,
+				uiFilter,
+				uiWrapMode);
+#endif
 			char szErrorMsg[256] = { 0, };
 			sprintf(szErrorMsg, "LoadBitmap Failed: %s", szFullPath);
 			PopUpErrorCheckMsgBox(szErrorMsg, true);

@@ -2416,7 +2416,13 @@ CNewUIWindowMenu* SEASON3B::CNewUISystem::GetUI_NewWindowMenu() const
 
 CNewUIOptionWindow* SEASON3B::CNewUISystem::GetUI_NewOptionWindow() const
 {
-	return m_pNewOptionWindow;
+	if (m_pNewOptionWindow)
+	{
+		return m_pNewOptionWindow;
+	}
+
+	static CNewUIOptionWindow s_fallbackOptionWindow;
+	return &s_fallbackOptionWindow;
 }
 
 CNewUIHeroPositionInfo* SEASON3B::CNewUISystem::GetUI_NewHeroPositionInfo() const
@@ -2651,7 +2657,17 @@ CScriptItem* SEASON3B::CNewUISystem::GetUI_NewItemScript() const
 
 CGMCameraWorld* SEASON3B::CNewUISystem::GetUI_NewUICamWebzen() const
 {
-	return m_iCamWebzen;
+	CNewUISystem* self = const_cast<CNewUISystem*>(this);
+	if (self->m_iCamWebzen == NULL)
+	{
+		self->m_iCamWebzen = new CGMCameraWorld;
+		if (self->m_iCamWebzen)
+		{
+			self->m_iCamWebzen->Init();
+		}
+	}
+
+	return self->m_iCamWebzen;
 }
 
 CNewUINameWindow* SEASON3B::CNewUISystem::GetUI_NewUINameWindow() const

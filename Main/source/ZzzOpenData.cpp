@@ -289,9 +289,12 @@ void OpenPlayers()
 	gmClientModels->AccessModel(MODEL_PANTS + 83, "Data\\Player\\", "PantMale", 60);
 	gmClientModels->AccessModel(MODEL_BOOTS + 83, "Data\\Player\\", "BootMale", 60);
 
-	CPhysicsClothMesh* pCloth = new CPhysicsClothMesh[1];
-	pCloth[0].Create(&Hero->Object, 2, 17, 0.0f, 0.0f, 0.0f, 5, 8, 45.0f, 85.0f, BITMAP_PANTS_G_SOUL, BITMAP_PANTS_G_SOUL, PCT_MASK_ALPHA | PCT_HEAVY | PCT_STICKED, MODEL_PANTS + 18);
-	delete[] pCloth;
+	if (Hero)
+	{
+		CPhysicsClothMesh* pCloth = new CPhysicsClothMesh[1];
+		pCloth[0].Create(&Hero->Object, 2, 17, 0.0f, 0.0f, 0.0f, 5, 8, 45.0f, 85.0f, BITMAP_PANTS_G_SOUL, BITMAP_PANTS_G_SOUL, PCT_MASK_ALPHA | PCT_HEAVY | PCT_STICKED, MODEL_PANTS + 18);
+		delete[] pCloth;
+	}
 
 	for (int i = 0; i < 1; i++)
 		gmClientModels->AccessModel(MODEL_SHADOW_BODY + i, "Data\\Player\\", "Shadow", i + 1);
@@ -1463,12 +1466,26 @@ void OpenItems()
 	gmClientModels->AccessModel(MODEL_POTION + 168, "Data\\Item\\", "DimensionCloth", -1);
 	gmClientModels->AccessModel(MODEL_STAFF + 36, "Data\\Item\\", "Archangelus", -1);
 
-	gmClientModels->GetModelMesh(MODEL_SPEAR, 1)->NoneBlendMesh;
-	gmClientModels->GetModelMesh(MODEL_SPEAR, 1)->NoneBlendMesh = true;
-	gmClientModels->GetModelMesh(MODEL_SWORD + 10, 1)->NoneBlendMesh = true;
-	gmClientModels->GetModelMesh(MODEL_STAFF + 6, 2)->NoneBlendMesh = true;
-	gmClientModels->GetModelMesh(MODEL_MACE + 6, 1)->NoneBlendMesh = true;
-	gmClientModels->GetModelMesh(MODEL_EVENT + 9, 1)->NoneBlendMesh = true;
+	if (auto* spearMesh = gmClientModels->GetModelMesh(MODEL_SPEAR, 1))
+	{
+		spearMesh->NoneBlendMesh = true;
+	}
+	if (auto* swordMesh = gmClientModels->GetModelMesh(MODEL_SWORD + 10, 1))
+	{
+		swordMesh->NoneBlendMesh = true;
+	}
+	if (auto* staffMesh = gmClientModels->GetModelMesh(MODEL_STAFF + 6, 2))
+	{
+		staffMesh->NoneBlendMesh = true;
+	}
+	if (auto* maceMesh = gmClientModels->GetModelMesh(MODEL_MACE + 6, 1))
+	{
+		maceMesh->NoneBlendMesh = true;
+	}
+	if (auto* eventMesh = gmClientModels->GetModelMesh(MODEL_EVENT + 9, 1))
+	{
+		eventMesh->NoneBlendMesh = true;
+	}
 }
 
 void OpenItemTextures()
@@ -2091,7 +2108,7 @@ void OpenNpc(int Type)
 		gmClientModels->OpenTexture(Type, "Npc\\");
 		break;
 
-		//  µ¥ºñ¾Æ½º, ·Î·£½Ã¾Æ Ãß°¡ »óÁ¡ NPC
+		//  ï¿½ï¿½ï¿½ï¿½Æ½ï¿½, ï¿½Î·ï¿½ï¿½Ã¾ï¿½ ï¿½ß°ï¿½ ï¿½ï¿½ï¿½ï¿½ NPC
 	case MODEL_DEVIAS_TRADER:
 		gmClientModels->AccessModel(MODEL_DEVIAS_TRADER, "Data\\Npc\\", "DeviasTrader", 1);
 		gmClientModels->OpenTexture(Type, "Npc\\");
@@ -2103,12 +2120,12 @@ void OpenNpc(int Type)
 		gmClientModels->OpenTexture(MODEL_ANGEL, "Npc\\");
 		break;
 #endif	// _PVP_ATTACK_GUARD
-	case MODEL_NPC_BREEDER:    //  Á¶·Ã»ç NPC.
+	case MODEL_NPC_BREEDER:    //  ï¿½ï¿½ï¿½Ã»ï¿½ NPC.
 		gmClientModels->AccessModel(MODEL_NPC_BREEDER, "Data\\Npc\\", "Breeder");
 		gmClientModels->OpenTexture(MODEL_NPC_BREEDER, "Npc\\");
 		break;
 #ifdef _PVP_MURDERER_HERO_ITEM
-	case MODEL_HERO_SHOP:	// ¿µ¿õ »óÁ¡
+	case MODEL_HERO_SHOP:	// ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 		gmClientModels->AccessModel(MODEL_HERO_SHOP, "Data\\Npc\\", "HeroNpc");
 		gmClientModels->OpenTexture(MODEL_HERO_SHOP, "Npc\\");
 		break;
@@ -3627,7 +3644,7 @@ void OpenMonsterModel(int Type)
 			b->Actions[MONSTER01_ATTACK1].PlaySpeed = 0.5f;
 			b->Actions[MONSTER01_ATTACK2].PlaySpeed = 0.5f;
 		}
-		b->BoneHead = 20;//ÀÎ¾î
+		b->BoneHead = 20;//ï¿½Î¾ï¿½
 		break;
 	case 35:
 		LoadWaveFile(SOUND_MONSTER + 135, "Data\\Sound\\mValkyrie1.wav", Channel, Enable);
@@ -3998,7 +4015,7 @@ void OpenMonsterModel(int Type)
 		LoadWaveFile(SOUND_RAKLION_ICEGIANT_DEATH, "Data\\Sound\\w58w59\\IceGiant_death.wav", 1);
 		break;
 	case 148:
-		LoadWaveFile(SOUND_MONSTER + 34, "Data\\Sound\\mÇï½ºÆÄÀÌ´õÁ×±â.wav", 1);
+		LoadWaveFile(SOUND_MONSTER + 34, "Data\\Sound\\mï¿½ï½ºï¿½ï¿½ï¿½Ì´ï¿½ï¿½×±ï¿½.wav", 1);
 		LoadWaveFile(SOUND_RAKLION_COOLERTIN_ATTACK, "Data\\Sound\\w58w59\\Coolertin_attack.wav", 1);
 		LoadWaveFile(SOUND_RAKLION_COOLERTIN_MOVE, "Data\\Sound\\w58w59\\Coolertin_move.wav", 1);
 		break;
@@ -4235,9 +4252,13 @@ void OpenSkills()
 	LoadBitmap("Skill\\dkthreebody_r.jpg", BITMAP_MONSTER_SKIN + 2, GL_LINEAR, GL_REPEAT);
 
 	gmClientModels->AccessModel(MODEL_WARCRAFT, "Data\\Skill\\", "HellGate");
-	gmClientModels->GetModel(MODEL_WARCRAFT)->Actions[0].LockPositions = false;
-	SAFE_DELETE_ARRAY(gmClientModels->GetModel(MODEL_WARCRAFT)->Actions[0].Positions);
-	gmClientModels->GetModel(MODEL_WARCRAFT)->Actions[0].PlaySpeed = 0.15f;
+	if (auto* warcraftModel = gmClientModels->GetModel(MODEL_WARCRAFT);
+		warcraftModel && warcraftModel->Actions && warcraftModel->NumActions > 0)
+	{
+		warcraftModel->Actions[0].LockPositions = false;
+		SAFE_DELETE_ARRAY(warcraftModel->Actions[0].Positions);
+		warcraftModel->Actions[0].PlaySpeed = 0.15f;
+	}
 
 	gmClientModels->AccessModel(MODEL_ARROW, "Data\\Skill\\", "Arrow", 1);
 	gmClientModels->AccessModel(MODEL_ARROW_STEEL, "Data\\Skill\\", "ArrowSteel", 1);
@@ -4300,9 +4321,13 @@ void OpenSkills()
 	gmClientModels->AccessModel(MODEL_MAGIC_CIRCLE1, "Data\\Skill\\", "MagicCircle", 1);
 	gmClientModels->AccessModel(MODEL_ARROW_WING, "Data\\Skill\\", "ArrowWing", 1);
 	gmClientModels->AccessModel(MODEL_ARROW_BOMB, "Data\\Skill\\", "ArrowBomb", 1);
-	gmClientModels->AccessModel(MODEL_BALL, "Data\\Skill\\", "Ball", 1);//°ø
+	gmClientModels->AccessModel(MODEL_BALL, "Data\\Skill\\", "Ball", 1);//ï¿½ï¿½
 
-	gmClientModels->GetModel(MODEL_BALL)->Actions[0].PlaySpeed = 0.5f;
+	if (auto* ballModel = gmClientModels->GetModel(MODEL_BALL);
+		ballModel && ballModel->Actions && ballModel->NumActions > 0)
+	{
+		ballModel->Actions[0].PlaySpeed = 0.5f;
+	}
 
 	gmClientModels->AccessModel(MODEL_SKILL_BLAST, "Data\\Skill\\", "Blast", 1);
 	gmClientModels->AccessModel(MODEL_SKILL_INFERNO, "Data\\Skill\\", "Inferno", 1);
@@ -4962,7 +4987,7 @@ void OpenSounds()
 	LoadWaveFile(SOUND_TOWER01, "Data\\Sound\\aTower.wav", 1);
 	LoadWaveFile(SOUND_WATER01, "Data\\Sound\\aWater.wav", 1);
 	LoadWaveFile(SOUND_DESERT01, "Data\\Sound\\desert.wav", 1);
-	//LoadWaveFile(SOUND_BOSS01		    ,"Data\\Sound\\aÄïµÐ.wav",1);
+	//LoadWaveFile(SOUND_BOSS01		    ,"Data\\Sound\\aï¿½ï¿½ï¿½.wav",1);
 	LoadWaveFile(SOUND_HUMAN_WALK_GROUND, "Data\\Sound\\pWalk(Soil).wav", 2);
 	LoadWaveFile(SOUND_HUMAN_WALK_GRASS, "Data\\Sound\\pWalk(Grass).wav", 2);
 	LoadWaveFile(SOUND_HUMAN_WALK_SNOW, "Data\\Sound\\pWalk(Snow).wav", 2);
@@ -5005,7 +5030,7 @@ void OpenSounds()
 	LoadWaveFile(SOUND_DROP_GOLD01, "Data\\Sound\\pDropMoney.wav", 1);
 	LoadWaveFile(SOUND_JEWEL01, "Data\\Sound\\eGem.wav", 1);
 	LoadWaveFile(SOUND_GET_ITEM01, "Data\\Sound\\pGetItem.wav", 1);
-	//LoadWaveFile(SOUND_SHOUT01    		,"Data\\Sound\\p±âÇÕ.wav",1); 
+	//LoadWaveFile(SOUND_SHOUT01    		,"Data\\Sound\\pï¿½ï¿½ï¿½ï¿½.wav",1); 
 
 	//skill
 	LoadWaveFile(SOUND_SKILL_DEFENSE, "Data\\Sound\\sKnightDefense.wav", 1);
@@ -5021,13 +5046,13 @@ void OpenSounds()
 	LoadWaveFile(SOUND_HELLFIRE, "Data\\Sound\\sHellFire.wav", 2, Enable3DSound);
 	LoadWaveFile(SOUND_ICE, "Data\\Sound\\sIce.wav", 2, Enable3DSound);
 	LoadWaveFile(SOUND_FLAME, "Data\\Sound\\sFlame.wav", 2, Enable3DSound);
-	//LoadWaveFile(SOUND_FLASH            ,"Data\\Sound\\mÈ÷µå¶ó°ø°Ý1.wav",2,Enable3DSound);
+	//LoadWaveFile(SOUND_FLASH            ,"Data\\Sound\\mï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½1.wav",2,Enable3DSound);
 	LoadWaveFile(SOUND_FLASH, "Data\\Sound\\sAquaFlash.wav", 2, Enable3DSound);
 
 	LoadWaveFile(SOUND_BREAK01, "Data\\Sound\\eBreak.wav", 1, Enable3DSound);
 	LoadWaveFile(SOUND_EXPLOTION01, "Data\\Sound\\eExplosion.wav", 1, Enable3DSound);
 	LoadWaveFile(SOUND_METEORITE01, "Data\\Sound\\eMeteorite.wav", 2, Enable3DSound);
-	//LoadWaveFile(SOUND_METEORITE02	    ,"Data\\Sound\\eÀ¯¼º.wav",2,Enable3DSound);
+	//LoadWaveFile(SOUND_METEORITE02	    ,"Data\\Sound\\eï¿½ï¿½ï¿½ï¿½.wav",2,Enable3DSound);
 	LoadWaveFile(SOUND_THUNDER01, "Data\\Sound\\eThunder.wav", 1, Enable3DSound);
 
 	LoadWaveFile(SOUND_BONE1, "Data\\Sound\\mBone1.wav", 2, Enable3DSound);
@@ -5307,7 +5332,12 @@ void SaveOptions()
 
 void OpenLogoSceneData()
 {
-	if (gmProtect->SceneLogin == 1)
+	int loginScene = gmProtect->SceneLogin;
+#ifdef __ANDROID__
+	loginScene = 1;
+#endif
+
+	if (loginScene == 1)
 	{
 		LoadBitmap("Logo\\Sky5.jpg", BITMAP_LOG_IN + 9);
 		LoadBitmap("Logo\\Sky0.jpg", BITMAP_LOG_IN + 10);
@@ -5321,7 +5351,7 @@ void OpenLogoSceneData()
 			gmClientModels->OpenTexture(MODEL_LOGO + i, "Logo\\", GL_REPEAT, GL_LINEAR);
 		}
 	}
-	else if (gmProtect->SceneLogin == 2)
+	else if (loginScene == 2)
 	{
 		LoadBitmap("Logo\\Login02_Back01.jpg", BITMAP_LOG_IN + 9);
 		LoadBitmap("Logo\\Login02_Back02.jpg", BITMAP_LOG_IN + 10);
@@ -5440,6 +5470,45 @@ void OpenBasicData(HDC hDC)
 	CUIMng& rUIMng = CUIMng::Instance();
 
 	rUIMng.RenderTitleSceneUI(hDC, 0, 12);
+
+#ifdef __ANDROID__
+	::LoadBitmap("Interface\\message_ok_b_all.tga", BITMAP_BUTTON);
+	::LoadBitmap("Interface\\loding_cancel_b_all.tga", BITMAP_BUTTON + 1);
+	::LoadBitmap("Interface\\message_close_b_all.tga", BITMAP_BUTTON + 2);
+	::LoadBitmap("Interface\\message_back.tga", BITMAP_MESSAGE_WIN);
+	::LoadBitmap("Interface\\delete_secret_number.tga", BITMAP_MSG_WIN_INPUT);
+	::LoadBitmap("Interface\\op1_stone.jpg", BITMAP_SYS_WIN, GL_NEAREST, GL_REPEAT);
+	::LoadBitmap("Interface\\op1_back1.tga", BITMAP_SYS_WIN + 1);
+	::LoadBitmap("Interface\\op1_back2.tga", BITMAP_SYS_WIN + 2);
+	::LoadBitmap("Interface\\op1_back3.jpg", BITMAP_SYS_WIN + 3, GL_NEAREST, GL_REPEAT);
+	::LoadBitmap("Interface\\op1_back4.jpg", BITMAP_SYS_WIN + 4, GL_NEAREST, GL_REPEAT);
+	::LoadBitmap("Interface\\op1_b_all.tga", BITMAP_TEXT_BTN);
+	::LoadBitmap("Interface\\op2_back1.tga", BITMAP_OPTION_WIN);
+	::LoadBitmap("Interface\\op2_ch.tga", BITMAP_CHECK_BTN);
+	::LoadBitmap("Interface\\op2_volume3.tga", BITMAP_SLIDER);
+	::LoadBitmap("Interface\\op2_volume2.jpg", BITMAP_SLIDER + 1, GL_NEAREST, GL_REPEAT);
+	::LoadBitmap("Interface\\op2_volume1.tga", BITMAP_SLIDER + 2);
+	::LoadBitmap("Interface\\cha_bt.tga", BITMAP_LOG_IN);
+	::LoadBitmap("Interface\\server_b2_all.tga", BITMAP_LOG_IN + 1);
+	::LoadBitmap("Interface\\server_b2_loding.jpg", BITMAP_LOG_IN + 2);
+	::LoadBitmap("Interface\\server_deco_all.tga", BITMAP_LOG_IN + 3);
+	::LoadBitmap("Interface\\server_menu_b_all.tga", BITMAP_LOG_IN + 4);
+	::LoadBitmap("Interface\\server_credit_b_all.tga", BITMAP_LOG_IN + 5);
+	::LoadBitmap("Interface\\deco.tga", BITMAP_LOG_IN + 6);
+	::LoadBitmap("Interface\\login_back.tga", BITMAP_LOG_IN + 7);
+	::LoadBitmap("Interface\\login_me.tga", BITMAP_LOG_IN + 8);
+	::LoadBitmap("Interface\\server_ex03.tga", BITMAP_LOG_IN + 11, GL_NEAREST, GL_REPEAT);
+	::LoadBitmap("Interface\\server_ex01.tga", BITMAP_LOG_IN + 12);
+	::LoadBitmap("Interface\\server_ex02.jpg", BITMAP_LOG_IN + 13, GL_NEAREST, GL_REPEAT);
+	::LoadBitmap("Interface\\cr_mu_lo.tga", BITMAP_LOG_IN + 14, GL_LINEAR);
+	::LoadBitmap("Interface\\HUD\\ConnectList.tga", BITMAP_LOG_IN + 15, GL_LINEAR);
+
+	rUIMng.RenderTitleSceneUI(hDC, 1, 12);
+	rUIMng.RenderTitleSceneUI(hDC, 9, 12);
+	rUIMng.RenderTitleSceneUI(hDC, 10, 12);
+	rUIMng.RenderTitleSceneUI(hDC, 11, 12);
+	return;
+#endif
 
 	LoadBitmap("Interface\\Cursor.tga", BITMAP_CURSOR, GL_LINEAR, GL_CLAMP_TO_EDGE);
 	LoadBitmap("Interface\\CursorPush.tga", BITMAP_CURSOR + 1, GL_LINEAR, GL_CLAMP_TO_EDGE);

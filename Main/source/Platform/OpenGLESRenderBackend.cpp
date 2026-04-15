@@ -9,6 +9,7 @@
 #include "GameAssetPath.h"
 
 #include <GLES3/gl3.h>
+#include <EGL/egl.h>
 #include <android/log.h>
 #ifdef min
 #  undef min
@@ -80,6 +81,48 @@ static std::stack<glm::mat4> s_modelviewStack;
 static std::stack<glm::mat4> s_projectionStack;
 static std::stack<glm::mat4> s_textureStack;
 static int s_matrixMode = 0; // 0=MV, 1=Proj, 2=Tex
+static void (*s_driverBindTexture)(GLenum, GLuint) = nullptr;
+static void (*s_driverDrawArrays)(GLenum, GLint, GLsizei) = nullptr;
+
+static inline void DriverBindTexture(GLenum target, GLuint tex)
+{
+    if (s_driverBindTexture)
+    {
+        s_driverBindTexture(target, tex);
+        return;
+    }
+
+    using BindTextureProc = void (*)(GLenum, GLuint);
+    s_driverBindTexture = reinterpret_cast<BindTextureProc>(eglGetProcAddress("glBindTexture"));
+    if (s_driverBindTexture)
+    {
+        s_driverBindTexture(target, tex);
+    }
+    else
+    {
+        LOGE("Failed to resolve driver glBindTexture");
+    }
+}
+
+static inline void DriverDrawArrays(GLenum mode, GLint first, GLsizei count)
+{
+    if (s_driverDrawArrays)
+    {
+        s_driverDrawArrays(mode, first, count);
+        return;
+    }
+
+    using DrawArraysProc = void (*)(GLenum, GLint, GLsizei);
+    s_driverDrawArrays = reinterpret_cast<DrawArraysProc>(eglGetProcAddress("glDrawArrays"));
+    if (s_driverDrawArrays)
+    {
+        s_driverDrawArrays(mode, first, count);
+    }
+    else
+    {
+        LOGE("Failed to resolve driver glDrawArrays");
+    }
+}
 
 static std::stack<glm::mat4>& ActiveStack()
 {
@@ -250,6 +293,11 @@ namespace GLESFF {
 bool Init(int screenW, int screenH)
 {
     s_screenW = screenW; s_screenH = screenH;
+    s_driverBindTexture = reinterpret_cast<void (*)(GLenum, GLuint)>(eglGetProcAddress("glBindTexture"));
+    if (!s_driverBindTexture)
+    {
+        LOGE("Init: could not resolve driver glBindTexture");
+    }
 
     // Init matrix stacks with identity
     while (!s_modelviewStack.empty())  s_modelviewStack.pop();
@@ -429,7 +477,7 @@ void FlushUniforms()
     if (useTexture)
     {
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, g_rs.boundTexture);
+        DriverBindTexture(GL_TEXTURE_2D, g_rs.boundTexture);
         glUniform1i(s_u.texture, 0);
     }
 
@@ -543,7 +591,7 @@ void ImmEnd()
     glBufferData(GL_ARRAY_BUFFER, bytes, nullptr, GL_STREAM_DRAW);
     glBufferSubData(GL_ARRAY_BUFFER, 0, bytes, src.data());
 
-    glDrawArrays(s_immMode, 0, (GLsizei)count);
+    DriverDrawArrays(s_immMode, 0, (GLsizei)count);
 
     glBindVertexArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -554,7 +602,7 @@ void ImmEnd()
 void BindTexture(GLenum /*target*/, GLuint tex)
 {
     g_rs.boundTexture = tex;
-    if (tex) glBindTexture(GL_TEXTURE_2D, tex);
+    if (tex) DriverBindTexture(GL_TEXTURE_2D, tex);
 }
 
 void TexEnvf(GLenum /*target*/, GLenum /*pname*/, float /*param*/) { /* stored in RS if needed */ }

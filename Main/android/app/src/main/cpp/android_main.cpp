@@ -11,6 +11,8 @@
 #include <string>
 #include <atomic>
 #include <chrono>
+#include <sys/stat.h>
+#include <cstdio>
 
 #define LOG_TAG "MUAndroid"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO,  LOG_TAG, __VA_ARGS__)
@@ -44,13 +46,18 @@
 #include "Time/Timer.h"
 #include "CGMProtect.h"
 #include "CGMFontLayer.h"
+#include "CGMModelManager.h"
+#include "w_MapProcess.h"
+#include "w_PetProcess.h"
 
 // Networking poll (replaces WSAAsyncSelect model)
 #include "Platform/AndroidNetworkPollCompat.h"
 
 // External SceneFlag and game loop functions declared in ZzzScene.cpp
 extern int SceneFlag;
-extern void MainScene(HDC hDC);
+extern void Scene(HDC hDC);
+extern float g_fScreenRate_x;
+extern float g_fScreenRate_y;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // App state
@@ -60,6 +67,10 @@ static AndroidEglWindow*   g_eglWindow   = nullptr;
 static bool                g_initialized = false;
 static bool                g_focused     = false;
 static std::atomic<bool>   g_running{true};
+static bool                g_renderBackendInitialized = false;
+
+// Windows initializes this singleton in WinMain(); Android must do it here.
+static CGMModelManager     g_androidModelManager;
 
 // JNI helper: get external files path from Java side
 static std::string GetExternalFilesDir(android_app* app)
@@ -109,6 +120,65 @@ static std::string GetAssetServerUrl(android_app* app)
     env->DeleteLocalRef(cls);
     app->activity->vm->DetachCurrentThread();
     return url;
+}
+
+static void SyncLegacyScreenMetrics(int width, int height)
+{
+    if (width <= 0 || height <= 0)
+    {
+        return;
+    }
+
+    WindowWidth = static_cast<unsigned int>(width);
+    WindowHeight = static_cast<unsigned int>(height);
+
+    int screenType = 0;
+    if (gmProtect != nullptr)
+    {
+        screenType = gmProtect->ScreenType;
+    }
+
+    if (screenType == 0)
+    {
+        g_fScreenRate_x = static_cast<float>(WindowWidth) / 640.0f;
+        g_fScreenRate_y = static_cast<float>(WindowHeight) / 480.0f;
+    }
+    else if (screenType == 1)
+    {
+        const float byWidth = static_cast<float>(WindowWidth) / 640.0f;
+        const float byHeight = static_cast<float>(WindowHeight) / 480.0f;
+        const float uniScale = (byWidth >= byHeight) ? byHeight : byWidth;
+        g_fScreenRate_x = uniScale;
+        g_fScreenRate_y = uniScale;
+    }
+    else
+    {
+        if (WindowWidth >= 1920)
+        {
+            g_fScreenRate_x = 1.6f;
+            g_fScreenRate_y = 1.6f;
+        }
+        else
+        {
+            g_fScreenRate_x = 1.25f;
+            g_fScreenRate_y = 1.25f;
+        }
+    }
+
+    if (g_fScreenRate_x <= 0.0f || g_fScreenRate_y <= 0.0f)
+    {
+        g_fScreenRate_x = static_cast<float>(WindowWidth) / 640.0f;
+        g_fScreenRate_y = static_cast<float>(WindowHeight) / 480.0f;
+    }
+
+    CInput::Instance().Create(gwinhandle->GethWnd(), WindowWidth, WindowHeight);
+
+    LOGI("Screen sync: window=%ux%u scale=%.3f/%.3f screenType=%d",
+         WindowWidth,
+         WindowHeight,
+         g_fScreenRate_x,
+         g_fScreenRate_y,
+         screenType);
 }
 
 static void CallMainActivityVoidMethod(const char* methodName)
@@ -195,9 +265,60 @@ static bool CallMainActivityBoolMethod2Strings(const char* methodName,
     return ok;
 }
 
+static bool PathExists(const std::string& path)
+{
+    if (path.empty())
+    {
+        return false;
+    }
+
+    struct stat st;
+    return stat(path.c_str(), &st) == 0;
+}
+
+static bool WriteBootstrapMarker(const std::string& markerPath)
+{
+    FILE* marker = fopen(markerPath.c_str(), "wb");
+    if (!marker)
+    {
+        return false;
+    }
+
+    static const char kMarkerContent[] = "copied\n";
+    const size_t wrote = fwrite(kMarkerContent, 1, sizeof(kMarkerContent) - 1, marker);
+    fclose(marker);
+    return wrote == sizeof(kMarkerContent) - 1;
+}
+
+static bool AreBootstrapFilesPresent()
+{
+    const std::string pakPath = GameAssetPath::Resolve("Data/av-code45.pak");
+    const std::string connectPath = GameAssetPath::Resolve("Data/Local/Connect.msil");
+    return PathExists(pakPath) && PathExists(connectPath);
+}
+
+static bool AreLoginWorldFilesPresent()
+{
+    const std::string worldMapPath = GameAssetPath::Resolve("Data/World95/EncTerrain95.map");
+    const std::string worldAttPath = GameAssetPath::Resolve("Data/World95/EncTerrain95.att");
+    return PathExists(worldMapPath) && PathExists(worldAttPath);
+}
+
+static bool AreShaderFilesPresent()
+{
+    const std::string vertexPath = GameAssetPath::Resolve("shaders/fixed_vert.glsl");
+    const std::string fragmentPath = GameAssetPath::Resolve("shaders/fixed_frag.glsl");
+    return PathExists(vertexPath) && PathExists(fragmentPath);
+}
+
 bool AndroidExtractZipArchive(const char* zipPath, const char* targetDir)
 {
     return CallMainActivityBoolMethod2Strings("extractZipArchive", zipPath, targetDir);
+}
+
+static bool AndroidCopyAssetDirectory(const char* assetDir, const char* targetDir)
+{
+    return CallMainActivityBoolMethod2Strings("copyAssetDirectoryToPath", assetDir, targetDir);
 }
 
 void AndroidShowSoftKeyboard()
@@ -230,15 +351,78 @@ static bool InitGame(android_app* app)
         LOGI("InitGame: asset server override = %s", assetServerUrl.c_str());
     }
 
-    // 2. First-run downloader: if game data is missing, download it
-    if (!GameDownloader::IsDataReady())
+    // 2. Local bundled assets: copy Data/ from APK assets into external files
+    //    only on first run (or when required files are missing).
+    std::string dataTarget = GameAssetPath::Resolve("Data");
+    std::string copyMarker = GameAssetPath::Resolve(".data_assets_copied");
+
+    const bool markerExists = PathExists(copyMarker);
+    const bool bootstrapDataReady = AreBootstrapFilesPresent();
+    const bool mustCopyData = !markerExists || !bootstrapDataReady;
+
+    if (mustCopyData)
     {
-        LOGI("InitGame: game data not found, starting download");
-        if (!GameDownloader::DownloadAll(g_eglWindow))
+        LOGI("InitGame: copying bundled Data assets (marker=%d, dataReady=%d)",
+             markerExists ? 1 : 0,
+               bootstrapDataReady ? 1 : 0);
+
+        if (!AndroidCopyAssetDirectory("Data", dataTarget.c_str()))
         {
-            LOGE("InitGame: download failed");
+            LOGE("InitGame: failed to copy bundled assets Data -> %s", dataTarget.c_str());
             return false;
         }
+
+        if (!WriteBootstrapMarker(copyMarker))
+        {
+            LOGE("InitGame: failed to write copy marker: %s", copyMarker.c_str());
+            return false;
+        }
+    }
+    else
+    {
+        LOGI("InitGame: bundled Data already materialized, skipping copy");
+    }
+
+    if (!AreBootstrapFilesPresent())
+    {
+        LOGE("InitGame: bundled assets copy completed but bootstrap files are still missing");
+        return false;
+    }
+
+    // 2.1 Ensure login-world files exist. External downloader mirrors can be
+    // partial, so keep this world materialized from APK assets when missing.
+    if (!AreLoginWorldFilesPresent())
+    {
+        std::string loginWorldTarget = GameAssetPath::Resolve("Data/World95");
+        LOGI("InitGame: login world files missing, copying Data/World95");
+        if (!AndroidCopyAssetDirectory("Data/World95", loginWorldTarget.c_str()))
+        {
+            LOGE("InitGame: failed to copy login world assets -> %s", loginWorldTarget.c_str());
+            return false;
+        }
+    }
+
+    if (!AreLoginWorldFilesPresent())
+    {
+        LOGE("InitGame: login world assets are missing after copy");
+        return false;
+    }
+
+    // 2.2 Materialize shader sources used by the GLES fixed-function backend.
+    std::string shaderTarget = GameAssetPath::Resolve("shaders");
+    if (!AreShaderFilesPresent())
+    {
+        if (!AndroidCopyAssetDirectory("shaders", shaderTarget.c_str()))
+        {
+            LOGE("InitGame: failed to copy shader assets -> %s", shaderTarget.c_str());
+            return false;
+        }
+    }
+
+    if (!AreShaderFilesPresent())
+    {
+        LOGE("InitGame: shader assets are missing after copy");
+        return false;
     }
 
     // 3. Config bootstrap (CProtect, Configs.xtm)
@@ -268,14 +452,38 @@ static bool InitGame(android_app* app)
     // 7. Global random table (used throughout the game)
     LegacyClientRuntime::InitRandomTable();
 
-    // 8. Game data loading (mirrors OpenBasicData call sequence in WebzenScene)
-    // SceneFlag starts at WEBZEN_SCENE; MainScene() handles the rest
+#ifndef __ANDROID__
+    // 7.1 Buff system runtime (initialized in WinMain on Windows)
+    if (!g_BuffSystem)
+    {
+        g_BuffSystem = BuffStateSystem::Make();
+    }
+
+    // 7.2 Map process runtime (initialized in WinMain on Windows)
+    if (!g_MapProcess)
+    {
+        g_MapProcess = MapProcess::Make();
+    }
+
+    // 7.3 Pet process runtime (initialized in WinMain on Windows)
+    if (!g_petProcess)
+    {
+        g_petProcess = PetProcess::Make();
+    }
+#else
+    // Android: defer heavy runtime subsystems until MAIN_SCENE entry.
+    // They are not required for WEBZEN/LOGIN bootstrap and can trigger
+    // early LMK kills on constrained devices.
+    LOGI("InitGame: deferring Buff/Map/Pet runtime init until MAIN_SCENE");
+#endif
+
+    // 8. Game data loading starts in WEBZEN_SCENE and advances via Scene() dispatcher
     LOGI("InitGame: bootstrap complete, entering game loop");
     return true;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Per-frame render — identical to the Windows Scene() call
+// Per-frame render — mirrors Windows loop (Scene dispatcher)
 // ─────────────────────────────────────────────────────────────────────────────
 static void RenderFrame()
 {
@@ -285,8 +493,8 @@ static void RenderFrame()
     PollSocketIO();
     ProtocolCompiler();
 
-    // Game logic + rendering — same function as on Windows
-    MainScene(nullptr);
+    // Game logic + rendering — use full scene dispatcher
+    Scene(nullptr);
     GameMouseInput::Update();
 
     g_eglWindow->SwapBuffers();
@@ -312,6 +520,9 @@ static void OnAppCmd(android_app* app, int32_t cmd)
             }
             LegacyClientRuntime::SetWindow(app->window);
 
+            const int width = ANativeWindow_getWidth(app->window);
+            const int height = ANativeWindow_getHeight(app->window);
+
             if (!g_initialized)
             {
                 if (!InitGame(app))
@@ -321,6 +532,24 @@ static void OnAppCmd(android_app* app, int32_t cmd)
                 }
                 g_initialized = true;
             }
+
+            if (!g_renderBackendInitialized)
+            {
+                if (!RenderBackend::Init(width, height))
+                {
+                    LOGE("RenderBackend::Init failed");
+                    ANativeActivity_finish(app->activity);
+                    return;
+                }
+                g_renderBackendInitialized = true;
+            }
+            else
+            {
+                RenderBackend::SetScreenSize(width, height);
+            }
+
+            SyncLegacyScreenMetrics(width, height);
+
             g_focused = true;
         }
         break;
@@ -328,6 +557,11 @@ static void OnAppCmd(android_app* app, int32_t cmd)
     case APP_CMD_TERM_WINDOW:
         LOGI("APP_CMD_TERM_WINDOW");
         g_focused = false;
+        if (g_renderBackendInitialized)
+        {
+            RenderBackend::Shutdown();
+            g_renderBackendInitialized = false;
+        }
         if (g_eglWindow)
         {
             g_eglWindow->Destroy();
@@ -403,6 +637,11 @@ void android_main(android_app* app)
 
     // Cleanup
     AudioOpenSLES::Shutdown();
+    if (g_renderBackendInitialized)
+    {
+        RenderBackend::Shutdown();
+        g_renderBackendInitialized = false;
+    }
     if (g_eglWindow)
     {
         g_eglWindow->Destroy();

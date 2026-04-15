@@ -102,7 +102,7 @@ short   g_shCameraLevel = 0;
 int g_iLengthAuthorityCode = 20;
 
 WORD g_ServerPort = 44405;
-char* szServerIpAddress = "192.168.0.104";
+char* szServerIpAddress = "74.63.218.132";
 
 #ifdef MOVIE_DIRECTSHOW
 int  SceneFlag = MOVIE_SCENE;
@@ -329,8 +329,8 @@ bool CheckAbuseNameFilter(char* Text)
 bool CheckName()
 {
 	if (CheckAbuseNameFilter(InputText[0]) || CheckAbuseFilter(InputText[0]) ||
-		FindText(InputText[0], " ") || FindText(InputText[0], "¡¡") ||
-		FindText(InputText[0], ".") || FindText(InputText[0], "¡¤") || FindText(InputText[0], "¡­") ||
+		FindText(InputText[0], " ") || FindText(InputText[0], "ï¿½ï¿½") ||
+		FindText(InputText[0], ".") || FindText(InputText[0], "ï¿½ï¿½") || FindText(InputText[0], "ï¿½ï¿½") ||
 		FindText(InputText[0], "Webzen") || FindText(InputText[0], "WebZen") || FindText(InputText[0], "webzen") || FindText(InputText[0], "WEBZEN") ||
 		FindText(InputText[0], GlobalText[457]) || FindText(InputText[0], GlobalText[458]))
 		return true;
@@ -391,6 +391,7 @@ void CreateWebzenScene()
 	CUIMng& rUIMng = CUIMng::Instance();
 
 	OpenFont();
+
 	ClearInput();
 
 	FogEnable = false;
@@ -452,7 +453,11 @@ void WebzenScene(HDC hDC)
 	}
 
 #ifdef SOCKET_LAUNCHER
+	#ifdef __ANDROID__
+	if (true)
+	#else
 	if (GMConnectHex->GetUpdateVersion() == false)
+	#endif
 	{
 		CUIMng& rUIMng = CUIMng::Instance();
 
@@ -462,7 +467,9 @@ void WebzenScene(HDC hDC)
 
 		OpenBasicData(hDC);
 
+		#ifndef __ANDROID__
 		g_pNewUISystem->LoadMainSceneInterface();
+		#endif
 
 		CUIMng::Instance().RenderTitleSceneUI(hDC, 11, 12);
 
@@ -497,7 +504,9 @@ void WebzenScene(HDC hDC)
 
 	OpenBasicData(hDC);
 
+	#ifndef __ANDROID__
 	g_pNewUISystem->LoadMainSceneInterface();
+	#endif
 
 	CUIMng::Instance().RenderTitleSceneUI(hDC, 11, 12);
 
@@ -1501,9 +1510,23 @@ bool NewRenderCharacterScene(HDC hDC)
 void CreateLogInScene()
 {
 	EnableMainRender = true;
-
-	if (gmProtect->SceneLogin == 1)
+#ifdef __ANDROID__
+	if (gmProtect)
 	{
+		gmProtect->SceneLogin = 1;
+	}
+#endif
+
+	int loginScene = gmProtect->SceneLogin;
+#ifdef __ANDROID__
+	loginScene = 1;
+#endif
+
+	if (loginScene == 1)
+	{
+#ifdef __ANDROID__
+		World = -1;
+#else
 		vec3_t Angle, Position;
 
 		World = -1;
@@ -1555,18 +1578,19 @@ void CreateLogInScene()
 		CurrentCameraCount = -1;
 		Vector(0.0, 0.0, 0.0, CameraAngle);
 		Vector(0.0, 0.0, 0.0, CameraPosition);
+#endif
 	}
 	else
 	{
-		if (gmProtect->SceneLogin == 2)
+		if (loginScene == 2)
 		{
 			World = WD_55LOGINSCENE;
 		}
-		else if (gmProtect->SceneLogin == 3)
+		else if (loginScene == 3)
 		{
 			World = WD_77NEW_LOGIN_SCENE;
 		}
-		else if (gmProtect->SceneLogin == 4)
+		else if (loginScene == 4)
 		{
 			World = WD_94NEW_LOGIN_SCENE;
 		}
@@ -1587,6 +1611,9 @@ void CreateLogInScene()
 	if (g_pReconnectUI->ReconnectCreateConnection(szServerIpAddress, g_ServerPort))
 	{
 		SendRequestServerHWID();
+		#ifdef __ANDROID__
+		SendRequestServerList();
+		#endif
 	}
 
 	EnableSocket = true;
@@ -1610,12 +1637,12 @@ void CreateLogInScene()
 	InputNumber = 2;
 	InputTextHide[1] = 1;
 
-	if (gmProtect->SceneLogin != 1)
+	if (loginScene != 1)
 	{
-		if (gmProtect->SceneLogin != 4)
+		if (loginScene != 4)
 		{
 			CCameraMove::GetInstancePtr()->PlayCameraWalk(Hero->Object.Position, 1000);
-			CCameraMove::GetInstancePtr()->SetTourMode(TRUE, FALSE, (gmProtect->SceneLogin != 3));
+			CCameraMove::GetInstancePtr()->SetTourMode(TRUE, FALSE, (loginScene != 3));
 		}
 		MoveMainCamera();
 	}
@@ -1634,6 +1661,27 @@ void NewMoveLogInScene()
 		InitLogIn = true;
 		CreateLogInScene();
 	}
+
+#ifdef __ANDROID__
+	if (CurrentProtocolState == REQUEST_JOIN_SERVER
+		&& g_ServerListManager->GetServerGroupSize() < 1)
+	{
+		static DWORD s_LastServerListRequestTick = 0;
+		DWORD dwNow = GetTickCount();
+		if (s_LastServerListRequestTick == 0 || (dwNow - s_LastServerListRequestTick) >= 3000)
+		{
+			s_LastServerListRequestTick = dwNow;
+			if (SocketClient.GetSocket() == INVALID_SOCKET)
+			{
+				if (g_pReconnectUI->ReconnectCreateConnection(szServerIpAddress, g_ServerPort))
+				{
+					SendRequestServerHWID();
+				}
+			}
+			SendRequestServerList();
+		}
+	}
+#endif
 
 	if (gmProtect->SceneLogin == 1)
 	{
@@ -1731,6 +1779,7 @@ bool NewRenderLogInScene(HDC hDC)
 	{
 		vec3_t pos;
 		float Width, Height;
+		VectorCopy(CameraPosition, pos);
 
 		if (CCameraMove::GetInstancePtr()->IsCameraMove())
 		{
@@ -1738,10 +1787,7 @@ bool NewRenderLogInScene(HDC hDC)
 		}
 		else
 		{
-			if (gmProtect->SceneLogin != 0)
-			{
-				gCameraManager->GetPosition(pos);
-			}
+			gCameraManager->GetPosition(pos);
 		}
 
 		MoveMainCamera();
@@ -1940,8 +1986,34 @@ void LoadingScene(HDC hDC)
 bool MoveMainCamera()
 {
 	bool bLockCamera = false;
+	auto* pCameraWorld = CameraFactorPtr;
+	if (pCameraWorld == NULL)
+	{
+		#ifdef __ANDROID__
+		static bool s_androidNullCameraWorldLogged = false;
+		if (!s_androidNullCameraWorldLogged)
+		{
+			__android_log_print(ANDROID_LOG_WARN,
+				"MUScene",
+				"MoveMainCamera: CameraFactorPtr is null");
+			s_androidNullCameraWorldLogged = true;
+		}
+		#endif
 
-	CAMERA_INFO* CurrentCam = CameraFactorPtr->CurrentCam();
+		if (SceneFlag != MAIN_SCENE && gCameraManager->Enable)
+			CameraFOV = gCameraManager->GetFov();
+		else
+			CameraFOV = 35.0f;
+
+		return false;
+	}
+
+	CAMERA_INFO* CurrentCam = pCameraWorld->CurrentCam();
+	if (CurrentCam == NULL)
+	{
+		CameraFOV = 35.0f;
+		return false;
+	}
 
 	int iWorld = World;
 
@@ -2331,7 +2403,38 @@ void MoveMainScene()
 {
 	if (!InitMainScene)
 	{
-		g_pMainFrame->ResetSkillHotKey();
+		#ifdef __ANDROID__
+		if (!g_BuffSystem)
+		{
+			g_BuffSystem = BuffStateSystem::Make();
+		}
+
+		if (!g_MapProcess)
+		{
+			g_MapProcess = MapProcess::Make();
+		}
+
+		if (!g_petProcess)
+		{
+			g_petProcess = PetProcess::Make();
+		}
+		#endif
+
+		#ifdef __ANDROID__
+		if (g_pNewUISystem->GetUI_NewMainFrameWindow() == NULL)
+		{
+			if (g_pNewUISystem->LoadMainSceneInterface() == false)
+			{
+				g_ErrorReport.Write("> LoadMainSceneInterface failed in MAIN_SCENE\r\n");
+				return;
+			}
+		}
+		#endif
+
+		if (g_pMainFrame)
+		{
+			g_pMainFrame->ResetSkillHotKey();
+		}
 
 		CHARACTER* pCharacter = gmCharacters->GetCharacter(SelectedHero);
 
@@ -2806,6 +2909,8 @@ void MoveClientManager()
 
 void MainScene(HDC hDC)
 {
+	const int sceneFrameFlag = SceneFlag;
+
 	const uintmax_t fixedDeltaTime = gsteady_clock->Getframe_per_second();
 
 	static uintmax_t accumulatedTime = fixedDeltaTime;
@@ -2819,7 +2924,7 @@ void MainScene(HDC hDC)
 
 		g_pNewKeyInput->ScanAsyncKeyState();
 
-		if (LOG_IN_SCENE == SceneFlag || CHARACTER_SCENE == SceneFlag)
+		if (LOG_IN_SCENE == sceneFrameFlag || CHARACTER_SCENE == sceneFrameFlag)
 		{
 			double dDeltaTick = g_pTimer->GetTimeElapsed();
 			dDeltaTick = MIN(dDeltaTick, 200.0);
@@ -2831,7 +2936,7 @@ void MainScene(HDC hDC)
 
 		g_dwMouseUseUIID = 0;
 
-		switch (SceneFlag)
+		switch (sceneFrameFlag)
 		{
 		case LOG_IN_SCENE:
 			NewMoveLogInScene();
@@ -2883,11 +2988,31 @@ void MainScene(HDC hDC)
 
 	SYSTEMTIME st;
 	GetLocalTime(&st);
+	#ifdef __ANDROID__
+	snprintf(GrabFileName, MAX_PATH, "ScreenShot_%02d-%02d_%02d-%02d_%d.jpg", st.wMonth, st.wDay, st.wHour, st.wMinute, GrabScreen);
+	#else
 	sprintf(GrabFileName, GMProtect->GetScreenPath(), st.wMonth, st.wDay, st.wHour, st.wMinute, GrabScreen);
+	#endif
 	char Text[256];
 	sprintf(Text, GlobalText[459], GrabFileName);
 	char lpszTemp[64];
-	wsprintf(lpszTemp, " [%s / %s]", g_ServerListManager->GetSelectServerName(), Hero->ID);
+	const char* serverName = "Unknown";
+	if (g_ServerListManager)
+	{
+		const char* selectedServerName = g_ServerListManager->GetSelectServerName();
+		if (selectedServerName && selectedServerName[0] != '\0')
+		{
+			serverName = selectedServerName;
+		}
+	}
+
+	const char* heroName = "Unknown";
+	if (Hero && Hero->ID[0] != '\0')
+	{
+		heroName = Hero->ID;
+	}
+
+	snprintf(lpszTemp, sizeof(lpszTemp), " [%s / %s]", serverName, heroName);
 	strcat(Text, lpszTemp);
 	int iCaptureMode = 1;
 
@@ -2959,7 +3084,7 @@ void MainScene(HDC hDC)
 
 	auto thread_tick = gsteady_clock->GetthreadTime();
 
-	switch (SceneFlag)
+	switch (sceneFrameFlag)
 	{
 	case LOG_IN_SCENE:
 		Success = NewRenderLogInScene(hDC);

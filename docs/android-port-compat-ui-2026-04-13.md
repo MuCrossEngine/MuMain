@@ -181,6 +181,36 @@ Foram ajustados:
 - inclusão da remoção de `CBTMessageBox.cpp` no `CMakeLists.txt` Android como concluída;
 - atualização da linha de "Última atualização" para `2026-04-14`.
 
+## Atualizacao final do dia (2026-04-14)
+
+Diagnostico e correcao aplicados para o sintoma "tela preta e fechamento antes de login/select server":
+
+- Causa identificada: quando `gmProtect->SceneLogin` vinha em modo custom (`2/3/4`), o caminho de login chamava `gMapManager->LoadWorld(...)`; em falha de arquivo de mundo no Android, esse caminho envia `WM_DESTROY` e encerra o app.
+- Correcao aplicada: `CreateLogInScene()` em `Main/source/ZzzScene.cpp` agora forca `SceneLogin=1` no Android para modo de compatibilidade (logo scene), preservando o fluxo original de login sem carregar mundos custom instaveis.
+- Validacao executada:
+  - `./gradlew assembleDebug --no-daemon` com sucesso;
+  - `adb install -r` + `adb shell pm clear com.mucrossengine.client`;
+  - logs confirmando `WEBZEN_SCENE -> LOG_IN_SCENE`, mensagem de fallback `forcing Android compatibility mode=1`, primeiro render bem-sucedido no login e processo ativo via `pidof`.
+
+Conclusao do dia: bootstrap e login render estao estaveis no Android sem crash fatal imediato no fluxo validado.
+
+### Complemento da rodada (2026-04-14, foco UI preta)
+
+Correcao adicional aplicada para o sintoma "sem loading/select server/login visivel":
+
+- `UIMng::RenderTitleSceneUI` ajustado para Android sem `SwapBuffers(hDC)` quando `hDC` e nulo.
+- `WebzenScene` voltou a chamar `RenderTitleSceneUI` no caminho Android (antes havia guarda `if (hDC)` que pulava o desenho da tela de titulo/loading).
+- `CreateLogInScene` passou a forcar exibicao inicial de `LoginMainWin` e `ServerSelWin`, evitando tela preta mesmo antes da resposta completa do servidor.
+- `wsctlc.cpp` atualizado para nao fechar socket em erros transitórios de connect não-bloqueante (`WSAENOTCONN`, `WSAEINPROGRESS`, `WSAEALREADY`) durante `sSend/FDWriteSend`.
+- `CreateLogInScene` passou a solicitar `SendRequestServerList()` junto com o bootstrap de conexão para reduzir janela sem lista.
+
+Validacao em adb (instalacao limpa) confirmou:
+
+- `LOG_IN_SCENE: forced initial login UI visibility (LoginMainWin + ServerSelWin)`
+- `LOG_IN_SCENE: ReconnectCreateConnection success (...), requested server list`
+- `First successful render in LOG_IN_SCENE`
+- processo ativo via `pidof` sem crash fatal.
+
 ## Próximo passo recomendado
 
 1. Fechar `CGMFontLayer.cpp` Android path + bundle da fonte TTF.

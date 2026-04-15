@@ -38,6 +38,10 @@ void CSprite::Create(int nOrgWidth, int nOrgHeight, int nTexID, int nMaxFrame, S
 	m_fOrgHeight = (float)nOrgHeight;
 	m_nTexID = nTexID;
 	m_pTexture = Bitmaps.FindTexture(m_nTexID);
+	if (-1 < m_nTexID && NULL == m_pTexture)
+	{
+		m_nTexID = -1;
+	}
 
 	m_fScrHeight = (float)WindowHeight / fScaleY;
 

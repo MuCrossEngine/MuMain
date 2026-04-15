@@ -11,6 +11,7 @@
 #include "w_PetActionUnicorn.h"
 #include "w_PetProcess.h"
 #include "ReadScript.h"
+#include "Platform/GameAssetPath.h"
 #include "./Utilities/Log/ErrorReport.h"
 
 PetInfoPtr PetInfo::Make()
@@ -180,8 +181,16 @@ void PetProcess::UnRegister(CHARACTER* Owner, int itemType, bool isUnregistAll)
 
 bool PetProcess::LoadData()
 {
-	char FileName[100];
+	char FileName[MAX_PATH];
+	std::string filePath;
+
+#ifdef __ANDROID__
+	filePath = GameAssetPath::Resolve("Data/Local/Pet.bmd");
+	strncpy(FileName, filePath.c_str(), sizeof(FileName) - 1);
+	FileName[sizeof(FileName) - 1] = '\0';
+#else
 	sprintf(FileName, "Data\\Local\\Pet.bmd");
+#endif
 
 	int _ver;
 	int _array;

@@ -2,6 +2,7 @@ package com.mucrossengine.client;
 
 import android.app.NativeActivity;
 import android.content.Intent;
+import android.content.res.AssetManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -37,15 +38,6 @@ public class MainActivity extends NativeActivity {
     protected void onCreate(Bundle savedInstanceState) {
         // Keep screen on while game is running
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-
-        // Request storage permission on Android 11+
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            if (!Environment.isExternalStorageManager()) {
-                Intent intent = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION);
-                intent.setData(Uri.parse("package:" + getPackageName()));
-                startActivity(intent);
-            }
-        }
 
         super.onCreate(savedInstanceState);
     }
@@ -231,5 +223,58 @@ public class MainActivity extends NativeActivity {
         }
 
         return extractedAnyFile;
+    }
+
+    public boolean copyAssetDirectoryToPath(String assetDir, String targetDir) {
+        if (assetDir == null || targetDir == null || assetDir.isEmpty() || targetDir.isEmpty()) {
+            return false;
+        }
+
+        File destination = new File(targetDir);
+        if (!destination.exists() && !destination.mkdirs()) {
+            return false;
+        }
+
+        AssetManager assetManager = getAssets();
+        return copyAssetEntryRecursive(assetManager, assetDir, destination);
+    }
+
+    private boolean copyAssetEntryRecursive(AssetManager assetManager, String assetPath, File destination) {
+        try {
+            String[] children = assetManager.list(assetPath);
+            if (children != null && children.length > 0) {
+                if (!destination.exists() && !destination.mkdirs()) {
+                    return false;
+                }
+
+                for (String child : children) {
+                    String childAssetPath = assetPath + "/" + child;
+                    File childDestination = new File(destination, child);
+                    if (!copyAssetEntryRecursive(assetManager, childAssetPath, childDestination)) {
+                        return false;
+                    }
+                }
+                return true;
+            }
+
+            File parent = destination.getParentFile();
+            if (parent != null && !parent.exists() && !parent.mkdirs()) {
+                return false;
+            }
+
+            try (InputStream input = assetManager.open(assetPath);
+                 FileOutputStream output = new FileOutputStream(destination)) {
+                byte[] buffer = new byte[8192];
+                int read;
+                while ((read = input.read(buffer)) != -1) {
+                    output.write(buffer, 0, read);
+                }
+                output.flush();
+            }
+            return true;
+        } catch (IOException exception) {
+            Log.e(TAG, "copyAssetEntryRecursive failed for " + assetPath + ": " + exception.getMessage());
+            return false;
+        }
     }
 }

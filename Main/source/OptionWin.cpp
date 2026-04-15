@@ -131,6 +131,11 @@ bool COptionWin::CursorInWin(int nArea)
 
 void COptionWin::UpdateDisplay()
 {
+	if (g_pOption == NULL)
+	{
+		return;
+	}
+
 	m_aBtn[OW_BTN_AUTO_ATTACK].SetCheck(g_pOption->IsAutoAttack());
 	m_aBtn[OW_BTN_WHISPER_ALARM].SetCheck(g_pOption->IsWhisperSound());
 	m_aBtn[OW_BTN_SLIDE_HELP].SetCheck(g_pOption->IsSlideHelp());
@@ -140,6 +145,11 @@ void COptionWin::UpdateDisplay()
 
 void COptionWin::UpdateWhileActive(double dDeltaTick)
 {
+	if (g_pOption == NULL)
+	{
+		return;
+	}
+
 	for (int i = 0; i < OW_SLD_MAX; ++i)
 		m_aSlider[i].Update(dDeltaTick);
 
@@ -207,7 +217,12 @@ void COptionWin::RenderControls()
 
 	int nTextPosY;
 	const char* apszSldText[OW_SLD_MAX] = { GlobalText[389], GlobalText[1840] };
-	int anVal[OW_SLD_MAX] = { g_pOption->GetVolumeLevel(), g_pOption->GetRenderLevel() * 2 + 5};
+	int anVal[OW_SLD_MAX] = { 0, 5 };
+	if (g_pOption != NULL)
+	{
+		anVal[0] = g_pOption->GetVolumeLevel();
+		anVal[1] = g_pOption->GetRenderLevel() * 2 + 5;
+	}
 	
 	char szVal[16];
 

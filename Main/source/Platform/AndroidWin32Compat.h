@@ -1794,6 +1794,18 @@ inline void ExitProcess(UINT) { exit(0); }
 #include <stdarg.h>
 #include <string.h>
 
+template <size_t N>
+inline size_t _muObjectSize(char (&)[N])
+{
+    return N;
+}
+
+template <size_t N>
+inline size_t _muObjectSize(const char (&)[N])
+{
+    return N;
+}
+
 inline size_t _muObjectSize(const char* buf)
 {
 #if defined(__GNUC__) || defined(__clang__)
@@ -1803,6 +1815,11 @@ inline size_t _muObjectSize(const char* buf)
     (void)buf;
     return 4096u;
 #endif
+}
+
+inline size_t _muObjectSize(char* buf)
+{
+    return _muObjectSize(static_cast<const char*>(buf));
 }
 
 template <typename... Args>
@@ -1987,7 +2004,8 @@ inline int _muVsntprintf(char* buffer, size_t sizeOfBuffer, size_t count, const 
 #define _vsntprintf(buf, cnt, fmt, args) _muVsntprintf((buf), _muObjectSize(buf), (cnt), (fmt), (args))
 // wsprintf (Win32 ANSI sprintf, no size arg) → snprintf with large buffer size
 #ifndef wsprintf
-#  define wsprintf(buf, fmt, ...) snprintf((buf), 4096, (fmt), ##__VA_ARGS__)
+#  define wsprintf(buf, fmt, ...) \
+    snprintf((buf), (_muObjectSize(buf) > 0 ? _muObjectSize(buf) : 4096), (fmt), ##__VA_ARGS__)
 #endif
 #ifndef wvsprintf
 #  define wvsprintf(buf, fmt, args) vsprintf((buf), (fmt), (args))

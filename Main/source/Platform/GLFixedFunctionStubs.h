@@ -13,6 +13,7 @@
 #include <GLES3/gl3.h>
 #include <EGL/egl.h>
 #include <dlfcn.h>
+#include <cstdint>
 #include "OpenGLESRenderBackend.h"
 #include "RenderStateCompat.h"
 
@@ -213,20 +214,23 @@ inline Fn Proc(const char* name)
 // ─────────────────────────────────────────────────────────────────────────────
 inline void glEnable(GLenum cap)
 {
+    using EnableFn = void (*)(GLenum);
+    static EnableFn nativeEnable = GLFixedNative::Proc<EnableFn>("glEnable");
+
     switch (cap)
     {
     case GL_TEXTURE_2D:      g_rs.texture2D     = true; break;
-    case GL_BLEND:           g_rs.blend         = true; glEnable(GL_BLEND);        break;
-    case GL_DEPTH_TEST:      g_rs.depthTest     = true; glEnable(GL_DEPTH_TEST);   break;
-    case GL_CULL_FACE:       g_rs.cullFace      = true; glEnable(GL_CULL_FACE);    break;
+    case GL_BLEND:           g_rs.blend         = true; if (nativeEnable) nativeEnable(GL_BLEND); break;
+    case GL_DEPTH_TEST:      g_rs.depthTest     = true; if (nativeEnable) nativeEnable(GL_DEPTH_TEST); break;
+    case GL_CULL_FACE:       g_rs.cullFace      = true; if (nativeEnable) nativeEnable(GL_CULL_FACE); break;
     case GL_ALPHA_TEST:      g_rs.alphaTest     = true; break;
     case GL_FOG:             g_rs.fog           = true; break;
     case GL_LIGHTING:        g_rs.lighting      = true; break;
     case GL_COLOR_MATERIAL:  g_rs.colorMaterial = true; break;
     case GL_NORMALIZE:       g_rs.normalize     = true; break;
-    case GL_SCISSOR_TEST:    g_rs.scissorTest   = true; glEnable(GL_SCISSOR_TEST); break;
-    case GL_POLYGON_OFFSET_FILL: g_rs.polygonOffsetFill = true; glEnable(GL_POLYGON_OFFSET_FILL); break;
-    default: /* passthrough ES3 caps */ glEnable(cap); break;
+    case GL_SCISSOR_TEST:    g_rs.scissorTest   = true; if (nativeEnable) nativeEnable(GL_SCISSOR_TEST); break;
+    case GL_POLYGON_OFFSET_FILL: g_rs.polygonOffsetFill = true; if (nativeEnable) nativeEnable(GL_POLYGON_OFFSET_FILL); break;
+    default: if (nativeEnable) nativeEnable(cap); break;
     }
 }
 // Prevent recursive call for passthrough path above — undef the macro if needed
@@ -234,33 +238,200 @@ inline void glEnable(GLenum cap)
 
 inline void glDisable(GLenum cap)
 {
+    using DisableFn = void (*)(GLenum);
+    static DisableFn nativeDisable = GLFixedNative::Proc<DisableFn>("glDisable");
+
     switch (cap)
     {
     case GL_TEXTURE_2D:      g_rs.texture2D     = false; break;
-    case GL_BLEND:           g_rs.blend         = false; glDisable(GL_BLEND);       break;
-    case GL_DEPTH_TEST:      g_rs.depthTest     = false; glDisable(GL_DEPTH_TEST);  break;
-    case GL_CULL_FACE:       g_rs.cullFace      = false; glDisable(GL_CULL_FACE);   break;
+    case GL_BLEND:           g_rs.blend         = false; if (nativeDisable) nativeDisable(GL_BLEND); break;
+    case GL_DEPTH_TEST:      g_rs.depthTest     = false; if (nativeDisable) nativeDisable(GL_DEPTH_TEST); break;
+    case GL_CULL_FACE:       g_rs.cullFace      = false; if (nativeDisable) nativeDisable(GL_CULL_FACE); break;
     case GL_ALPHA_TEST:      g_rs.alphaTest     = false; break;
     case GL_FOG:             g_rs.fog           = false; break;
     case GL_LIGHTING:        g_rs.lighting      = false; break;
     case GL_COLOR_MATERIAL:  g_rs.colorMaterial = false; break;
     case GL_NORMALIZE:       g_rs.normalize     = false; break;
-    case GL_SCISSOR_TEST:    g_rs.scissorTest   = false; glDisable(GL_SCISSOR_TEST); break;
-    case GL_POLYGON_OFFSET_FILL: g_rs.polygonOffsetFill = false; glDisable(GL_POLYGON_OFFSET_FILL); break;
-    default: glDisable(cap); break;
+    case GL_SCISSOR_TEST:    g_rs.scissorTest   = false; if (nativeDisable) nativeDisable(GL_SCISSOR_TEST); break;
+    case GL_POLYGON_OFFSET_FILL: g_rs.polygonOffsetFill = false; if (nativeDisable) nativeDisable(GL_POLYGON_OFFSET_FILL); break;
+    default: if (nativeDisable) nativeDisable(cap); break;
     }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Matrix stack
 // ─────────────────────────────────────────────────────────────────────────────
-inline void glEnableClientState(GLenum) {}
-inline void glDisableClientState(GLenum) {}
+namespace GLClientCompat
+{
+struct ClientArrayDesc
+{
+    bool enabled = false;
+    GLint size = 0;
+    GLenum type = GL_FLOAT;
+    GLsizei stride = 0;
+    const void* pointer = nullptr;
+};
+
+inline ClientArrayDesc& VertexArray()   { static ClientArrayDesc d; return d; }
+inline ClientArrayDesc& ColorArray()    { static ClientArrayDesc d; return d; }
+inline ClientArrayDesc& NormalArray()   { static ClientArrayDesc d; return d; }
+inline ClientArrayDesc& TexCoordArray() { static ClientArrayDesc d; return d; }
+
+inline size_t TypeSize(GLenum type)
+{
+    switch (type)
+    {
+    case GL_FLOAT:         return sizeof(float);
+    case GL_UNSIGNED_BYTE: return sizeof(uint8_t);
+    case GL_BYTE:          return sizeof(int8_t);
+    case GL_UNSIGNED_SHORT:return sizeof(uint16_t);
+    case GL_SHORT:         return sizeof(int16_t);
+    case GL_UNSIGNED_INT:  return sizeof(uint32_t);
+    case GL_INT:           return sizeof(int32_t);
+    default:               return 0;
+    }
+}
+
+inline size_t EffectiveStride(const ClientArrayDesc& d)
+{
+    if (d.stride > 0)
+    {
+        return (size_t)d.stride;
+    }
+    const size_t ts = TypeSize(d.type);
+    return ts > 0 ? (size_t)d.size * ts : 0;
+}
+
+inline const uint8_t* ElementPtr(const ClientArrayDesc& d, GLint index)
+{
+    if (!d.enabled || d.pointer == nullptr || d.size <= 0)
+    {
+        return nullptr;
+    }
+
+    const size_t stride = EffectiveStride(d);
+    if (stride == 0)
+    {
+        return nullptr;
+    }
+
+    return reinterpret_cast<const uint8_t*>(d.pointer) + stride * (size_t)index;
+}
+
+inline void ReadFloatN(const ClientArrayDesc& d, GLint index, float* out, int outCount, float defaultValue)
+{
+    for (int i = 0; i < outCount; ++i)
+    {
+        out[i] = defaultValue;
+    }
+
+    const uint8_t* src = ElementPtr(d, index);
+    if (!src)
+    {
+        return;
+    }
+
+    const int count = (d.size < outCount) ? d.size : outCount;
+    switch (d.type)
+    {
+    case GL_FLOAT:
+    {
+        const float* p = reinterpret_cast<const float*>(src);
+        for (int i = 0; i < count; ++i) out[i] = p[i];
+        break;
+    }
+    case GL_UNSIGNED_BYTE:
+    {
+        const uint8_t* p = reinterpret_cast<const uint8_t*>(src);
+        for (int i = 0; i < count; ++i) out[i] = (float)p[i] / 255.0f;
+        break;
+    }
+    case GL_BYTE:
+    {
+        const int8_t* p = reinterpret_cast<const int8_t*>(src);
+        for (int i = 0; i < count; ++i) out[i] = (float)p[i] / 127.0f;
+        break;
+    }
+    default:
+        break;
+    }
+}
+
+inline bool HasActiveClientArrays()
+{
+    const auto& v = VertexArray();
+    const auto& c = ColorArray();
+    const auto& n = NormalArray();
+    const auto& t = TexCoordArray();
+    return (v.enabled && v.pointer) || (c.enabled && c.pointer) || (n.enabled && n.pointer) || (t.enabled && t.pointer);
+}
+
+inline void EmitClientArrayVertex(GLint index)
+{
+    float tex[2]   = {0.0f, 0.0f};
+    float col[4]   = {1.0f, 1.0f, 1.0f, 1.0f};
+    float normal[3]= {0.0f, 0.0f, 1.0f};
+    float pos[3]   = {0.0f, 0.0f, 0.0f};
+
+    ReadFloatN(TexCoordArray(), index, tex, 2, 0.0f);
+    ReadFloatN(ColorArray(), index, col, 4, 1.0f);
+    ReadFloatN(NormalArray(), index, normal, 3, 0.0f);
+    if (!NormalArray().enabled || NormalArray().pointer == nullptr)
+    {
+        normal[2] = 1.0f;
+    }
+    ReadFloatN(VertexArray(), index, pos, 3, 0.0f);
+
+    GLESFF::ImmTexCoord2f(tex[0], tex[1]);
+    GLESFF::ImmColor4f(col[0], col[1], col[2], col[3]);
+    GLESFF::ImmNormal3f(normal[0], normal[1], normal[2]);
+    GLESFF::ImmVertex3f(pos[0], pos[1], pos[2]);
+}
+} // namespace GLClientCompat
+
+inline void glEnableClientState(GLenum array)
+{
+    switch (array)
+    {
+    case GL_VERTEX_ARRAY:        GLClientCompat::VertexArray().enabled = true; break;
+    case GL_COLOR_ARRAY:         GLClientCompat::ColorArray().enabled = true; break;
+    case GL_NORMAL_ARRAY:        GLClientCompat::NormalArray().enabled = true; break;
+    case GL_TEXTURE_COORD_ARRAY: GLClientCompat::TexCoordArray().enabled = true; break;
+    default: break;
+    }
+}
+inline void glDisableClientState(GLenum array)
+{
+    switch (array)
+    {
+    case GL_VERTEX_ARRAY:        GLClientCompat::VertexArray().enabled = false; break;
+    case GL_COLOR_ARRAY:         GLClientCompat::ColorArray().enabled = false; break;
+    case GL_NORMAL_ARRAY:        GLClientCompat::NormalArray().enabled = false; break;
+    case GL_TEXTURE_COORD_ARRAY: GLClientCompat::TexCoordArray().enabled = false; break;
+    default: break;
+    }
+}
 inline void glPolygonMode(GLenum, GLenum) {}
-inline void glVertexPointer(GLint, GLenum, GLsizei, const void*) {}
-inline void glColorPointer(GLint, GLenum, GLsizei, const void*) {}
-inline void glNormalPointer(GLenum, GLsizei, const void*) {}
-inline void glTexCoordPointer(GLint, GLenum, GLsizei, const void*) {}
+inline void glVertexPointer(GLint size, GLenum type, GLsizei stride, const void* pointer)
+{
+    auto& d = GLClientCompat::VertexArray();
+    d.size = size; d.type = type; d.stride = stride; d.pointer = pointer;
+}
+inline void glColorPointer(GLint size, GLenum type, GLsizei stride, const void* pointer)
+{
+    auto& d = GLClientCompat::ColorArray();
+    d.size = size; d.type = type; d.stride = stride; d.pointer = pointer;
+}
+inline void glNormalPointer(GLenum type, GLsizei stride, const void* pointer)
+{
+    auto& d = GLClientCompat::NormalArray();
+    d.size = 3; d.type = type; d.stride = stride; d.pointer = pointer;
+}
+inline void glTexCoordPointer(GLint size, GLenum type, GLsizei stride, const void* pointer)
+{
+    auto& d = GLClientCompat::TexCoordArray();
+    d.size = size; d.type = type; d.stride = stride; d.pointer = pointer;
+}
 inline void glClientActiveTexture(GLenum) {}
 
 inline void glMatrixMode(GLenum mode)
@@ -501,17 +672,149 @@ inline void glFinish()
 // ─────────────────────────────────────────────────────────────────────────────
 inline void glDrawArrays(GLenum mode, GLint first, GLsizei count)
 {
+    if (mode == GL_QUADS && GLClientCompat::HasActiveClientArrays())
+    {
+        GLESFF::ImmBegin(GL_TRIANGLES);
+        const GLsizei quadCount = count / 4;
+        for (GLsizei q = 0; q < quadCount; ++q)
+        {
+            const GLint base = first + q * 4;
+
+            GLClientCompat::EmitClientArrayVertex(base + 0);
+            GLClientCompat::EmitClientArrayVertex(base + 1);
+            GLClientCompat::EmitClientArrayVertex(base + 2);
+
+            GLClientCompat::EmitClientArrayVertex(base + 0);
+            GLClientCompat::EmitClientArrayVertex(base + 2);
+            GLClientCompat::EmitClientArrayVertex(base + 3);
+        }
+        GLESFF::ImmEnd();
+        return;
+    }
+
+    if (GLClientCompat::HasActiveClientArrays())
+    {
+        GLESFF::ImmBegin(mode);
+        for (GLint i = 0; i < count; ++i)
+        {
+            GLClientCompat::EmitClientArrayVertex(first + i);
+        }
+        GLESFF::ImmEnd();
+        return;
+    }
+
     GLESFF::FlushUniforms();
     using Fn = void (*)(GLenum, GLint, GLsizei);
     static Fn fn = GLFixedNative::Proc<Fn>("glDrawArrays");
-    if (fn) fn(mode, first, count);
+    if (!fn)
+    {
+        return;
+    }
+
+    if (mode == GL_QUADS)
+    {
+        const GLsizei quadCount = count / 4;
+        for (GLsizei q = 0; q < quadCount; ++q)
+        {
+            fn(GL_TRIANGLE_FAN, first + q * 4, 4);
+        }
+        return;
+    }
+
+    fn(mode, first, count);
 }
 inline void glDrawElements(GLenum mode, GLsizei count, GLenum type, const void* indices)
 {
+    auto ReadElementIndex = [indices, type](GLsizei element)->GLint
+    {
+        if (indices == nullptr)
+        {
+            return (GLint)element;
+        }
+
+        switch (type)
+        {
+        case GL_UNSIGNED_BYTE:
+            return (GLint)reinterpret_cast<const uint8_t*>(indices)[element];
+        case GL_UNSIGNED_SHORT:
+            return (GLint)reinterpret_cast<const uint16_t*>(indices)[element];
+        case GL_UNSIGNED_INT:
+            return (GLint)reinterpret_cast<const uint32_t*>(indices)[element];
+        default:
+            return -1;
+        }
+    };
+
+    if (GLClientCompat::HasActiveClientArrays())
+    {
+        if (mode == GL_QUADS)
+        {
+            GLESFF::ImmBegin(GL_TRIANGLES);
+            const GLsizei quadCount = count / 4;
+            for (GLsizei q = 0; q < quadCount; ++q)
+            {
+                const GLint i0 = ReadElementIndex(q * 4 + 0);
+                const GLint i1 = ReadElementIndex(q * 4 + 1);
+                const GLint i2 = ReadElementIndex(q * 4 + 2);
+                const GLint i3 = ReadElementIndex(q * 4 + 3);
+                if (i0 < 0 || i1 < 0 || i2 < 0 || i3 < 0)
+                {
+                    continue;
+                }
+
+                GLClientCompat::EmitClientArrayVertex(i0);
+                GLClientCompat::EmitClientArrayVertex(i1);
+                GLClientCompat::EmitClientArrayVertex(i2);
+
+                GLClientCompat::EmitClientArrayVertex(i0);
+                GLClientCompat::EmitClientArrayVertex(i2);
+                GLClientCompat::EmitClientArrayVertex(i3);
+            }
+            GLESFF::ImmEnd();
+            return;
+        }
+
+        GLESFF::ImmBegin(mode);
+        for (GLsizei i = 0; i < count; ++i)
+        {
+            const GLint idx = ReadElementIndex(i);
+            if (idx < 0)
+            {
+                continue;
+            }
+            GLClientCompat::EmitClientArrayVertex(idx);
+        }
+        GLESFF::ImmEnd();
+        return;
+    }
+
     GLESFF::FlushUniforms();
     using Fn = void (*)(GLenum, GLsizei, GLenum, const void*);
     static Fn fn = GLFixedNative::Proc<Fn>("glDrawElements");
-    if (fn) fn(mode, count, type, indices);
+    if (!fn)
+    {
+        return;
+    }
+
+    if (mode == GL_QUADS)
+    {
+        const size_t indexSize = GLClientCompat::TypeSize(type);
+        if (indexSize == 0)
+        {
+            return;
+        }
+
+        const GLsizei quadCount = count / 4;
+        const uintptr_t baseOffset = reinterpret_cast<uintptr_t>(indices);
+        for (GLsizei q = 0; q < quadCount; ++q)
+        {
+            const uintptr_t quadOffset = baseOffset + (uintptr_t)(q * 4) * indexSize;
+            fn(GL_TRIANGLE_FAN, 4, type, reinterpret_cast<const void*>(quadOffset));
+        }
+        return;
+    }
+
+    fn(mode, count, type, indices);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -15,6 +15,7 @@
 #include <gli/gli.hpp>
 
 #include "GlobalBitmap.h"
+#include "Platform/GameAssetPath.h"
 #include "./Utilities/Log/ErrorReport.h"
 #include "./Utilities/Log/muConsoleDebug.h"
 
@@ -583,7 +584,7 @@ bool CGlobalBitmap::OpenJpeg(GLuint uiBitmapIndex, const std::string& filename, 
 	std::string filename_ozj;
 	ExchangeExt(filename, "OZJ", filename_ozj);
 
-	FILE* compressedFile = fopen(filename_ozj.c_str(), "rb");
+	FILE* compressedFile = MU_FOPEN(filename_ozj.c_str(), "rb");
 
 	if (compressedFile == NULL)
 	{
@@ -596,12 +597,12 @@ bool CGlobalBitmap::OpenJpeg(GLuint uiBitmapIndex, const std::string& filename, 
 
 	if (fileSize <= 24)
 	{
-		//std::cerr << "Error: Archivo JPEG inválido o muy pequeño." << std::endl;
+		//std::cerr << "Error: Archivo JPEG invï¿½lido o muy pequeï¿½o." << std::endl;
 		fclose(compressedFile);
 		return false;
 	}
 
-	fileSize -= 24;  // Ajuste de tamaño
+	fileSize -= 24;  // Ajuste de tamaï¿½o
 	fseek(compressedFile, 24, SEEK_SET);  // Saltar los primeros 24 bytes
 
 	std::vector<BYTE> PakBuffer(fileSize, 0);
@@ -620,7 +621,7 @@ bool CGlobalBitmap::OpenJpeg(GLuint uiBitmapIndex, const std::string& filename, 
 
 	if (jpegwidth > MAX_WIDTH || jpegheight > MAX_HEIGHT)
 	{
-		//std::cerr << "Error: La imagen supera el tamaño máximo permitido." << std::endl;
+		//std::cerr << "Error: La imagen supera el tamaï¿½o mï¿½ximo permitido." << std::endl;
 		tjDestroy(jpegDecompressor);
 		return false;
 	}
@@ -664,7 +665,7 @@ bool CGlobalBitmap::OpenJpeg(GLuint uiBitmapIndex, const std::string& filename, 
 
 	if (jpegwidth != textureWidth || jpegheight != textureHeight)
 	{
-		// Si la GPU NO soporta NPOT, copiar línea por línea
+		// Si la GPU NO soporta NPOT, copiar lï¿½nea por lï¿½nea
 		int row_size = jpegwidth * channels_in_file;
 
 		for (int row = 0; row < jpegheight; row++)
@@ -700,7 +701,7 @@ bool CGlobalBitmap::OpenTga(GLuint uiBitmapIndex, const std::string& filename, G
 	std::string filename_ozt;
 	ExchangeExt(filename, "OZT", filename_ozt);
 
-	FILE* compressedFile = fopen(filename_ozt.c_str(), "rb");
+	FILE* compressedFile = MU_FOPEN(filename_ozt.c_str(), "rb");
 
 	if (compressedFile == NULL)
 	{
@@ -717,7 +718,7 @@ bool CGlobalBitmap::OpenTga(GLuint uiBitmapIndex, const std::string& filename, G
 		return false;
 	}
 
-	fileSize -= 4;  // Ajuste de tamaño
+	fileSize -= 4;  // Ajuste de tamaï¿½o
 	std::vector<BYTE> filebuffer(fileSize, 0);
 
 	fseek(compressedFile, 4, SEEK_SET);  // Saltar los primeros 24 bytes
@@ -733,16 +734,15 @@ bool CGlobalBitmap::OpenTga(GLuint uiBitmapIndex, const std::string& filename, G
 		return false;
 	}
 
-	if (channels_in_file != 4 || tgawidth > MAX_WIDTH || tgaheight > MAX_HEIGHT)
+	if ((channels_in_file != 3 && channels_in_file != 4) || tgawidth > MAX_WIDTH || tgaheight > MAX_HEIGHT)
 	{
+		stbi_image_free(imageData);
 		return false;
 	}
 
 	int textureWidth = leftoverSize(tgawidth);
 
 	int textureHeight = leftoverSize(tgaheight);
-
-	channels_in_file = 4;
 
 	BITMAP_t* pNewBitmap = new BITMAP_t;
 	memset(pNewBitmap, 0, sizeof(BITMAP_t));
@@ -767,7 +767,7 @@ bool CGlobalBitmap::OpenTga(GLuint uiBitmapIndex, const std::string& filename, G
 
 	if (tgawidth != textureWidth || tgaheight != textureHeight)
 	{
-		// Si la GPU NO soporta NPOT, copiar línea por línea
+		// Si la GPU NO soporta NPOT, copiar lï¿½nea por lï¿½nea
 		int row_size = tgawidth * channels_in_file;
 
 		for (int row = 0; row < tgaheight; row++)
@@ -809,7 +809,7 @@ void CGlobalBitmap::CreateMipmappedTexture(GLuint* TextureNumber, GLuint Compone
 
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
-	glTexImage2D(GL_TEXTURE_2D, 0, Components, Width, Height, 0, format, GL_UNSIGNED_BYTE, textureBuff);
+	glTexImage2D(GL_TEXTURE_2D, 0, format, Width, Height, 0, format, GL_UNSIGNED_BYTE, textureBuff);
 
 	glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
 
@@ -1019,9 +1019,9 @@ bool CGlobalBitmap::removeByFullPath(const std::string& fullPath)
 	if (it != m_BitmapName.end())
 	{
 		m_BitmapName.erase(it);  // Elimina el elemento
-		return true;  // Se eliminó el elemento
+		return true;  // Se eliminï¿½ el elemento
 	}
-	return false;  // No se encontró el elemento
+	return false;  // No se encontrï¿½ el elemento
 }
 
 int CGlobalBitmap::leftoverSize(int Size)
@@ -1029,7 +1029,7 @@ int CGlobalBitmap::leftoverSize(int Size)
 	if (Size <= 1)
 		return 1; // Maneja el caso de 0 o 1 (potencia de 2)
 	if ((Size & (Size - 1)) == 0)
-		return Size; // Si es ya potencia de 2, devuelve el mismo número
+		return Size; // Si es ya potencia de 2, devuelve el mismo nï¿½mero
 
 	return (1 << (int)std::ceil(std::log2(Size))); // Si no es potencia de 2, redondea
 }

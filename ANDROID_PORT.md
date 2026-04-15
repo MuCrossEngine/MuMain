@@ -3,7 +3,7 @@
 Port do cliente MU Online (Win32/OpenGL) para Android (NativeActivity/OpenGL ES 3.0).
 - **Min API:** Android 8.0 (API 26)
 - **ABI:** arm64-v8a + armeabi-v7a
-- **Game data:** Baixado na 1ª execução via downloader integrado
+- **Game data:** Embutido em `assets/Data` (cópia local no bootstrap); downloader HTTP adiado para a fase final
 - **Áudio:** OpenSL ES
 
 Atualizar os checkboxes conforme cada item for concluído.
@@ -21,8 +21,8 @@ Atualizar os checkboxes conforme cada item for concluído.
 | 4 | Áudio (OpenSL ES) | 🔄 Em andamento |
 | 5 | Font/Text Rendering (stb_truetype) | 🔄 Em andamento |
 | 6 | Win32 System Replacements | 🔄 Em andamento |
-| 7 | Game Data Downloader (1ª execução) | 🔄 Em andamento |
-| 8 | Integração & Testes por Cena | ⬜ Pendente |
+| 7 | Game Data Downloader (1ª execução) | ⬜ Adiado (último) |
+| 8 | Integração & Testes por Cena | 🔄 Em andamento |
 
 ---
 
@@ -79,6 +79,8 @@ Atualizar os checkboxes conforme cada item for concluído.
 - [x] `Platform/RenderStateCompat.h` — estado da state machine OpenGL (enable/disable flags, blend, depth, fog, light)
 - [x] `Platform/OpenGLESRenderBackend.h/cpp` — VBO temporário + flush no glEnd(), matrix stack com GLM
 - [x] `Platform/RenderBackend.h/cpp` — interface pública (BeginFrame, EndFrame, SwapBuffers)
+- [x] `Platform/GLFixedFunctionStubs.h` — emulação de client arrays (`glEnableClientState`, `gl*Pointer`, `glDrawArrays`) para fluxos legados de render
+- [x] `Platform/GLFixedFunctionStubs.h` — compat de `glDrawElements` com client arrays e tratamento de `GL_QUADS` para caminhos legados
 - [x] `android/app/src/main/assets/shaders/fixed_vert.glsl` — a_position, a_texcoord, a_color, a_normal + iluminação por vértice
 - [x] `android/app/src/main/assets/shaders/fixed_frag.glsl` — textura + fog + alpha test
 - [x] `ZzzOpenglUtil.cpp` — includes GLEW/GL cobertos via StdAfx.h → GLFixedFunctionStubs.h
@@ -160,7 +162,7 @@ Atualizar os checkboxes conforme cada item for concluído.
 
 ### File I/O
 - [x] `CGMProtect.cpp` — CreateFile/ReadFile → fopen/fread
-- [ ] `ZzzAI.cpp` — idem (verificar se usa CreateFile)
+- [x] `ZzzAI.cpp` — `WriteDebugInfoStr` com fallback Android (`fopen/fwrite`) em vez de `CreateFile/WriteFile`
 - [x] `_access()` → `access()` (POSIX, disponível no NDK)
 
 ### Font
@@ -189,7 +191,11 @@ Atualizar os checkboxes conforme cada item for concluído.
 
 ## Fase 7 — Game Data Downloader (1ª Execução)
 
-- [x] `Platform/GameDownloader.h/cpp`
+> **Status atual:** adiado para a última etapa. No fluxo atual, o app usa `Data/` embutido em `android/app/src/main/assets/Data` e copia localmente no bootstrap, sem download HTTP.
+
+- [x] Bootstrap local otimizado: cópia de `assets/Data` apenas na 1ª execução (ou se faltarem arquivos mínimos), com marcador `.data_assets_copied`
+
+- [ ] `Platform/GameDownloader.h/cpp` (refazer por último, após integração completa)
   - [x] Detecta se game data existe em `getExternalFilesDir()`
   - [x] Exibe tela de download com progresso (renderizada via GLES3)
   - [x] Baixa arquivos do servidor de assets reutilizando `GameShop/FileDownloader` + `HTTPConnecter`
@@ -199,23 +205,25 @@ Atualizar os checkboxes conforme cada item for concluído.
   - [x] Verifica integridade CRC32 (sidecar opcional `<arquivo>.crc32` via `Util/CCRC32.H`)
   - [x] Refresh periódico do manifesto local (6h) para forçar rechecagem remota de assets
   - [x] Fluxo de pacote compactado `.zip` + extração para `getExternalFilesDir()` via JNI (`MainActivity.extractZipArchive`) com marcador `.extracted`
-- [x] Definir URL base do servidor de assets por parâmetro de execução (`MU_ASSET_SERVER` → intent extra `MU_ASSET_SERVER`)
-- [x] Publicar template de manifesto de produção no repositório (`docs/assets-server/Data/assets-manifest.txt`)
-- [x] Adicionar ferramenta para geração automática do manifesto de produção com CRC (`tools/generate_assets_manifest.sh`)
-- [x] Gerar manifesto completo de arquivos em `Data/assets-manifest.txt` (2117 entradas, incluindo pacotes `.zip`)
-- [ ] Estabilizar transporte HTTP Android para arquivos grandes no runtime (`Data/Custom/NPC/Monster1000.bmd` ainda falha por abort/timeout no emulador)
+- [ ] Definir URL base do servidor de assets por parâmetro de execução (`MU_ASSET_SERVER` → intent extra `MU_ASSET_SERVER`) — **retomar no final**
+- [ ] Publicar template de manifesto de produção no repositório (`docs/assets-server/Data/assets-manifest.txt`) — **retomar no final**
+- [ ] Adicionar ferramenta para geração automática do manifesto de produção com CRC (`tools/generate_assets_manifest.sh`) — **retomar no final**
+- [ ] Gerar manifesto completo de arquivos em `Data/assets-manifest.txt` — **retomar no final**
+- [ ] Estabilizar transporte HTTP Android para arquivos grandes no runtime — **retomar no final**
 
 ---
 
 ## Fase 8 — Integração & Testes
 
 ### Por Cena (validar em ordem)
-- [ ] Boot: `OpenBasicData()` carrega dados sem crash (WEBZEN_SCENE)
-- [ ] Login: tela renderiza, campos de texto funcionam, socket conecta (LOG_IN_SCENE)
+- [x] Boot: `OpenBasicData()` carrega dados sem crash (WEBZEN_SCENE) e avanca para `LOG_IN_SCENE`
+- [ ] Login: render e conexao inicial validados; faltam validacoes finais de input/texto e fluxo completo de UI (LOG_IN_SCENE)
 - [ ] Server select: lista de servidores aparece, seleção funciona
 - [ ] Character select: lista renderiza com modelos 3D
 - [ ] Character creation: modelos de criação renderizam
 - [ ] Main scene: terreno, personagem, UI in-game (MAIN_SCENE)
+- [x] Crash hardening inicial em `MainScene`: removidos aborts imediatos por formatação insegura de strings (`FORTIFY`) no Android
+- [x] Instrumentação Android de cena em `ZzzScene.cpp` (`MUScene`): transição, primeira tentativa de render, primeiro sucesso e falhas com contagem
 
 ### Verificação técnica
 - [ ] Framerate estável ≥ 30 FPS em device mid-range
@@ -223,6 +231,47 @@ Atualizar os checkboxes conforme cada item for concluído.
 - [ ] Sem ANR (Application Not Responding)
 - [ ] Rotação de tela desabilitada (portrait fixo)
 - [ ] Back button fecha o jogo corretamente
+
+### Última validação (2026-04-15)
+
+- Build Android: `./gradlew :app:assembleDebug` ✅
+- Endpoint de login Android validado em runtime: `74.63.218.132:44404` ✅
+- Teste de conectividade de porta realizado em host e device (`74.63.218.132:44404`) ✅
+- Fluxo de cena continua estável sem crash fatal imediato no bootstrap/login (processo vivo após launch) ✅
+- Rodada de paridade com `Main/sourceOld` no fluxo login/server-list aplicada com shim mínimo Android (polling/reconnect controlado) ✅
+- Estado atual do bloqueio funcional:
+  - recepção da server list (`ReceiveServerList total=...`) mostrou comportamento intermitente em janelas curtas de validação pós-limpeza;
+  - próxima ação é consolidar uma janela de validação end-to-end (server select -> character scene) com os ajustes finais já aplicados.
+
+### Validação anterior (2026-04-14)
+
+- Build Android: `./gradlew assembleDebug` ✅
+- Install/launch via ADB: ✅
+- Instalação limpa validada com `adb shell pm clear com.mucrossengine.client` ✅
+- Evidência de runtime coletada:
+  - `MUScene: Scene transition: UNKNOWN_SCENE (-9999) -> WEBZEN_SCENE (1)`
+  - `MUScene: Scene transition: WEBZEN_SCENE (1) -> LOG_IN_SCENE (2)`
+  - `MUScene: LOG_IN_SCENE: SceneLogin=0 detected, forcing Android compatibility mode=1`
+  - `MUScene: LOG_IN_SCENE: forced initial login UI visibility (LoginMainWin + ServerSelWin)`
+  - `MUScene: LOG_IN_SCENE: ReconnectCreateConnection success (...), requested server list`
+  - `MUScene: First successful render in LOG_IN_SCENE`
+  - `pidof com.mucrossengine.client` retornando PID ativo apos janela adicional de execucao
+- Correções validadas nesta rodada:
+  - fallback de compatibilidade no login Android forçando `SceneLogin=1` para evitar fechamento por erro de `LoadWorld()` em mapas de login custom;
+  - restauração do render da tela de loading/título no Android (`RenderTitleSceneUI` sem swap direto no caminho `hDC=null`);
+  - fallback de visibilidade inicial da UI de login (`LoginMainWin` + `ServerSelWin`);
+  - robustez de send em socket não bloqueante (`WSAENOTCONN/WSAEINPROGRESS/WSAEALREADY` tratados como transitórios).
+- Estado atual: bootstrap + login render estaveis sem crash fatal imediato; bloqueio funcional restante esta em fluxo completo de login/server-select/character.
+
+### Atualizações da rodada 2026-04-15
+
+- `Platform/LegacyBootstrapStubs.cpp`
+  - endpoint Android fixado para `74.63.218.132:44404` e log explícito de endpoint aplicado em runtime.
+- `ZzzScene.cpp`
+  - refinamentos no caminho de `CreateLogInScene`/`NewMoveLogInScene` para alinhar com `sourceOld` mantendo compatibilidade Android mínima de request/reconnect da server list.
+  - limpeza de logs de diagnóstico temporários e ajuste fino das condições de polling Android.
+- `WSclient.cpp`
+  - mantido log Android de confirmação de retorno da server list (`ReceiveServerList total=%d`) para validação de campo.
 
 ---
 
@@ -262,4 +311,4 @@ adb logcat -s MUAssets:V           # download e carregamento de assets
 
 ---
 
-*Última atualização: 2026-04-14 — downloader Android mantido no código original (`GameShop/FileDownloader` + `HTTPConnecter`) com progresso em tela; compat WinINet HTTP no Android recebeu retries internos, instrumentação detalhada e ajustes de timeout; validação CRC32 Android corrigida para 32-bit estrito; manifesto remoto/local e fluxo `.zip` + extração JNI seguem ativos; builds `buildCMakeDebug[arm64-v8a]` + `assembleDebug` validados. Pendência crítica atual: falha de transporte (abort/timeout) no arquivo `Data/Custom/NPC/Monster1000.bmd` durante 1ª execução no emulador.*
+*Última atualização: 2026-04-15 — fluxo temporário sem downloader HTTP: `Data/` embutido em `Main/android/app/src/main/assets/Data` e cópia local no bootstrap Android (otimizada com marcador `.data_assets_copied`). Endpoint Android de login consolidado em `74.63.218.132:44404`, com iteração de paridade frente ao `sourceOld` no caminho de login/server list e manutenção de shim mínimo Android para confiabilidade de rede. Fluxo `WEBZEN_SCENE` -> `LOG_IN_SCENE` permanece estável sem crash fatal imediato; pendência ativa está na validação funcional contínua do server select até character/main scene.*
