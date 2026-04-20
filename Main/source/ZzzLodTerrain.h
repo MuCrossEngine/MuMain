@@ -11,8 +11,15 @@ extern unsigned char TerrainMappingLayer2[];
 extern float         TerrainMappingAlpha [];
 extern WORD          TerrainWall         [];
 
-extern inline int TERRAIN_INDEX(int x,int y);
-extern inline int TERRAIN_INDEX_REPEAT(int x,int y);
+static inline int TERRAIN_INDEX(int x, int y)
+{
+    return (y)*TERRAIN_SIZE + (x);
+}
+
+static inline int TERRAIN_INDEX_REPEAT(int x, int y)
+{
+    return (y & TERRAIN_SIZE_MASK) * TERRAIN_SIZE + (x & TERRAIN_SIZE_MASK);
+}
 extern WORD TERRAIN_ATTRIBUTE(float x,float y);
 
 bool OpenTerrainHeight(char *name);
@@ -35,7 +42,7 @@ bool SaveTerrainMapping(char *FileName, int iMapNumber);
 int OpenTerrainAttribute(char *FileName);
 bool SaveTerrainAttribute(char *FileName, int iMapNumber);
 
-//  ¼Ó¼º º¯°æ.
+//  ï¿½Ó¼ï¿½ ï¿½ï¿½ï¿½ï¿½.
 void AddTerrainAttribute ( int x, int y, BYTE att );
 void SubTerrainAttribute ( int x, int y, BYTE att );
 void AddTerrainAttributeRange ( int x, int y, int dx, int dy, BYTE att, BYTE Add=0 );
@@ -107,7 +114,7 @@ public:
 	CFrustrum(){}
 	~CFrustrum(){}
 
-	//3DÇÁ·¯½ºÅÒ Ä¸½¶È­
+	//3Dï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ Ä¸ï¿½ï¿½È­
 	void Create(vec3_t vEye, float fFov, float fAspect, float fDist);
 	bool Test(vec3_t vPos, float fRange);
 	void Reset();
@@ -122,7 +129,7 @@ void ResetAllFrustrum();
 void DeleteAllFrustrum();
 CFrustrum* FindFrustrum(unsigned int iID);
 typedef std::map<unsigned int, CFrustrum* > FrustrumMap_t;
-extern FrustrumMap_t g_FrustrumMap; //ÀüÃ¼ ÇÁ·¯½ºÅÒ°ú º°°³·Î ¾ÆÀÌµð·Î ÁöÁ¤ÇÒ ¼ö ÀÖ´Â ÇÁ·¯½ºÅÒ
+extern FrustrumMap_t g_FrustrumMap; //ï¿½ï¿½Ã¼ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò°ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ìµï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½Ö´ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 #endif //DYNAMIC_FRUSTRUM
 
 

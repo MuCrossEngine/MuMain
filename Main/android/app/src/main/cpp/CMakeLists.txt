@@ -561,6 +561,11 @@ add_library(mucrossengine SHARED
 target_compile_options(mucrossengine PRIVATE
     -Wno-error=format-security
     -Wno-c++11-narrowing
+    -w
+    -Wno-unused-parameter
+    -Wno-unused-variable
+    -Wno-tautological-compare
+    -Wno-reorder
 )
 
 # ─────────────────────────────────────────────────────────────────────────────

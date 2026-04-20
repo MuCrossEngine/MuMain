@@ -1,5 +1,5 @@
 ///////////////////////////////////////////////////////////////////////////////
-// Terrain °ü·Ã ÇÔ¼ö
+// Terrain ï¿½ï¿½ï¿½ï¿½ ï¿½Ô¼ï¿½
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "stdafx.h"
@@ -116,16 +116,6 @@ extern  float CameraDistance;
 
 static  float   g_fFrustumRange = -40.f;
 
-
-inline int TERRAIN_INDEX(int x, int y)
-{
-	return (y)*TERRAIN_SIZE + (x);
-}
-
-inline int TERRAIN_INDEX_REPEAT(int x, int y)
-{
-	return (y & TERRAIN_SIZE_MASK) * TERRAIN_SIZE + (x & TERRAIN_SIZE_MASK);
-}
 
 WORD TERRAIN_ATTRIBUTE(float x, float y)
 {
@@ -717,8 +707,8 @@ void pull_extension(std::string& fileName, const char* ext)
 	size_t dotPosition = fileName.find_last_of('.');
 	if (dotPosition != std::string::npos)
 	{
-		fileName.erase(dotPosition + 1);  // Elimina la extensión existente
-		fileName += ext;  // Agrega la nueva extensión
+		fileName.erase(dotPosition + 1);  // Elimina la extensiï¿½n existente
+		fileName += ext;  // Agrega la nueva extensiï¿½n
 	}
 }
 
