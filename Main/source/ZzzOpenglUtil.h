@@ -12,7 +12,7 @@ extern unsigned int WindowWidth;
 extern unsigned int WindowHeight;
 extern vec3_t CollisionPosition;
 extern float  FPS;
-#if defined(LDS_FOR_DEVELOPMENT_TESTMODE) || defined(LDS_UNFIXED_FIXEDFRAME_FORDEBUG)		// ½ÇFPS.(°íÁ¤ 20FPS »óÈ²¿¡¼­ ÃßÁ¤¿ë.)
+#if defined(LDS_FOR_DEVELOPMENT_TESTMODE) || defined(LDS_UNFIXED_FIXEDFRAME_FORDEBUG)		// ï¿½ï¿½FPS.(ï¿½ï¿½ï¿½ï¿½ 20FPS ï¿½ï¿½È²ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½.)
 extern float g_fFrameEstimate;
 #endif // defined(LDS_FOR_DEVELOPMENT_TESTMODE) || defined(LDS_UNFIXED_FIXEDFRAME_FORDEBUG)
 extern float  WorldTime;
@@ -87,7 +87,11 @@ extern void EndTextureStream();
 extern void BeginOpengl(int x = 0, int y = 0, int Width = 640, int Height = 480, bool Screen = false);
 extern void EndOpengl();
 extern void UpdateMousePositionn();
-extern inline void TEXCOORD(float* c, float u, float v);
+static inline void TEXCOORD(float* c, float u, float v)
+{
+    c[0] = u;
+    c[1] = v;
+}
 extern void RenderBox(float Matrix[3][4]);
 extern void RenderPlane3D(float Width, float Height, float Matrix[3][4]);
 extern void RenderSprite(int Texture, vec3_t Position, float Width, float Height, vec3_t Light, float Angle = 0.f, float u = 0.f, float v = 0.f, float uWidth = 1.f, float vHeight = 1.f);
