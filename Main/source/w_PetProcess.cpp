@@ -64,6 +64,10 @@ PetProcessPtr g_petProcess;
 
 PetProcess& ThePetProcess()
 {
+	if (!g_petProcess)
+	{
+		g_petProcess = PetProcess::Make();
+	}
 	assert(g_petProcess);
 	return *g_petProcess;
 }

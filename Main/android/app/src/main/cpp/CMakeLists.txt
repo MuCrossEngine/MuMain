@@ -11,7 +11,9 @@ set(SOURCE_DIR  "${CMAKE_CURRENT_SOURCE_DIR}/../../../../../source")
 set(DEP_DIR     "${CMAKE_CURRENT_SOURCE_DIR}/../../../../../dependencies")
 set(UTIL_DIR    "${CMAKE_CURRENT_SOURCE_DIR}/../../../../../../Util")
 set(PLATFORM_DIR "${SOURCE_DIR}/Platform")
+set(CRYPTOPP_SRC_DIR "${DEP_DIR}/cryptopp-src")
 set(NATIVE_APP_GLUE_DIR "${ANDROID_NDK}/sources/android/native_app_glue")
+set(NDK_CPUFEATURES_DIR "${ANDROID_NDK}/sources/android/cpufeatures")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Compiler definitions (mirror Release config from Main.vcxproj)
@@ -42,11 +44,13 @@ include_directories(
     ${SOURCE_DIR}
     ${PLATFORM_DIR}
     ${NATIVE_APP_GLUE_DIR}
+    ${NDK_CPUFEATURES_DIR}
     ${DEP_DIR}/include
     ${DEP_DIR}/include/glm
     ${DEP_DIR}/include/Sol
     ${DEP_DIR}/include/Lua
     ${DEP_DIR}/include/asio
+    ${CRYPTOPP_SRC_DIR}
     ${DEP_DIR}/include/cryptopp820
     ${DEP_DIR}/ImGui
     ${UTIL_DIR}/include
@@ -60,8 +64,27 @@ include_directories(
 # freetype2 — TODO: add source to Main/dependencies/freetype-src/
 #   find_package(Freetype) or add_subdirectory(...)
 # lua 5.4  — TODO: add source to Main/dependencies/lua-5.4-src/
-# crypto++ — TODO: add source to Main/dependencies/cryptopp-src/
 # turbojpeg— TODO: add source to Main/dependencies/libjpeg-turbo-src/
+
+if(NOT EXISTS "${CRYPTOPP_SRC_DIR}/cryptlib.cpp")
+    message(FATAL_ERROR "Crypto++ source not found at ${CRYPTOPP_SRC_DIR}")
+endif()
+
+file(GLOB CRYPTOPP_ALL_CPP CONFIGURE_DEPENDS "${CRYPTOPP_SRC_DIR}/*.cpp")
+list(FILTER CRYPTOPP_ALL_CPP EXCLUDE REGEX ".*/(adhoc|bench1|bench2|bench3|datatest|dlltest|fipsalgt|fipstest|regtest[1-4]|test|validat[0-9]+|simple|pch)\\.cpp$")
+
+add_library(cryptopp_android STATIC
+    ${CRYPTOPP_ALL_CPP}
+    ${NDK_CPUFEATURES_DIR}/cpu-features.c
+)
+
+set_target_properties(cryptopp_android PROPERTIES
+    POSITION_INDEPENDENT_CODE ON
+)
+
+target_compile_definitions(cryptopp_android PRIVATE
+    CRYPTOPP_DISABLE_ASM
+)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Android NDK libraries
@@ -579,5 +602,6 @@ target_link_libraries(mucrossengine
     ${opensl-lib}
     ${dl-lib}
     ${z-lib}
-    # TODO: add freetype, lua54, cryptopp when source is added
+    cryptopp_android
+    # TODO: add freetype, lua54 when source is added
 )

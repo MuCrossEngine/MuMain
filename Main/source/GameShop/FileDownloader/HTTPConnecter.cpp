@@ -101,7 +101,10 @@ WZResult		HTTPConnecter::OpenRemoteFile(HINTERNET& hConnection,
 				}
 				else
 				{
-					this->m_Result.SetResult(DL_GET_FILE_LENGTH,GetLastError(),"[HTTPConnecter::OpenRemoteFile] Fail : HttpQueryInfo - HTTP_QUERY_CONTENT_LENGTH, FileName = %s",this->m_pFileInfo->GetRemoteFilePath());
+					// Content-Length is optional in HTTP (e.g. chunked/streamed responses).
+					// Keep download enabled and let FileDownloader read until EOF.
+					nFileLength = 0;
+					this->m_Result.SetSuccessResult();
 				}
 				}
 				else

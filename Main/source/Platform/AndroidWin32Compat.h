@@ -1741,12 +1741,187 @@ inline LONG ImmGetCompositionString(HIMC, DWORD, LPVOID lpBuf, DWORD dwBufLen)
 // ─────────────────────────────────────────────────────────────────────────────
 // GDI object stubs
 // ─────────────────────────────────────────────────────────────────────────────
-inline HFONT   CreateFontA(int,int,int,int,int,DWORD,DWORD,DWORD,DWORD,DWORD,DWORD,DWORD,DWORD,const char*) { return (HFONT)(void*)1; }
+namespace AndroidTextRenderer
+{
+    HFONT CreateFont(int heightPx, bool bold);
+    void SetDCFont(HDC hdc, HFONT font);
+    void SetDCBitmap(HDC hdc, HBITMAP hbm, int width, int height, void* bits);
+}
+
+struct AndroidCompatDIBSectionInfo
+{
+    int width;
+    int height;
+    int bytesPerPixel;
+    void* bits;
+};
+
+struct AndroidCompatDCInfo
+{
+    HFONT font;
+    HBITMAP bitmap;
+};
+
+inline std::unordered_map<uintptr_t, AndroidCompatDIBSectionInfo>& AndroidCompatDIBSectionRegistry()
+{
+    static std::unordered_map<uintptr_t, AndroidCompatDIBSectionInfo> s_registry;
+    return s_registry;
+}
+
+inline std::unordered_map<uintptr_t, AndroidCompatDCInfo>& AndroidCompatDCRegistry()
+{
+    static std::unordered_map<uintptr_t, AndroidCompatDCInfo> s_registry;
+    return s_registry;
+}
+
+inline std::unordered_set<uintptr_t>& AndroidCompatFontHandleRegistry()
+{
+    static std::unordered_set<uintptr_t> s_registry;
+    return s_registry;
+}
+
+inline HDC AndroidCompatCreateCompatibleDC()
+{
+    static uintptr_t s_nextId = 1;
+    const uintptr_t id = ++s_nextId;
+    AndroidCompatDCRegistry()[id] = { g_hFont, nullptr };
+    if (g_hFont != nullptr)
+    {
+        AndroidTextRenderer::SetDCFont((HDC)id, g_hFont);
+    }
+    return (HDC)id;
+}
+
+inline void AndroidCompatDeleteCompatibleDC(HDC hdc)
+{
+    if (!hdc)
+    {
+        return;
+    }
+
+    AndroidCompatDCRegistry().erase((uintptr_t)hdc);
+}
+
+inline void AndroidCompatRegisterDIBSection(HBITMAP hbm, int width, int height, int bytesPerPixel, void* bits)
+{
+    if (!hbm)
+    {
+        return;
+    }
+
+    AndroidCompatDIBSectionRegistry()[(uintptr_t)hbm] = { width, height, bytesPerPixel, bits };
+}
+
+inline HFONT   CreateFontA(int h, int, int, int, int wt, DWORD, DWORD, DWORD, DWORD, DWORD, DWORD, DWORD, DWORD, const char*)
+{
+    int pixelHeight = (h < 0) ? -h : h;
+    if (pixelHeight <= 0)
+    {
+        pixelHeight = 16;
+    }
+    HFONT font = AndroidTextRenderer::CreateFont(pixelHeight, wt >= FW_BOLD);
+    if (font)
+    {
+        AndroidCompatFontHandleRegistry().insert((uintptr_t)font);
+    }
+    return font;
+}
+
 inline HFONT   CreateFont(int h,int w,int e,int o,int wt,DWORD i,DWORD u,DWORD so,DWORD cs,DWORD op,DWORD cp,DWORD q,DWORD p,const char* f)
                { return CreateFontA(h,w,e,o,wt,i,u,so,cs,op,cp,q,p,f); }
-inline BOOL    DeleteObject(HGDIOBJ) { return TRUE; }
-inline HGDIOBJ SelectObject(HDC, HGDIOBJ o) { return o; }
-inline BOOL    GetTextMetricsW(HDC, TEXTMETRICW* tm) { if(tm) memset(tm,0,sizeof(*tm)); return TRUE; }
+
+inline BOOL DeleteObject(HGDIOBJ hObject)
+{
+    if (!hObject)
+    {
+        return TRUE;
+    }
+
+    auto& dibRegistry = AndroidCompatDIBSectionRegistry();
+    const uintptr_t key = (uintptr_t)hObject;
+    auto dibIt = dibRegistry.find(key);
+    if (dibIt != dibRegistry.end())
+    {
+        if (dibIt->second.bits)
+        {
+            free(dibIt->second.bits);
+        }
+        dibRegistry.erase(dibIt);
+
+        auto& dcRegistry = AndroidCompatDCRegistry();
+        for (auto& entry : dcRegistry)
+        {
+            if (entry.second.bitmap == (HBITMAP)hObject)
+            {
+                entry.second.bitmap = nullptr;
+                AndroidTextRenderer::SetDCBitmap((HDC)entry.first, nullptr, 0, 0, nullptr);
+            }
+        }
+    }
+    else
+    {
+        AndroidCompatFontHandleRegistry().erase(key);
+    }
+
+    return TRUE;
+}
+
+inline HGDIOBJ SelectObject(HDC hdc, HGDIOBJ object)
+{
+    if (!hdc)
+    {
+        return object;
+    }
+
+    auto& dcRegistry = AndroidCompatDCRegistry();
+    AndroidCompatDCInfo& dcInfo = dcRegistry[(uintptr_t)hdc];
+
+    auto& dibRegistry = AndroidCompatDIBSectionRegistry();
+    const uintptr_t key = (uintptr_t)object;
+    auto dibIt = dibRegistry.find(key);
+    if (dibIt != dibRegistry.end())
+    {
+        dcInfo.bitmap = (HBITMAP)object;
+        AndroidTextRenderer::SetDCBitmap(hdc, (HBITMAP)object, dibIt->second.width, dibIt->second.height, dibIt->second.bits);
+    }
+    else if (AndroidCompatFontHandleRegistry().find(key) != AndroidCompatFontHandleRegistry().end())
+    {
+        dcInfo.font = (HFONT)object;
+        AndroidTextRenderer::SetDCFont(hdc, (HFONT)object);
+    }
+
+    return object;
+}
+
+inline BOOL GetTextMetricsW(HDC hdc, TEXTMETRICW* tm)
+{
+    if (tm == nullptr)
+    {
+        return FALSE;
+    }
+
+    memset(tm, 0, sizeof(*tm));
+
+    int pixelHeight = 16;
+    auto dcIt = AndroidCompatDCRegistry().find((uintptr_t)hdc);
+    if (dcIt != AndroidCompatDCRegistry().end() && dcIt->second.font != nullptr)
+    {
+        const uintptr_t fontHandle = (uintptr_t)dcIt->second.font;
+        const int decodedHeight = (int)(fontHandle >> 1);
+        if (decodedHeight > 0)
+        {
+            pixelHeight = decodedHeight;
+        }
+    }
+
+    tm->tmHeight = pixelHeight;
+    tm->tmAscent = (pixelHeight * 3) / 4;
+    tm->tmDescent = pixelHeight - tm->tmAscent;
+    tm->tmAveCharWidth = (pixelHeight > 4) ? (pixelHeight / 2) : pixelHeight;
+    tm->tmMaxCharWidth = tm->tmAveCharWidth;
+    return TRUE;
+}
+
 inline BOOL    GetTextMetrics(HDC h, TEXTMETRICW* tm) { return GetTextMetricsW(h, tm); }
 inline DWORD   GetFontData(HDC, DWORD, DWORD, void*, DWORD) { return 0; }
 inline int     SetBkMode(HDC, int) { return 0; }
@@ -1754,7 +1929,21 @@ inline DWORD   SetBkColor(HDC, DWORD c) { return c; }
 inline DWORD   SetTextColor(HDC, DWORD) { return 0; }
 inline HDC     GetDC(HWND) { return nullptr; }
 inline int     ReleaseDC(HWND, HDC) { return 1; }
-inline HGDIOBJ GetCurrentObject(HDC, UINT) { return (HGDIOBJ)g_hFont; }
+inline HGDIOBJ GetCurrentObject(HDC hdc, UINT objType)
+{
+    auto dcIt = AndroidCompatDCRegistry().find((uintptr_t)hdc);
+    if (dcIt == AndroidCompatDCRegistry().end())
+    {
+        return (HGDIOBJ)g_hFont;
+    }
+
+    if (objType == OBJ_FONT)
+    {
+        return (HGDIOBJ)(dcIt->second.font ? dcIt->second.font : g_hFont);
+    }
+
+    return (HGDIOBJ)dcIt->second.bitmap;
+}
 inline BOOL    SwapBuffers(HDC) { return TRUE; }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2289,6 +2478,11 @@ struct AndroidInternetRequestHandle : AndroidInternetBaseHandle
     size_t contentLength;
     std::vector<BYTE> body;
     size_t readOffset;
+    std::vector<BYTE> streamPrefetch;
+    size_t streamPrefetchOffset;
+    int streamSocket;
+    bool streamMode;
+    bool streamChunked;
     bool sent;
 
     AndroidInternetRequestHandle()
@@ -2296,9 +2490,22 @@ struct AndroidInternetRequestHandle : AndroidInternetBaseHandle
           statusCode(0),
           contentLength(0),
           readOffset(0),
+          streamPrefetchOffset(0),
+          streamSocket(-1),
+          streamMode(false),
+          streamChunked(false),
           sent(false)
     {
         type = ANDROID_INET_REQUEST;
+    }
+
+    ~AndroidInternetRequestHandle() override
+    {
+        if (streamSocket >= 0)
+        {
+            close(streamSocket);
+            streamSocket = -1;
+        }
     }
 };
 
@@ -3303,6 +3510,348 @@ static inline bool AndroidHttpFetch(const std::string& host,
     return false;
 }
 
+static inline bool AndroidHttpOpenStream(const std::string& host,
+                                         INTERNET_PORT port,
+                                         const std::string& method,
+                                         const std::string& path,
+                                         int& outStatusCode,
+                                         size_t& outContentLength,
+                                         bool& outChunkedTransfer,
+                                         std::vector<BYTE>& outPrefetchBody,
+                                         int& outSocket)
+{
+    outStatusCode = 0;
+    outContentLength = 0;
+    outChunkedTransfer = false;
+    outPrefetchBody.clear();
+    outSocket = -1;
+
+    if (host.empty())
+    {
+        errno = EINVAL;
+        return false;
+    }
+
+    static const int k_ioTimeoutMs = 120000;
+    static const int k_maxAttempts = 4;
+
+    std::string reqPath = path.empty() ? "/" : path;
+    if (reqPath[0] != '/')
+    {
+        reqPath = "/" + reqPath;
+    }
+
+    int lastErr = EIO;
+    for (int attempt = 1; attempt <= k_maxAttempts; ++attempt)
+    {
+        bool retryable = false;
+
+        struct addrinfo hints;
+        std::memset(&hints, 0, sizeof(hints));
+        if (AndroidIsIPv4LiteralHost(host))
+        {
+            hints.ai_family = AF_INET;
+            hints.ai_flags = AI_NUMERICHOST;
+        }
+        else
+        {
+            hints.ai_family = AF_UNSPEC;
+        }
+        hints.ai_socktype = SOCK_STREAM;
+
+        char portStr[16];
+        std::snprintf(portStr, sizeof(portStr), "%u", (unsigned)port);
+
+        struct addrinfo* result = nullptr;
+        if (getaddrinfo(host.c_str(), portStr, &hints, &result) != 0 || !result)
+        {
+            lastErr = EHOSTUNREACH;
+            retryable = true;
+            errno = lastErr;
+            if (result)
+            {
+                freeaddrinfo(result);
+            }
+            if (attempt < k_maxAttempts && retryable)
+            {
+                Sleep((DWORD)(attempt * 300));
+                continue;
+            }
+            return false;
+        }
+
+        int sock = -1;
+        int connectErr = ETIMEDOUT;
+        for (struct addrinfo* it = result; it; it = it->ai_next)
+        {
+            sock = (int)socket(it->ai_family, it->ai_socktype, it->ai_protocol);
+            if (sock < 0)
+            {
+                connectErr = (errno != 0) ? errno : EIO;
+                continue;
+            }
+
+            if (AndroidConnectWithTimeout(sock, it->ai_addr, (socklen_t)it->ai_addrlen, k_ioTimeoutMs))
+            {
+                connectErr = 0;
+                break;
+            }
+
+            connectErr = (errno != 0) ? errno : ETIMEDOUT;
+            close(sock);
+            sock = -1;
+        }
+        freeaddrinfo(result);
+
+        if (sock < 0)
+        {
+            lastErr = (connectErr != 0) ? connectErr : ETIMEDOUT;
+            retryable = AndroidIsTransientNetworkError(lastErr);
+            errno = lastErr;
+            if (attempt < k_maxAttempts && retryable)
+            {
+                Sleep((DWORD)(attempt * 300));
+                continue;
+            }
+            return false;
+        }
+
+        AndroidSetSocketTimeouts(sock, k_ioTimeoutMs);
+
+        std::string hostHeader = host;
+        if (port != INTERNET_DEFAULT_HTTP_PORT)
+        {
+            char hostPort[32];
+            std::snprintf(hostPort, sizeof(hostPort), ":%u", (unsigned)port);
+            hostHeader += hostPort;
+        }
+
+        std::string request =
+            method + " " + reqPath + " HTTP/1.0\r\n" +
+            "Host: " + hostHeader + "\r\n" +
+            "Connection: close\r\n" +
+            "User-Agent: MuAndroid/1.0\r\n" +
+            "Accept-Encoding: identity\r\n" +
+            "Accept: */*\r\n\r\n";
+
+        size_t sent = 0;
+        bool sendOk = true;
+        while (sent < request.size())
+        {
+            ssize_t n = send(sock, request.data() + sent, request.size() - sent, 0);
+            if (n < 0)
+            {
+                if (errno == EINTR)
+                {
+                    continue;
+                }
+                sendOk = false;
+                break;
+            }
+            if (n == 0)
+            {
+                sendOk = false;
+                errno = EPIPE;
+                break;
+            }
+            sent += (size_t)n;
+        }
+
+        if (!sendOk)
+        {
+            lastErr = (errno != 0) ? errno : EPIPE;
+            retryable = AndroidIsTransientNetworkError(lastErr);
+            close(sock);
+            errno = lastErr;
+            if (attempt < k_maxAttempts && retryable)
+            {
+                Sleep((DWORD)(attempt * 300));
+                continue;
+            }
+            return false;
+        }
+
+        std::vector<BYTE> response;
+        response.reserve(8192);
+        size_t headerEnd = std::string::npos;
+        bool recvOk = true;
+        bool peerClosed = false;
+        BYTE chunk[8192];
+        while (headerEnd == std::string::npos)
+        {
+            struct pollfd pfd;
+            pfd.fd = sock;
+            pfd.events = POLLIN;
+            pfd.revents = 0;
+
+            int pollResult = poll(&pfd, 1, k_ioTimeoutMs);
+            if (pollResult < 0)
+            {
+                if (errno == EINTR)
+                {
+                    continue;
+                }
+                recvOk = false;
+                break;
+            }
+            if (pollResult == 0)
+            {
+                errno = ETIMEDOUT;
+                recvOk = false;
+                break;
+            }
+
+            if ((pfd.revents & (POLLERR | POLLHUP | POLLNVAL)) != 0 && (pfd.revents & POLLIN) == 0)
+            {
+                int soError = 0;
+                socklen_t soErrorLen = (socklen_t)sizeof(soError);
+                if (getsockopt(sock, SOL_SOCKET, SO_ERROR, &soError, &soErrorLen) == 0 && soError != 0)
+                {
+                    errno = soError;
+                }
+                else if (errno == 0)
+                {
+                    errno = ECONNABORTED;
+                }
+                recvOk = false;
+                break;
+            }
+
+            ssize_t n = recv(sock, chunk, sizeof(chunk), 0);
+            if (n < 0)
+            {
+                if (errno == EINTR)
+                {
+                    continue;
+                }
+                if (errno == EAGAIN || errno == EWOULDBLOCK)
+                {
+                    errno = ETIMEDOUT;
+                }
+                recvOk = false;
+                break;
+            }
+            if (n == 0)
+            {
+                peerClosed = true;
+                break;
+            }
+
+            response.insert(response.end(), chunk, chunk + n);
+            if (response.size() >= 4)
+            {
+                for (size_t i = 0; i + 3 < response.size(); ++i)
+                {
+                    if (response[i] == '\r' && response[i + 1] == '\n' &&
+                        response[i + 2] == '\r' && response[i + 3] == '\n')
+                    {
+                        headerEnd = i;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (!recvOk)
+        {
+            lastErr = (errno != 0) ? errno : ECONNABORTED;
+            retryable = AndroidIsTransientNetworkError(lastErr);
+            close(sock);
+            errno = lastErr;
+            if (attempt < k_maxAttempts && retryable)
+            {
+                Sleep((DWORD)(attempt * 300));
+                continue;
+            }
+            return false;
+        }
+
+        if (headerEnd == std::string::npos)
+        {
+            lastErr = peerClosed ? EPROTO : ECONNABORTED;
+            retryable = AndroidIsTransientNetworkError(lastErr);
+            close(sock);
+            errno = lastErr;
+            if (attempt < k_maxAttempts && retryable)
+            {
+                Sleep((DWORD)(attempt * 300));
+                continue;
+            }
+            return false;
+        }
+
+        std::string headers((const char*)response.data(), headerEnd);
+        size_t firstLineEnd = headers.find("\r\n");
+        std::string statusLine = (firstLineEnd == std::string::npos) ? headers : headers.substr(0, firstLineEnd);
+
+        size_t firstSpace = statusLine.find(' ');
+        size_t secondSpace = (firstSpace == std::string::npos) ? std::string::npos : statusLine.find(' ', firstSpace + 1);
+        if (firstSpace != std::string::npos)
+        {
+            std::string code = (secondSpace == std::string::npos)
+                ? statusLine.substr(firstSpace + 1)
+                : statusLine.substr(firstSpace + 1, secondSpace - firstSpace - 1);
+            outStatusCode = std::atoi(code.c_str());
+        }
+        if (outStatusCode <= 0)
+        {
+            outStatusCode = 500;
+        }
+
+        outChunkedTransfer = false;
+        outContentLength = 0;
+        size_t cursor = (firstLineEnd == std::string::npos) ? headers.size() : firstLineEnd + 2;
+        while (cursor < headers.size())
+        {
+            size_t lineEnd = headers.find("\r\n", cursor);
+            std::string line = (lineEnd == std::string::npos) ? headers.substr(cursor) : headers.substr(cursor, lineEnd - cursor);
+            cursor = (lineEnd == std::string::npos) ? headers.size() : lineEnd + 2;
+
+            if (line.empty())
+            {
+                continue;
+            }
+
+            size_t sep = line.find(':');
+            if (sep == std::string::npos)
+            {
+                continue;
+            }
+
+            std::string name = AndroidHttpLower(AndroidHttpTrim(line.substr(0, sep)));
+            std::string value = AndroidHttpTrim(line.substr(sep + 1));
+            if (name == "content-length")
+            {
+                outContentLength = (size_t)std::strtoull(value.c_str(), nullptr, 10);
+            }
+            else if (name == "transfer-encoding")
+            {
+                std::string lowerValue = AndroidHttpLower(value);
+                if (lowerValue.find("chunked") != std::string::npos)
+                {
+                    outChunkedTransfer = true;
+                }
+            }
+        }
+
+        const size_t bodyStart = headerEnd + 4;
+        if (response.size() > bodyStart)
+        {
+            outPrefetchBody.assign(response.begin() + (std::ptrdiff_t)bodyStart, response.end());
+        }
+        else
+        {
+            outPrefetchBody.clear();
+        }
+
+        outSocket = sock;
+        return true;
+    }
+
+    errno = lastErr;
+    return false;
+}
+
 static inline HINTERNET InternetOpen(const char* agent, DWORD, const char*, const char*, DWORD)
 {
     AndroidInternetSessionHandle* h = new AndroidInternetSessionHandle();
@@ -3383,21 +3932,58 @@ static inline BOOL HttpSendRequest(HINTERNET hRequest, const char*, DWORD, LPVOI
     }
 
     AndroidInternetRequestHandle* req = reinterpret_cast<AndroidInternetRequestHandle*>(base);
+    if (req->streamSocket >= 0)
+    {
+        close(req->streamSocket);
+        req->streamSocket = -1;
+    }
+
+    req->streamMode = false;
+    req->streamChunked = false;
+    req->streamPrefetch.clear();
+    req->streamPrefetchOffset = 0;
     req->body.clear();
     req->readOffset = 0;
     req->contentLength = 0;
     req->statusCode = 0;
-
-    if (!AndroidHttpFetch(req->host, req->port, req->method, req->path, req->statusCode, req->contentLength, req->body))
+    bool streamChunked = false;
+    if (AndroidHttpOpenStream(req->host,
+                              req->port,
+                              req->method,
+                              req->path,
+                              req->statusCode,
+                              req->contentLength,
+                              streamChunked,
+                              req->streamPrefetch,
+                              req->streamSocket))
     {
-        __android_log_print(ANDROID_LOG_ERROR,
-                            "MUAssets",
-                            "AndroidHttpFetch failed: host=%s port=%u path=%s errno=%d",
-                            req->host.c_str(),
-                            (unsigned)req->port,
-                            req->path.c_str(),
-                            errno);
-        return FALSE;
+        if (!streamChunked)
+        {
+            req->streamMode = true;
+            req->streamChunked = false;
+        }
+        else
+        {
+            close(req->streamSocket);
+            req->streamSocket = -1;
+            req->streamPrefetch.clear();
+            req->streamPrefetchOffset = 0;
+        }
+    }
+
+    if (!req->streamMode)
+    {
+        if (!AndroidHttpFetch(req->host, req->port, req->method, req->path, req->statusCode, req->contentLength, req->body))
+        {
+            __android_log_print(ANDROID_LOG_ERROR,
+                                "MUAssets",
+                                "AndroidHttpFetch failed: host=%s port=%u path=%s errno=%d",
+                                req->host.c_str(),
+                                (unsigned)req->port,
+                                req->path.c_str(),
+                                errno);
+            return FALSE;
+        }
     }
 
     req->sent = true;
@@ -3446,9 +4032,23 @@ static inline BOOL InternetQueryDataAvailable(HINTERNET hRequest, LPDWORD availa
     }
 
     AndroidInternetRequestHandle* req = reinterpret_cast<AndroidInternetRequestHandle*>(base);
-    size_t remaining = (req->readOffset < req->body.size()) ? (req->body.size() - req->readOffset) : 0;
+    size_t remaining = 0;
+    if (req->streamMode)
+    {
+        remaining = (req->streamPrefetchOffset < req->streamPrefetch.size())
+            ? (req->streamPrefetch.size() - req->streamPrefetchOffset)
+            : 0;
+    }
+    else
+    {
+        remaining = (req->readOffset < req->body.size()) ? (req->body.size() - req->readOffset) : 0;
+    }
     if (available)
     {
+        if (remaining > (size_t)0xFFFFFFFFu)
+        {
+            remaining = (size_t)0xFFFFFFFFu;
+        }
         *available = (DWORD)remaining;
     }
     return TRUE;
@@ -3464,6 +4064,64 @@ static inline BOOL InternetReadFile(HINTERNET hRequest, LPVOID outBuffer, DWORD 
     }
 
     AndroidInternetRequestHandle* req = reinterpret_cast<AndroidInternetRequestHandle*>(base);
+    if (req->streamMode)
+    {
+        BYTE* dst = reinterpret_cast<BYTE*>(outBuffer);
+        size_t copied = 0;
+        while (copied < (size_t)bytesToRead)
+        {
+            size_t prefetchedRemaining = (req->streamPrefetchOffset < req->streamPrefetch.size())
+                ? (req->streamPrefetch.size() - req->streamPrefetchOffset)
+                : 0;
+            if (prefetchedRemaining > 0)
+            {
+                size_t take = std::min<size_t>(prefetchedRemaining, (size_t)bytesToRead - copied);
+                std::memcpy(dst + copied, req->streamPrefetch.data() + req->streamPrefetchOffset, take);
+                req->streamPrefetchOffset += take;
+                req->readOffset += take;
+                copied += take;
+                continue;
+            }
+
+            if (req->streamSocket < 0)
+            {
+                break;
+            }
+
+            ssize_t n = recv(req->streamSocket, dst + copied, (size_t)bytesToRead - copied, 0);
+            if (n > 0)
+            {
+                copied += (size_t)n;
+                req->readOffset += (size_t)n;
+                continue;
+            }
+
+            if (n == 0)
+            {
+                close(req->streamSocket);
+                req->streamSocket = -1;
+                break;
+            }
+
+            if (errno == EINTR)
+            {
+                continue;
+            }
+
+            if (bytesRead)
+            {
+                *bytesRead = (DWORD)copied;
+            }
+            return FALSE;
+        }
+
+        if (bytesRead)
+        {
+            *bytesRead = (DWORD)copied;
+        }
+        return TRUE;
+    }
+
     size_t remaining = (req->readOffset < req->body.size()) ? (req->body.size() - req->readOffset) : 0;
     size_t toCopy = std::min<size_t>((size_t)bytesToRead, remaining);
     if (toCopy > 0)
@@ -3487,6 +4145,15 @@ static inline BOOL InternetCloseHandle(HINTERNET hInternet)
     }
 
     AndroidInternetBaseHandle* base = reinterpret_cast<AndroidInternetBaseHandle*>(hInternet);
+    if (base->type == ANDROID_INET_REQUEST)
+    {
+        AndroidInternetRequestHandle* req = reinterpret_cast<AndroidInternetRequestHandle*>(base);
+        if (req->streamSocket >= 0)
+        {
+            close(req->streamSocket);
+            req->streamSocket = -1;
+        }
+    }
     delete base;
     return TRUE;
 }

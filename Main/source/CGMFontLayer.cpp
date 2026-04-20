@@ -3,6 +3,9 @@
 #include "CGMFontLayer.h"
 #include "MultiLanguage.h"
 #include "./Utilities/Log/muConsoleDebug.h"
+#ifdef __ANDROID__
+#include "Platform/GameAssetPath.h"
+#endif
 
 extern void BindTexture(int tex);
 
@@ -95,10 +98,12 @@ void CGMFontLayer::runtime_font_property(HDC hdc, HFONT hFont, DWORD dwTable, FT
 	{
 		PixelSize = tm.tmHeight;
 
+#ifndef __ANDROID__
 		if (tm.tmCharSet == GB2312_CHARSET)
 		{
 			dwTable = 0x66637474;
 		}
+#endif
 	}
 
 	DWORD fontSize = GetFontData(hdc, 0, 0, NULL, 0);
@@ -299,20 +304,91 @@ void CGMFontLayer::runtime_font_property(HFONT hFont, int PixelSize)
 	{
 		return;
 	}
-	//HFONT _hFont;
-	bool font_korean = GetPrivateProfileInt("SettingsFont", "font-korean", 0, ".\\config.ini");
 
+	bool font_korean = GetPrivateProfileInt("SettingsFont", "font-korean", 0, ".\\config.ini");
 	bool font_chinase = GetPrivateProfileInt("SettingsFont", "font-chinase", 0, ".\\config.ini");
 
-	HDC hdc = GetDC(NULL);
-
 	Characters.clear();
+
+#ifdef __ANDROID__
+	auto load_android_font = [&](BitmapFont* pFont, int fontIndex, std::initializer_list<const char*> candidates) -> bool
+	{
+		if (pFont == NULL)
+		{
+			return false;
+		}
+
+		for (const char* candidate : candidates)
+		{
+			if (candidate == NULL || candidate[0] == '\0')
+			{
+				continue;
+			}
+
+			std::string filePath(candidate);
+			if (filePath[0] != '/')
+			{
+				filePath = GameAssetPath::Resolve(candidate);
+			}
+
+			pFont->PakBuffer.clear();
+			pFont->BitmapIndex = (FT_UInt)-1;
+			runtime_font_property(filePath.c_str(), library, pFont, fontIndex, PixelSize);
+
+			if (pFont->BitmapIndex != (FT_UInt)-1)
+			{
+				return true;
+			}
+		}
+
+		return false;
+	};
+
+	const bool baseFontLoaded = load_android_font(
+		&NormalFont[0], 0,
+		{
+			"Data/Interface/HUD/fonts/fonts_all.ttf",
+			"/system/fonts/NotoSans-Regular.ttf",
+			"/system/fonts/Roboto-Regular.ttf",
+			"/system/fonts/DroidSans.ttf",
+		});
+
+	if (font_chinase)
+	{
+		load_android_font(
+			&NormalFont[1], 1,
+			{
+				"Data/Interface/HUD/fonts/fonts_ch.ttf",
+				"/system/fonts/NotoSansCJK-Regular.ttc",
+				"/system/fonts/NotoSansSC-Regular.otf",
+				"/system/fonts/NotoSans-Regular.ttf",
+			});
+	}
+
+	if (font_korean)
+	{
+		load_android_font(
+			&NormalFont[2], 2,
+			{
+				"Data/Interface/HUD/fonts/fonts_kr.ttf",
+				"/system/fonts/NotoSansCJK-Regular.ttc",
+				"/system/fonts/NotoSansKR-Regular.otf",
+				"/system/fonts/NotoSans-Regular.ttf",
+			});
+	}
+
+	if (!baseFontLoaded)
+	{
+		FT_Done_FreeType(library);
+		return;
+	}
+#else
+	HDC hdc = GetDC(NULL);
 
 	if (font_chinase)
 		runtime_font_property("Data\\Interface\\HUD\\fonts\\fonts_all.ttf", library, &NormalFont[0], 0, PixelSize);
 	else
 		runtime_font_property(hdc, hFont, 0, library, &NormalFont[0], 0, PixelSize);
-
 
 	if (font_chinase)
 	{
@@ -327,16 +403,17 @@ void CGMFontLayer::runtime_font_property(HFONT hFont, int PixelSize)
 		//_hFont = CreateFont(PixelSize, 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, ANTIALIASED_QUALITY, DEFAULT_PITCH | FF_DONTCARE, "Malgun Gothic");
 		//runtime_font_property(hdc, _hFont, 0, library, &NormalFont[2], 2, PixelSize);
 	}
+#endif
 
-	BYTE* buffer = new BYTE[512*32];
-
+	BYTE* buffer = new BYTE[512 * 32];
 	runtime_load_bitmap(&BitmapFontIndex, 512, 32, buffer);
-
 	SAFE_DELETE_ARRAY(buffer);
 
 	FT_Done_FreeType(library);
 
+#ifndef __ANDROID__
 	DeleteDC(hdc);
+#endif
 }
 
 BOOL CGMFontLayer::_GetTextExtentPoint32(std::wstring wstrText, LPSIZE lpSize)

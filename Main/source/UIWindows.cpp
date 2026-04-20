@@ -711,7 +711,7 @@ void CUIWindowMgr::OpenMainWnd(int iPos_x, int iPos_y)
 		{
 			pWindow->SetSize(m_iMainWindowWidth, m_iMainWindowHeight);
 			pWindow->SetBackPosition(m_bIsMainWindowMaximize, m_iMainWindowBackPos_y, m_iMainWindowBackHeight);
-			// À©µµ¿ì ¸ñ·Ï º¹±¸
+			// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 			RefreshMainWndChatRoomList();
 			pWindow->Refresh();
 			//			((CUIFriendWindow *)pWindow)->SetTabIndex(m_iLastFriendWindowTabIndex);
@@ -896,8 +896,14 @@ void RenderWindowHLine(float pos_x, float pos_y, float width)
 }
 
 CUIBaseWindow::CUIBaseWindow()
-	: MAX_LETTER_TITLE_LENGTH_UTF16((int)(MAX_LETTER_TITLE_LENGTH / g_pMultiLanguage->GetNumByteForOneCharUTF8())),
-	MAX_LETTER_TEXT_LENGTH_UTF16((int)(MAX_LETTERTEXT_LENGTH / g_pMultiLanguage->GetNumByteForOneCharUTF8()))
+	: MAX_LETTER_TITLE_LENGTH_UTF16((int)(MAX_LETTER_TITLE_LENGTH /
+		((g_pMultiLanguage && g_pMultiLanguage->GetNumByteForOneCharUTF8() > 0)
+			? g_pMultiLanguage->GetNumByteForOneCharUTF8()
+			: 1))),
+	MAX_LETTER_TEXT_LENGTH_UTF16((int)(MAX_LETTERTEXT_LENGTH /
+		((g_pMultiLanguage && g_pMultiLanguage->GetNumByteForOneCharUTF8() > 0)
+			? g_pMultiLanguage->GetNumByteForOneCharUTF8()
+			: 1)))
 {
 	memset(&m_WorkMessage, 0, sizeof(UI_MESSAGE));
 	m_iMouseClickPos_x = 0;
@@ -1329,7 +1335,9 @@ CUIChatWindow::CUIChatWindow()
 	: m_iShowType(1),
 	m_dwRoomNumber(0)
 	, MAX_CHATROOM_TEXT_LENGTH_UTF16((int)(MAX_CHATROOM_TEXT_LENGTH /
-		(g_pMultiLanguage->GetNumByteForOneCharUTF8())))
+		((g_pMultiLanguage && g_pMultiLanguage->GetNumByteForOneCharUTF8() > 0)
+			? g_pMultiLanguage->GetNumByteForOneCharUTF8()
+			: 1)))
 {
 	m_iPrevWidth = -1;
 	memset(m_szLastText, 0, sizeof(m_szLastText));
@@ -1359,18 +1367,18 @@ void CUIChatWindow::Init(const char* pszTitle, DWORD dwParentID)
 	m_TextInputBox.SetOption(UIOPTION_ENTERIMECHKOFF);
 	m_TextInputBox.SetBackColor(0, 0, 0, 0);
 
-	//	m_PalListBox.AddText("ÀÌ¸§³×ÀÚ", 1, 1);
-	//	m_PalListBox.AddText("ÀÌ¸§³ËÀÚ", 1, 1);
-	//	m_PalListBox.AddText("ÀÌ¸§¼ö³Ý", 1, 1);
-	//	m_PalListBox.AddText("ÀÌ¸§1ÀÚ", 1, 1);
-	//	m_PalListBox.AddText("ÀÌ¸§2ÀÚ", 1, 1);
-	//	m_PalListBox.AddText("ÀÌ¸§3³Ý", 1, 1);
-	//	m_PalListBox.AddText("ÀÌ¸§4ÀÚ", 1, 1);
-	//	m_PalListBox.AddText("ÀÌ¸§5ÀÚ", 1, 1);
-	//	m_PalListBox.AddText("ÀÌ¸§6³Ý", 1, 1);
-	//	m_PalListBox.AddText("ÀÌ¸§7³Ý", 1, 1);
-	//	m_PalListBox.AddText("ÀÌ¸§8³Ý", 1, 1);
-	//	m_PalListBox.AddText("ÀÌ¸§9³Ý", 1, 1);
+	//	m_PalListBox.AddText("ï¿½Ì¸ï¿½ï¿½ï¿½ï¿½ï¿½", 1, 1);
+	//	m_PalListBox.AddText("ï¿½Ì¸ï¿½ï¿½ï¿½ï¿½ï¿½", 1, 1);
+	//	m_PalListBox.AddText("ï¿½Ì¸ï¿½ï¿½ï¿½ï¿½ï¿½", 1, 1);
+	//	m_PalListBox.AddText("ï¿½Ì¸ï¿½1ï¿½ï¿½", 1, 1);
+	//	m_PalListBox.AddText("ï¿½Ì¸ï¿½2ï¿½ï¿½", 1, 1);
+	//	m_PalListBox.AddText("ï¿½Ì¸ï¿½3ï¿½ï¿½", 1, 1);
+	//	m_PalListBox.AddText("ï¿½Ì¸ï¿½4ï¿½ï¿½", 1, 1);
+	//	m_PalListBox.AddText("ï¿½Ì¸ï¿½5ï¿½ï¿½", 1, 1);
+	//	m_PalListBox.AddText("ï¿½Ì¸ï¿½6ï¿½ï¿½", 1, 1);
+	//	m_PalListBox.AddText("ï¿½Ì¸ï¿½7ï¿½ï¿½", 1, 1);
+	//	m_PalListBox.AddText("ï¿½Ì¸ï¿½8ï¿½ï¿½", 1, 1);
+	//	m_PalListBox.AddText("ï¿½Ì¸ï¿½9ï¿½ï¿½", 1, 1);
 
 	m_ChatListBox.SetParentUIID(GetUIID());
 	m_ChatListBox.SetArrangeType(2, 0, 16);
@@ -1430,7 +1438,7 @@ CWsctlc* CUIChatWindow::GetCurrentSocket()
 	if (pCRSocket != NULL) return &pCRSocket->m_WSClient;
 	else
 	{
-		assert(!"¹æ ¼ÒÄÏ °Ë»ö ½ÇÆÐ!!!");
+		assert(!"ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ë»ï¿½ ï¿½ï¿½ï¿½ï¿½!!!");
 		return NULL;
 	}
 }
@@ -2160,7 +2168,7 @@ void CUIPhotoViewer::Init(int iInitType)
 
 	CreateCharacterPointer(&m_PhotoChar, MODEL_PLAYER, (Hero->PositionX), (Hero->PositionY), 0);
 
-	// ÀÌµ¿
+	// ï¿½Ìµï¿½
 	Vector(-300, -300, -300, m_PhotoChar.Object.Position);
 
 	m_bIsInitialized = TRUE;
@@ -2262,7 +2270,7 @@ void CUIPhotoViewer::CopyPlayer()
 		if (CompareItemEqual(&m_PhotoChar.Helper, &Hero->Helper) == FALSE)
 			bChangeHelper = TRUE;
 	}
-	else	// º¯½Å »óÅÂ
+	else	// ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 	{
 
 		if (CompareItemEqual(&m_PhotoChar.BodyPart[BODYPART_HELM], &CharacterMachine->Equipment[EQUIPMENT_HELM], MODEL_BODY_HELM + gCharacterManager.GetSkinModelIndex(Hero->Class)) == FALSE)
@@ -2927,7 +2935,7 @@ BOOL CUILetterWriteWindow::HandleMessage()
 				for (k = 0; k < MAX_LETTER_TEXT_LENGTH_UTF16; k++)
 					szTextUTF16[k] = g_pMultiLanguage->ConvertFulltoHalfWidthChar(szTextUTF16[k]);
 
-				// Asegúrate de que estén terminados en nulo
+				// Asegï¿½rate de que estï¿½n terminados en nulo
 				szTitleUTF16[MAX_LETTER_TITLE_LENGTH_UTF16] = L'\0';
 				szTextUTF16[MAX_LETTER_TEXT_LENGTH_UTF16] = L'\0';
 
@@ -3365,7 +3373,7 @@ BOOL CUILetterReadWindow::HandleMessage()
 	case UI_MESSAGE_YNRETURN:
 		if (m_WorkMessage.m_iParam2 == 1)
 		{
-			// ÆíÁö »èÁ¦
+			// ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 			SendRequestDeleteLetter(m_LetterHead.m_dwLetterID);
 			g_pWindowMgr->SendUIMessage(UI_MESSAGE_CLOSE, GetUIID(), 0);
 		}
@@ -3467,7 +3475,7 @@ bool TestAlphabeticOrder(const char* pszText1, const char* pszText2, BOOL* pbEqu
 		else return false;
 	}
 	if (pbEqual != NULL) *pbEqual = TRUE;
-	return false;	// ¿ÏÀüÈ÷ µ¿ÀÏ
+	return false;	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 }
 
 bool FriendListSortByID(const GUILDLIST_TEXT& lhs, const GUILDLIST_TEXT& rhs)
@@ -3688,11 +3696,11 @@ BOOL CUIFriendListTabWindow::HandleMessage()
 			}
 		}
 		break;
-		case 4:		// ÆíÁö¾²±â
+		case 4:		// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 		{
 			char temp[MAX_TEXT_LENGTH + 1];
 			sprintf(temp, GlobalText[1071], g_cdwLetterCost);
-			dwUIID = g_pWindowMgr->AddWindow(UIWNDTYPE_WRITELETTER, 100, 100, temp);	// "ÆíÁö¾²±â"
+			dwUIID = g_pWindowMgr->AddWindow(UIWNDTYPE_WRITELETTER, 100, 100, temp);	// "ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½"
 			if (dwUIID == 0) break;
 			if (GetCurrentSelectedFriend() != NULL)
 				((CUILetterWriteWindow*)g_pWindowMgr->GetWindow(dwUIID))->SetMailtoText((const char*)GetCurrentSelectedFriend());
@@ -4461,7 +4469,7 @@ BOOL CUILetterBoxTabWindow::HandleMessage()
 			DWORD dwLetterID = GetCurrentSelectedLetter()->m_dwLetterID;
 			if (g_pWindowMgr->LetterReadCheck(dwLetterID) == FALSE)
 			{
-				// Ä³½Ã
+				// Ä³ï¿½ï¿½
 				if (g_pLetterList->GetLetterText(dwLetterID) == NULL)
 				{
 					SendRequestLetterText(dwLetterID);

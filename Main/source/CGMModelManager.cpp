@@ -3,6 +3,11 @@
 #include "CGMModelManager.h"
 #include "./Utilities/Log/muConsoleDebug.h"
 
+#ifdef __ANDROID__
+#include <android/log.h>
+#define MU_ANDROID_MODEL_LOGI(...) __android_log_print(ANDROID_LOG_INFO, "MUAndroid", __VA_ARGS__)
+#endif
+
 CGMModelManager::CGMModelManager()
 {
 	ClientModels = NULL;
@@ -86,7 +91,29 @@ void CGMModelManager::AccessModel(int Type, char* Path, char* FileName, int i)
 	if (pModel)
 	{
 		pModel->m_iBMDSeqID = Type;
+
+	#ifdef __ANDROID__
+		if (strcmp(Path, "Data\\Player\\") == 0)
+		{
+			MU_ANDROID_MODEL_LOGI("AccessModel begin type=%d file=%s%s", Type, Path, Name);
+		}
+	#endif
+
 		Success = pModel->Open2(Path, Name);
+
+	#ifdef __ANDROID__
+		if (strcmp(Path, "Data\\Player\\") == 0)
+		{
+			MU_ANDROID_MODEL_LOGI("AccessModel end type=%d file=%s%s success=%d meshes=%d bones=%d actions=%d",
+				Type,
+				Path,
+				Name,
+				Success ? 1 : 0,
+				pModel->NumMeshs,
+				pModel->NumBones,
+				pModel->NumActions);
+		}
+	#endif
 
 		if (Success == false)
 		{

@@ -7,12 +7,14 @@
 #include <android/log.h>
 #include <android_native_app_glue.h>
 #include <android/native_window.h>
+#include <android/input.h>
 #include <jni.h>
 #include <string>
 #include <atomic>
 #include <chrono>
 #include <sys/stat.h>
 #include <cstdio>
+#include <vector>
 
 #define LOG_TAG "MUAndroid"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO,  LOG_TAG, __VA_ARGS__)
@@ -30,6 +32,7 @@
 #include "Platform/RenderBackend.h"
 #include "Platform/GameDownloader.h"
 #include "Platform/AudioOpenSLES.h"
+#include "Platform/AndroidTextRenderer.h"
 
 // ── Game headers (same as Windows) ──────────────────────────────────────────
 #include "stdafx.h"
@@ -38,6 +41,7 @@
 #include "ZzzTexture.h"
 #include "ZzzOpenData.h"
 #include "ZzzBMD.h"
+#include "ZzzInfomation.h"
 #include "ZzzObject.h"
 #include "ZzzCharacter.h"
 #include "UIManager.h"
@@ -45,10 +49,12 @@
 #include "Input.h"
 #include "Time/Timer.h"
 #include "CGMProtect.h"
+#include "CGMCharacter.h"
 #include "CGMFontLayer.h"
 #include "CGMModelManager.h"
 #include "w_MapProcess.h"
 #include "w_PetProcess.h"
+#include "NewUISystem.h"
 
 // Networking poll (replaces WSAAsyncSelect model)
 #include "Platform/AndroidNetworkPollCompat.h"
@@ -70,7 +76,53 @@ static std::atomic<bool>   g_running{true};
 static bool                g_renderBackendInitialized = false;
 
 // Windows initializes this singleton in WinMain(); Android must do it here.
+static CGMCharacter        g_androidCharacterManager;
 static CGMModelManager     g_androidModelManager;
+static bool                g_legacyCoreInitialized = false;
+
+static void InitLegacyCoreState()
+{
+    if (g_legacyCoreInitialized)
+    {
+        return;
+    }
+
+    if (GateAttribute == nullptr)
+    {
+        GateAttribute = new GATE_ATTRIBUTE[MAX_GATES];
+        memset(GateAttribute, 0, sizeof(GATE_ATTRIBUTE) * MAX_GATES);
+    }
+
+    if (SkillAttribute == nullptr)
+    {
+        SkillAttribute = new SKILL_ATTRIBUTE[MAX_SKILLS];
+        memset(SkillAttribute, 0, sizeof(SKILL_ATTRIBUTE) * MAX_SKILLS);
+    }
+
+    if (CharacterMachine == nullptr)
+    {
+        CharacterMachine = new CHARACTER_MACHINE;
+        memset(CharacterMachine, 0, sizeof(CHARACTER_MACHINE));
+        CharacterAttribute = &CharacterMachine->Character;
+        CharacterMachine->Init();
+    }
+    else if (CharacterAttribute == nullptr)
+    {
+        CharacterAttribute = &CharacterMachine->Character;
+    }
+
+    if (Hero == nullptr && gmCharacters != nullptr)
+    {
+        Hero = gmCharacters->GetCharacter(0);
+    }
+
+    g_legacyCoreInitialized = true;
+
+    LOGI("InitLegacyCoreState: gmCharacters=%p Hero=%p CharacterMachine=%p",
+         gmCharacters,
+         Hero,
+         CharacterMachine);
+}
 
 // JNI helper: get external files path from Java side
 static std::string GetExternalFilesDir(android_app* app)
@@ -276,6 +328,72 @@ static bool PathExists(const std::string& path)
     return stat(path.c_str(), &st) == 0;
 }
 
+static bool CopyBinaryFile(const std::string& sourcePath, const std::string& targetPath)
+{
+    FILE* source = fopen(sourcePath.c_str(), "rb");
+    if (!source)
+    {
+        return false;
+    }
+
+    FILE* target = fopen(targetPath.c_str(), "wb");
+    if (!target)
+    {
+        fclose(source);
+        return false;
+    }
+
+    std::vector<unsigned char> buffer(64 * 1024);
+    bool ok = true;
+
+    while (!feof(source))
+    {
+        const size_t read = fread(buffer.data(), 1, buffer.size(), source);
+        if (read > 0)
+        {
+            if (fwrite(buffer.data(), 1, read, target) != read)
+            {
+                ok = false;
+                break;
+            }
+        }
+
+        if (ferror(source))
+        {
+            ok = false;
+            break;
+        }
+    }
+
+    fclose(target);
+    fclose(source);
+    return ok;
+}
+
+static bool EnsureCaseSensitiveAlias(const char* targetRelativePath, const char* fallbackRelativePath)
+{
+    const std::string targetPath = GameAssetPath::Resolve(targetRelativePath);
+    if (PathExists(targetPath))
+    {
+        return true;
+    }
+
+    const std::string fallbackPath = GameAssetPath::Resolve(fallbackRelativePath);
+    if (!PathExists(fallbackPath))
+    {
+        return false;
+    }
+
+    if (!CopyBinaryFile(fallbackPath, targetPath))
+    {
+        LOGE("InitGame: failed to create case alias %s <- %s", targetPath.c_str(), fallbackPath.c_str());
+        return false;
+    }
+
+    LOGI("InitGame: created case alias %s <- %s", targetPath.c_str(), fallbackPath.c_str());
+    return true;
+}
+
 static bool WriteBootstrapMarker(const std::string& markerPath)
 {
     FILE* marker = fopen(markerPath.c_str(), "wb");
@@ -343,6 +461,11 @@ static bool InitGame(android_app* app)
     GameAssetPath::Init(dataPath);
     LOGI("InitGame: asset path = %s", dataPath.c_str());
 
+    if (!AndroidTextRenderer::Init())
+    {
+        LOGE("InitGame: AndroidTextRenderer init failed (font rendering fallback may be limited)");
+    }
+
     // 1.1 Optional downloader base URL from launch intent extra.
     std::string assetServerUrl = GetAssetServerUrl(app);
     if (!assetServerUrl.empty())
@@ -386,6 +509,12 @@ static bool InitGame(android_app* app)
     if (!AreBootstrapFilesPresent())
     {
         LOGE("InitGame: bundled assets copy completed but bootstrap files are still missing");
+        return false;
+    }
+
+    if (!EnsureCaseSensitiveAlias("Data/Player/Player.bmd", "Data/Player/player.bmd"))
+    {
+        LOGE("InitGame: required player model alias is missing");
         return false;
     }
 
@@ -452,30 +581,36 @@ static bool InitGame(android_app* app)
     // 7. Global random table (used throughout the game)
     LegacyClientRuntime::InitRandomTable();
 
-#ifndef __ANDROID__
-    // 7.1 Buff system runtime (initialized in WinMain on Windows)
+    // 7.1 Minimal WinMain parity for legacy globals used before MAIN_SCENE.
+    InitLegacyCoreState();
+
+    // 7.2 Runtime parity with WinMain (required before LOG_IN_SCENE world load)
     if (!g_BuffSystem)
     {
         g_BuffSystem = BuffStateSystem::Make();
     }
 
-    // 7.2 Map process runtime (initialized in WinMain on Windows)
     if (!g_MapProcess)
     {
         g_MapProcess = MapProcess::Make();
     }
 
-    // 7.3 Pet process runtime (initialized in WinMain on Windows)
     if (!g_petProcess)
     {
         g_petProcess = PetProcess::Make();
     }
-#else
-    // Android: defer heavy runtime subsystems until MAIN_SCENE entry.
-    // They are not required for WEBZEN/LOGIN bootstrap and can trigger
-    // early LMK kills on constrained devices.
-    LOGI("InitGame: deferring Buff/Map/Pet runtime init until MAIN_SCENE");
-#endif
+
+    LOGI("InitGame: runtime systems ready Buff=%p Map=%p Pet=%p", g_BuffSystem.get(), g_MapProcess.get(), g_petProcess.get());
+
+    // 7.5 NewUI system (Windows does this in WinMain; essential for LoadMainSceneInterface)
+    if (!g_pNewUISystem->Create())
+    {
+        LOGE("InitGame: g_pNewUISystem->Create() failed");
+    }
+    else
+    {
+        LOGI("InitGame: g_pNewUISystem->Create() OK");
+    }
 
     // 8. Game data loading starts in WEBZEN_SCENE and advances via Scene() dispatcher
     LOGI("InitGame: bootstrap complete, entering game loop");
@@ -595,6 +730,25 @@ static void OnAppCmd(android_app* app, int32_t cmd)
 // ─────────────────────────────────────────────────────────────────────────────
 static int32_t OnInputEvent(android_app* app, AInputEvent* event)
 {
+    if (AInputEvent_getType(event) == AINPUT_EVENT_TYPE_KEY)
+    {
+        const int32_t keyCode = AKeyEvent_getKeyCode(event);
+        if (keyCode == AKEYCODE_BACK)
+        {
+            const int32_t action = AKeyEvent_getAction(event);
+            if (action == AKEY_EVENT_ACTION_UP)
+            {
+                LOGI("OnInputEvent: BACK pressed, finishing activity");
+                g_running = false;
+                if (app && app->activity)
+                {
+                    ANativeActivity_finish(app->activity);
+                }
+            }
+            return 1;
+        }
+    }
+
     return GameMouseInput::ProcessEvent(event);
 }
 
@@ -636,6 +790,7 @@ void android_main(android_app* app)
     }
 
     // Cleanup
+    AndroidTextRenderer::Shutdown();
     AudioOpenSLES::Shutdown();
     if (g_renderBackendInitialized)
     {
