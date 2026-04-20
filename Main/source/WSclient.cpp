@@ -1713,6 +1713,10 @@ void ReceiveChat(BYTE* ReceiveBuffer)
 		g_ErrorReport.Write("Send Request Server List.\r\n");
 		SendRequestServerList();
 	}
+	else if (SceneFlag != MAIN_SCENE)
+	{
+		return;
+	}
 	else
 	{
 		LPPCHATING Data = (LPPCHATING)ReceiveBuffer;
@@ -1782,9 +1786,13 @@ void ReceiveChat(BYTE* ReceiveBuffer)
 		{
 			memcpy(Text, (char*)Data->ChatText, MAX_CHAT_SIZE);
 			CHARACTER* pFindGm = NULL;
-			for (int i = 0; i < MAX_CHARACTERS_CLIENT; i++)
+			for (int i = 0; gmCharacters != NULL && i < MAX_CHARACTERS_CLIENT; i++)
 			{
 				CHARACTER* c = gmCharacters->GetCharacter(i);
+				if (c == NULL)
+				{
+					continue;
+				}
 				OBJECT* o = &c->Object;
 				if (o->Live && o->Kind == KIND_PLAYER && g_isCharacterBuff((&c->Object), eBuff_GMEffect) || (c->CtlCode == CTLCODE_20OPERATOR) || (c->CtlCode == CTLCODE_08OPERATOR))
 				{

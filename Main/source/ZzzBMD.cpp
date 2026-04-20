@@ -2,6 +2,15 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "stdafx.h"
+#include "Platform/GameAssetPath.h"
+#include <new>
+
+static inline int32_t ReadSerializedInt32(const unsigned char* data)
+{
+	int32_t value = 0;
+	memcpy(&value, data, sizeof(value));
+	return value;
+}
 #include "ZzzOpenglUtil.h"
 #include "ZzzInfomation.h"
 #include "ZzzBMD.h"
@@ -2274,33 +2283,38 @@ void BlurShadow()
 
 void BMD::Release()
 {
-	for (int i = 0; i < NumBones; i++)
+	if (Bones)
 	{
-		Bone_t* b = &Bones[i];
-
-		if (!b->Dummy)
+		for (int i = 0; i < NumBones; i++)
 		{
-			for (int j = 0; j < NumActions; j++)
-			{
-				BoneMatrix_t* bm = &b->BoneMatrixes[j];
+			Bone_t* b = &Bones[i];
 
-				if (bm)
+			if (!b->Dummy && b->BoneMatrixes)
+			{
+				for (int j = 0; j < NumActions; j++)
 				{
-					SAFE_DELETE_ARRAY(bm->Position);
-					SAFE_DELETE_ARRAY(bm->Rotation);
-					SAFE_DELETE_ARRAY(bm->Quaternion);
+					BoneMatrix_t* bm = &b->BoneMatrixes[j];
+					if (bm)
+					{
+						SAFE_DELETE_ARRAY(bm->Position);
+						SAFE_DELETE_ARRAY(bm->Rotation);
+						SAFE_DELETE_ARRAY(bm->Quaternion);
+					}
 				}
+				SAFE_DELETE_ARRAY(b->BoneMatrixes);
 			}
-			SAFE_DELETE_ARRAY(b->BoneMatrixes);
 		}
 	}
 
-	for (int i = 0; i < NumActions; i++)
+	if (Actions)
 	{
-		Action_t* a = &Actions[i];
-		if (a->LockPositions)
+		for (int i = 0; i < NumActions; i++)
 		{
-			SAFE_DELETE_ARRAY(a->Positions);
+			Action_t* a = &Actions[i];
+			if (a->LockPositions)
+			{
+				SAFE_DELETE_ARRAY(a->Positions);
+			}
 		}
 	}
 
@@ -2320,7 +2334,13 @@ void BMD::Release()
 				delete m->m_csTScript;
 				m->m_csTScript = NULL;
 			}
-			if (IndexTexture[m->Texture] != BITMAP_SKIN && IndexTexture[m->Texture] != BITMAP_HQSKIN && IndexTexture[m->Texture] != BITMAP_HQSKIN2 && IndexTexture[m->Texture] != BITMAP_HQSKIN3)
+			if (IndexTexture &&
+				m->Texture >= 0 &&
+				m->Texture < NumMeshs &&
+				IndexTexture[m->Texture] != BITMAP_SKIN &&
+				IndexTexture[m->Texture] != BITMAP_HQSKIN &&
+				IndexTexture[m->Texture] != BITMAP_HQSKIN2 &&
+				IndexTexture[m->Texture] != BITMAP_HQSKIN3)
 			{
 				DeleteBitmap(IndexTexture[m->Texture]);
 
@@ -2333,14 +2353,13 @@ void BMD::Release()
 	SAFE_DELETE_ARRAY(Actions);
 	SAFE_DELETE_ARRAY(Textures);
 	SAFE_DELETE_ARRAY(IndexTexture);
+	SAFE_DELETE_ARRAY(LightTexture);
 
 	NumBones = 0;
 	NumActions = 0;
 	NumMeshs = 0;
 
-#ifdef LDS_FIX_SETNULLALLOCVALUE_WHEN_BMDRELEASE
 	m_bCompletedAlloc = false;
-#endif // LDS_FIX_SETNULLALLOCVALUE_WHEN_BMDRELEASE
 }
 
 void BMD::FindNearTriangle(void)
@@ -2445,7 +2464,7 @@ bool BMD::Open(char* DirName, char* ModelFileName)
 	char ModelName[64];
 	strcpy(ModelName, DirName);
 	strcat(ModelName, ModelFileName);
-	FILE* fp = fopen(ModelName, "rb");
+	FILE* fp = MU_FOPEN(ModelName, "rb");
 	if (fp == NULL)
 	{
 		return false;
@@ -2673,7 +2692,7 @@ bool BMD::Open2(char* DirName, char* ModelFileName, bool bReAlloc)
 	strcpy(ModelName, DirName);
 	strcat(ModelName, ModelFileName);
 
-	FILE* fp = fopen(ModelName, "rb");
+	FILE* fp = MU_FOPEN(ModelName, "rb");
 
 	if (fp == NULL)
 	{
@@ -2683,19 +2702,62 @@ bool BMD::Open2(char* DirName, char* ModelFileName, bool bReAlloc)
 	strcpy(FileName, ModelFileName);
 
 	fseek(fp, 0, SEEK_END);
-	int fileSize = ftell(fp);
+	const long rawFileSize = ftell(fp);
 	fseek(fp, 0, SEEK_SET);
+	if (rawFileSize <= 0 || rawFileSize > (256L * 1024L * 1024L))
+	{
+		fclose(fp);
+		m_bCompletedAlloc = false;
+		return false;
+	}
+	const int fileSize = (int)rawFileSize;
 
-	unsigned char* Data = new unsigned char[fileSize];
-	//std::vector<BYTE> PakBuffer(fileSize, 0);
+	unsigned char* Data = new (std::nothrow) unsigned char[fileSize];
+	if (Data == NULL)
+	{
+		fclose(fp);
+		m_bCompletedAlloc = false;
+		return false;
+	}
 
-	fread(Data, 1, fileSize, fp);
+	const size_t readCount = fread(Data, 1, (size_t)fileSize, fp);
 	fclose(fp);
+	if (readCount != (size_t)fileSize)
+	{
+		delete[] Data;
+		Release();
+		m_bCompletedAlloc = false;
+		return false;
+	}
+	int dataSize = fileSize;
 
-	//BYTE* Data = PakBuffer.data();
+	auto failOpen = [&]() -> bool
+	{
+		if (Data)
+		{
+			delete[] Data;
+			Data = NULL;
+		}
+		Release();
+		m_bCompletedAlloc = false;
+		return false;
+	};
 
-	int Size;
+	int Size = 0;
 	int DataPtr = 3;
+	auto hasBytes = [&](size_t need) -> bool
+	{
+		if (DataPtr < 0)
+		{
+			return false;
+		}
+		return ((size_t)DataPtr + need) <= (size_t)dataSize;
+	};
+
+	if (!hasBytes(1))
+	{
+		return failOpen();
+	}
 
 	Version = *((char*)(Data + DataPtr));
 	DataPtr += 1;
@@ -2705,12 +2767,32 @@ bool BMD::Open2(char* DirName, char* ModelFileName, bool bReAlloc)
 		if (Data[0] == 'L' && Data[1] == 'U' && Data[2] == 'A')
 		{
 			int pos = DataPtr;
-			long lSize = *((long*)(Data + pos));
+			if ((size_t)pos + sizeof(int32_t) > (size_t)dataSize)
+			{
+				return failOpen();
+			}
+			const int32_t lSize = ReadSerializedInt32(Data + pos);
+			if (lSize < 0)
+			{
+				return failOpen();
+			}
 			pos += 4;
+			if ((size_t)pos + (size_t)lSize > (size_t)dataSize)
+			{
+				return failOpen();
+			}
 			pos += lSize;
 
-			long DataLen = *((long*)(Data + pos));
+			if ((size_t)pos + sizeof(int32_t) > (size_t)dataSize)
+			{
+				return failOpen();
+			}
+			const int32_t DataLen = ReadSerializedInt32(Data + pos);
 			pos += 4;
+			if (DataLen < 0 || ((size_t)pos + (size_t)DataLen > (size_t)dataSize))
+			{
+				return failOpen();
+			}
 
 			if (DataLen > 0)
 			{
@@ -2721,44 +2803,97 @@ bool BMD::Open2(char* DirName, char* ModelFileName, bool bReAlloc)
 
 	if (Version == 12)
 	{
-		long lSize = *((long*)(Data + DataPtr)); DataPtr += sizeof(long);
-		long lDecSize = MapFileDecrypt(NULL, Data + DataPtr, lSize);
-		BYTE* pbyDec = new BYTE[lDecSize];
+		if (!hasBytes(sizeof(int32_t)))
+		{
+			return failOpen();
+		}
+		const int32_t lSize = ReadSerializedInt32(Data + DataPtr); DataPtr += 4;
+		if (lSize <= 0 || !hasBytes((size_t)lSize))
+		{
+			return failOpen();
+		}
+		const int32_t lDecSize = MapFileDecrypt(NULL, Data + DataPtr, lSize);
+		if (lDecSize <= 0 || lDecSize > (256 * 1024 * 1024))
+		{
+			return failOpen();
+		}
+		BYTE* pbyDec = new (std::nothrow) BYTE[lDecSize];
+		if (pbyDec == NULL)
+		{
+			return failOpen();
+		}
 		MapFileDecrypt(pbyDec, Data + DataPtr, lSize);
 		delete[] Data;
 		Data = pbyDec;
+		dataSize = lDecSize;
 		DataPtr = 0;
 	}
 	else if (Version == 0xE)
 	{
-		long lSize = *((long*)(Data + DataPtr));
+		if (!hasBytes(sizeof(int32_t)))
+		{
+			return failOpen();
+		}
+		const int32_t lSize = ReadSerializedInt32(Data + DataPtr);
 		DataPtr += 4;
-		long lDecSize = MuFileDecrypt(NULL, &Data[DataPtr], lSize);
-		BYTE* pbyDec = new BYTE[lDecSize];
+		if (lSize <= 0 || !hasBytes((size_t)lSize))
+		{
+			return failOpen();
+		}
+		const int32_t lDecSize = MuFileDecrypt(NULL, &Data[DataPtr], lSize);
+		if (lDecSize <= 0 || lDecSize > (256 * 1024 * 1024))
+		{
+			return failOpen();
+		}
+		BYTE* pbyDec = new (std::nothrow) BYTE[lDecSize];
+		if (pbyDec == NULL)
+		{
+			return failOpen();
+		}
 		MuFileDecrypt(pbyDec, &Data[DataPtr], lSize);
 		delete[] Data;
 		Data = pbyDec;
+		dataSize = lDecSize;
 		DataPtr = 0;
 	}
 
+	if (!hasBytes(32 + sizeof(short) * 3))
+	{
+		return failOpen();
+	}
 	memcpy(Name, Data + DataPtr, 32); DataPtr += 32;
 
 	NumMeshs = *((short*)(Data + DataPtr)); DataPtr += 2;
 	NumBones = *((short*)(Data + DataPtr)); DataPtr += 2;
-	assert(NumBones <= MAX_BONES && "Bones 200");
 	NumActions = *((short*)(Data + DataPtr)); DataPtr += 2;
+	if (NumMeshs < 0 || NumMeshs > MAX_MESH ||
+		NumBones < 0 || NumBones > MAX_BONES ||
+		NumActions < 0 || NumActions > 4096)
+	{
+		return failOpen();
+	}
 
-	Meshs = new Mesh_t[max(1, NumMeshs)];
-	Bones = new Bone_t[max(1, NumBones)];
-	Actions = new Action_t[max(1, NumActions)];
-	Textures = new Texture_t[max(1, NumMeshs)];
-	IndexTexture = new GLuint[max(1, NumMeshs)];
-	LightTexture = new GLuint[max(1, NumMeshs)];
+	Meshs = new (std::nothrow) Mesh_t[max(1, NumMeshs)];
+	Bones = new (std::nothrow) Bone_t[max(1, NumBones)]();
+	Actions = new (std::nothrow) Action_t[max(1, NumActions)]();
+	Textures = new (std::nothrow) Texture_t[max(1, NumMeshs)]();
+	IndexTexture = new (std::nothrow) GLuint[max(1, NumMeshs)]();
+	LightTexture = new (std::nothrow) GLuint[max(1, NumMeshs)]();
+	if (Meshs == NULL || Bones == NULL || Actions == NULL ||
+		Textures == NULL || IndexTexture == NULL || LightTexture == NULL)
+	{
+		return failOpen();
+	}
 
 	int i;
 
 	for (i = 0; i < NumMeshs; i++)
 	{
+		if (!hasBytes(sizeof(short) * 5))
+		{
+			return failOpen();
+		}
+
 		Mesh_t* m = &Meshs[i];
 		m->NumVertices = *((short*)(Data + DataPtr));
 		DataPtr += 2;
@@ -2774,26 +2909,66 @@ bool BMD::Open2(char* DirName, char* ModelFileName, bool bReAlloc)
 
 		m->Texture = *((short*)(Data + DataPtr));
 		DataPtr += 2;
+		if (m->NumVertices < 0 || m->NumVertices > MAX_VERTICES ||
+			m->NumNormals < 0 || m->NumNormals > MAX_VERTICES ||
+			m->NumTexCoords < 0 || m->NumTexCoords > MAX_VERTICES ||
+			m->NumTriangles < 0 || m->NumTriangles > 30000)
+		{
+			return failOpen();
+		}
 
 		m->NoneBlendMesh = false;
-		m->Vertices = new Vertex_t[m->NumVertices];
-		m->Normals = new Normal_t[m->NumNormals];
-		m->TexCoords = new TexCoord_t[m->NumTexCoords];
-		m->Triangles = new Triangle_t[m->NumTriangles];
+		m->Vertices = (m->NumVertices > 0) ? new (std::nothrow) Vertex_t[m->NumVertices] : NULL;
+		m->Normals = (m->NumNormals > 0) ? new (std::nothrow) Normal_t[m->NumNormals] : NULL;
+		m->TexCoords = (m->NumTexCoords > 0) ? new (std::nothrow) TexCoord_t[m->NumTexCoords] : NULL;
+		m->Triangles = (m->NumTriangles > 0) ? new (std::nothrow) Triangle_t[m->NumTriangles] : NULL;
+		if ((m->NumVertices > 0 && m->Vertices == NULL) ||
+			(m->NumNormals > 0 && m->Normals == NULL) ||
+			(m->NumTexCoords > 0 && m->TexCoords == NULL) ||
+			(m->NumTriangles > 0 && m->Triangles == NULL))
+		{
+			return failOpen();
+		}
 
-		Size = m->NumVertices * sizeof(Vertex_t);
-		memcpy(m->Vertices, Data + DataPtr, Size);
-		DataPtr += Size;
+		Size = m->NumVertices * (int)sizeof(Vertex_t);
+		if (Size > 0)
+		{
+			if (!hasBytes((size_t)Size))
+			{
+				return failOpen();
+			}
+			memcpy(m->Vertices, Data + DataPtr, (size_t)Size);
+			DataPtr += Size;
+		}
 
-		Size = m->NumNormals * sizeof(Normal_t);
-		memcpy(m->Normals, Data + DataPtr, Size);
-		DataPtr += Size;
+		Size = m->NumNormals * (int)sizeof(Normal_t);
+		if (Size > 0)
+		{
+			if (!hasBytes((size_t)Size))
+			{
+				return failOpen();
+			}
+			memcpy(m->Normals, Data + DataPtr, (size_t)Size);
+			DataPtr += Size;
+		}
 
-		Size = m->NumTexCoords * sizeof(TexCoord_t);
-		memcpy(m->TexCoords, Data + DataPtr, Size);
-		DataPtr += Size;
+		Size = m->NumTexCoords * (int)sizeof(TexCoord_t);
+		if (Size > 0)
+		{
+			if (!hasBytes((size_t)Size))
+			{
+				return failOpen();
+			}
+			memcpy(m->TexCoords, Data + DataPtr, (size_t)Size);
+			DataPtr += Size;
+		}
 
 		Size = sizeof(Triangle_t);
+		const size_t triangleBytes = (size_t)m->NumTriangles * sizeof(Triangle_t2);
+		if (!hasBytes(triangleBytes))
+		{
+			return failOpen();
+		}
 
 		for (int j = 0; j < m->NumTriangles; j++)
 		{
@@ -2801,6 +2976,10 @@ bool BMD::Open2(char* DirName, char* ModelFileName, bool bReAlloc)
 			DataPtr += sizeof(Triangle_t2);
 		}
 
+		if (!hasBytes(32))
+		{
+			return failOpen();
+		}
 		memcpy(Textures[i].FileName, Data + DataPtr, 32);
 		DataPtr += 32;
 
@@ -2823,19 +3002,37 @@ bool BMD::Open2(char* DirName, char* ModelFileName, bool bReAlloc)
 
 	for (i = 0; i < NumActions; i++)
 	{
+		if (!hasBytes(sizeof(short) + sizeof(bool)))
+		{
+			return failOpen();
+		}
+
 		Action_t* a = &Actions[i];
 		a->Loop = false;
 		a->NumAnimationKeys = *((short*)(Data + DataPtr));
 		DataPtr += 2;
+		if (a->NumAnimationKeys < 0 || a->NumAnimationKeys > 20000)
+		{
+			return failOpen();
+		}
 
 		a->LockPositions = *((bool*)(Data + DataPtr));
 		DataPtr += 1;
 
-		if (a->LockPositions)
+		if (a->LockPositions && a->NumAnimationKeys > 0)
 		{
-			a->Positions = new vec3_t[a->NumAnimationKeys];
-			Size = a->NumAnimationKeys * sizeof(vec3_t);
-			memcpy(a->Positions, Data + DataPtr, Size); DataPtr += Size;
+			a->Positions = new (std::nothrow) vec3_t[a->NumAnimationKeys];
+			if (a->Positions == NULL)
+			{
+				return failOpen();
+			}
+			Size = a->NumAnimationKeys * (int)sizeof(vec3_t);
+			if (!hasBytes((size_t)Size))
+			{
+				return failOpen();
+			}
+			memcpy(a->Positions, Data + DataPtr, (size_t)Size);
+			DataPtr += Size;
 		}
 		else
 		{
@@ -2845,34 +3042,72 @@ bool BMD::Open2(char* DirName, char* ModelFileName, bool bReAlloc)
 
 	for (i = 0; i < NumBones; i++)
 	{
+		if (!hasBytes(sizeof(char)))
+		{
+			return failOpen();
+		}
+
 		Bone_t* b = &Bones[i];
 		b->Dummy = *((char*)(Data + DataPtr));
 		DataPtr += 1;
 
 		if (!b->Dummy)
 		{
+			if (!hasBytes(32 + sizeof(short)))
+			{
+				return failOpen();
+			}
 			memcpy(b->Name, Data + DataPtr, 32);
 			DataPtr += 32;
 
 			b->Parent = *((short*)(Data + DataPtr));
 			DataPtr += 2;
+			if (b->Parent >= NumBones)
+			{
+				b->Parent = -1;
+			}
 
-			b->BoneMatrixes = new BoneMatrix_t[NumActions];
+			b->BoneMatrixes = (NumActions > 0) ? new (std::nothrow) BoneMatrix_t[NumActions]() : NULL;
+			if (NumActions > 0 && b->BoneMatrixes == NULL)
+			{
+				return failOpen();
+			}
 
 			for (int j = 0; j < NumActions; j++)
 			{
 				BoneMatrix_t* bm = &b->BoneMatrixes[j];
-				Size = Actions[j].NumAnimationKeys * sizeof(vec3_t);
 				int NumAnimationKeys = Actions[j].NumAnimationKeys;
-				bm->Position = new vec3_t[NumAnimationKeys];
-				bm->Rotation = new vec3_t[NumAnimationKeys];
-				bm->Quaternion = new vec4_t[NumAnimationKeys];
+				if (NumAnimationKeys < 0 || NumAnimationKeys > 20000)
+				{
+					return failOpen();
+				}
 
-				memcpy(bm->Position, Data + DataPtr, Size);
-				DataPtr += Size;
+				bm->Position = (NumAnimationKeys > 0) ? new (std::nothrow) vec3_t[NumAnimationKeys] : NULL;
+				bm->Rotation = (NumAnimationKeys > 0) ? new (std::nothrow) vec3_t[NumAnimationKeys] : NULL;
+				bm->Quaternion = (NumAnimationKeys > 0) ? new (std::nothrow) vec4_t[NumAnimationKeys] : NULL;
+				if (NumAnimationKeys > 0 &&
+					(bm->Position == NULL || bm->Rotation == NULL || bm->Quaternion == NULL))
+				{
+					return failOpen();
+				}
 
-				memcpy(bm->Rotation, Data + DataPtr, Size);
-				DataPtr += Size;
+				Size = NumAnimationKeys * (int)sizeof(vec3_t);
+				if (Size > 0)
+				{
+					if (!hasBytes((size_t)Size))
+					{
+						return failOpen();
+					}
+					memcpy(bm->Position, Data + DataPtr, (size_t)Size);
+					DataPtr += Size;
+
+					if (!hasBytes((size_t)Size))
+					{
+						return failOpen();
+					}
+					memcpy(bm->Rotation, Data + DataPtr, (size_t)Size);
+					DataPtr += Size;
+				}
 
 				for (int k = 0; k < NumAnimationKeys; k++)
 				{
@@ -2883,6 +3118,7 @@ bool BMD::Open2(char* DirName, char* ModelFileName, bool bReAlloc)
 	}
 
 	delete[] Data;
+	Data = NULL;
 	Init(false);
 
 	m_bCompletedAlloc = true;
@@ -2916,8 +3152,8 @@ bool BMD::OpenPack(unsigned char* Data, long DataBytes, bool bReAlloc)
 
 	if (Version == 12)
 	{
-		long lSize = *((long*)(Data + DataPtr)); DataPtr += sizeof(long);
-		long lDecSize = MapFileDecrypt(NULL, Data + DataPtr, lSize);
+		const int32_t lSize = ReadSerializedInt32(Data + DataPtr); DataPtr += 4;
+		const int32_t lDecSize = MapFileDecrypt(NULL, Data + DataPtr, lSize);
 		BYTE* pbyDec = new BYTE[lDecSize];
 		MapFileDecrypt(pbyDec, Data + DataPtr, lSize);
 		delete[] Data;
@@ -2926,9 +3162,9 @@ bool BMD::OpenPack(unsigned char* Data, long DataBytes, bool bReAlloc)
 	}
 	else if (Version == 14)
 	{
-		long lSize = *((long*)(Data + DataPtr));
+		const int32_t lSize = ReadSerializedInt32(Data + DataPtr);
 		DataPtr += 4;
-		long lDecSize = MuFileDecrypt(NULL, &Data[DataPtr], lSize);
+		const int32_t lDecSize = MuFileDecrypt(NULL, &Data[DataPtr], lSize);
 		BYTE* pbyDec = new BYTE[lDecSize];
 		MuFileDecrypt(pbyDec, &Data[DataPtr], lSize);
 		delete[] Data;
@@ -3160,7 +3396,10 @@ void BMD::Init(bool Dummy)
 
 void BMD::CreateBoundingBox()
 {
-	for (int i = 0; i < NumBones; i++)
+	const int safeBones = (NumBones < 0) ? 0 : ((NumBones > MAX_BONES) ? MAX_BONES : NumBones);
+	const int safeMeshes = (NumMeshs < 0) ? 0 : ((NumMeshs > MAX_MESH) ? MAX_MESH : NumMeshs);
+
+	for (int i = 0; i < safeBones; i++)
 	{
 		for (int j = 0; j < 3; j++)
 		{
@@ -3170,12 +3409,23 @@ void BMD::CreateBoundingBox()
 		BoundingVertices[i] = 0;
 	}
 
-	for (int i = 0; i < NumMeshs; i++)
+	for (int i = 0; i < safeMeshes; i++)
 	{
 		Mesh_t* m = &Meshs[i];
-		for (int j = 0; j < m->NumVertices; j++)
+		if (m == NULL || m->Vertices == NULL || m->NumVertices <= 0)
+		{
+			continue;
+		}
+
+		const int safeVertices = (m->NumVertices > MAX_VERTICES) ? MAX_VERTICES : m->NumVertices;
+		for (int j = 0; j < safeVertices; j++)
 		{
 			Vertex_t* v = &m->Vertices[j];
+			if (v->Node < 0 || v->Node >= safeBones)
+			{
+				continue;
+			}
+
 			for (int k = 0; k < 3; k++)
 			{
 				if (v->Position[k] < BoundingMin[v->Node][k])
@@ -3183,11 +3433,11 @@ void BMD::CreateBoundingBox()
 
 				if (v->Position[k] > BoundingMax[v->Node][k])
 					BoundingMax[v->Node][k] = v->Position[k];
-			}
-			BoundingVertices[v->Node]++;
+				}
+				BoundingVertices[v->Node]++;
 		}
 	}
-	for (int i = 0; i < NumBones; i++)
+	for (int i = 0; i < safeBones; i++)
 	{
 		Bone_t* b = &Bones[i];
 		if (BoundingVertices[i])
@@ -3235,7 +3485,7 @@ void createPerspectiveMatrix(float* matrix, float fov, float aspect, float _near
 
 void multiplyMatrices(float* result, const float* mat1, const float* mat2)
 {
-	// Multiplicación de matrices 4x4
+	// Multiplicaciï¿½n de matrices 4x4
 	for (int i = 0; i < 4; i++) {
 		for (int j = 0; j < 4; j++) {
 			result[i * 4 + j] = 0.0f;
@@ -3248,12 +3498,12 @@ void multiplyMatrices(float* result, const float* mat1, const float* mat2)
 
 void rotateMatrix(float* matrix, float angle, float x, float y, float z)
 {
-	// Calculamos la matriz de rotación usando OpenGL
+	// Calculamos la matriz de rotaciï¿½n usando OpenGL
 	float rad = angle * (Q_PI / 180.f);
 	float cosA = cosf(rad);
 	float sinA = sinf(rad);
 
-	// Matriz de rotación 3D en torno al eje (x, y, z)
+	// Matriz de rotaciï¿½n 3D en torno al eje (x, y, z)
 	float rot[16] = {
 		cosA + (1 - cosA) * x * x,        (1 - cosA) * x * y - sinA * z, (1 - cosA) * x * z + sinA * y, 0.0f,
 		(1 - cosA) * y * x + sinA * z,    cosA + (1 - cosA) * y * y,      (1 - cosA) * y * z - sinA * x, 0.0f,
@@ -3261,13 +3511,13 @@ void rotateMatrix(float* matrix, float angle, float x, float y, float z)
 		0.0f, 0.0f, 0.0f, 1.0f
 	};
 
-	// Multiplicamos la matriz actual por la matriz de rotación
+	// Multiplicamos la matriz actual por la matriz de rotaciï¿½n
 	multiplyMatrices(matrix, matrix, rot);
 }
 
 void translateMatrix(float* matrix, float tx, float ty, float tz)
 {
-	// Matriz de traslación
+	// Matriz de traslaciï¿½n
 	float translation[16] = {
 		1.0f, 0.0f, 0.0f, tx,
 		0.0f, 1.0f, 0.0f, ty,
@@ -3275,7 +3525,7 @@ void translateMatrix(float* matrix, float tx, float ty, float tz)
 		0.0f, 0.0f, 0.0f, 1.0f
 	};
 
-	// Multiplicamos la matriz actual por la matriz de traslación
+	// Multiplicamos la matriz actual por la matriz de traslaciï¿½n
 	multiplyMatrices(matrix, matrix, translation);
 }
 
@@ -3292,19 +3542,19 @@ void createViewMatrix(float* matrix, float* cameraPosition, float* cameraAngles,
 	// Primero, copiamos la matriz de identidad al arreglo final
 	memcpy(matrix, identity, sizeof(float) * 16);
 
-	// Realizamos las rotaciones de la cámara según los ángulos
-	// Rotación en el eje Y (alrededor de Y)
+	// Realizamos las rotaciones de la cï¿½mara segï¿½n los ï¿½ngulos
+	// Rotaciï¿½n en el eje Y (alrededor de Y)
 	rotateMatrix(matrix, cameraAngles[1], 0.f, 1.f, 0.f);
 
-	// Si la vista no es superior, aplicamos la rotación en el eje X
+	// Si la vista no es superior, aplicamos la rotaciï¿½n en el eje X
 	if (!cameraTopViewEnable) {
 		rotateMatrix(matrix, cameraAngles[0], 1.f, 0.f, 0.f);
 	}
 
-	// Rotación en el eje Z (alrededor de Z)
+	// Rotaciï¿½n en el eje Z (alrededor de Z)
 	rotateMatrix(matrix, cameraAngles[2], 0.f, 0.f, 1.f);
 
-	// Aplicamos la traslación para posicionar la cámara (en el espacio mundial)
+	// Aplicamos la traslaciï¿½n para posicionar la cï¿½mara (en el espacio mundial)
 	translateMatrix(matrix, -cameraPosition[0], -cameraPosition[1], -cameraPosition[2]);
 }
 

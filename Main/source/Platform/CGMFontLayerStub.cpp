@@ -2,6 +2,8 @@
 
 #include "../stdafx.h"
 #include "../CGMFontLayer.h"
+#include "../UIControls.h"
+#include "../MultiLanguage.h"
 
 #include <cstring>
 
@@ -55,33 +57,57 @@ void CGMFontLayer::runtime_font_property(const char* file_base, FT_Library libra
 
 BOOL CGMFontLayer::_GetTextExtentPoint32(std::wstring wstrText, LPSIZE lpSize)
 {
-	if (lpSize)
+	if (lpSize == NULL)
+	{
+		return FALSE;
+	}
+
+	HDC hdc = g_pRenderText ? g_pRenderText->GetFontDC() : NULL;
+	if (hdc == NULL)
 	{
 		lpSize->cx = static_cast<LONG>(wstrText.size() * 8);
 		lpSize->cy = static_cast<LONG>(getmetrics());
+		return TRUE;
 	}
-	return TRUE;
+
+	return GetTextExtentPoint32W(hdc, wstrText.c_str(), (int)wstrText.length(), lpSize);
 }
 
 BOOL CGMFontLayer::_GetTextExtentPoint32(LPCSTR lpString, int cbString, LPSIZE lpSize)
 {
-	if (lpSize)
+	if (lpSize == NULL)
 	{
-		int length = 0;
-		if (lpString != nullptr)
-		{
-			length = (cbString > 0) ? cbString : static_cast<int>(std::strlen(lpString));
-		}
-		lpSize->cx = static_cast<LONG>(length * 8);
-		lpSize->cy = static_cast<LONG>(getmetrics());
+		return FALSE;
 	}
-	return TRUE;
+
+	HDC hdc = g_pRenderText ? g_pRenderText->GetFontDC() : NULL;
+	if (hdc == NULL || lpString == NULL)
+	{
+		lpSize->cx = 0;
+		lpSize->cy = static_cast<LONG>(getmetrics());
+		return TRUE;
+	}
+
+	int textLength = cbString;
+	if (textLength <= 0)
+	{
+		textLength = (int)std::strlen(lpString);
+	}
+
+	return g_pMultiLanguage->_GetTextExtentPoint32(hdc, lpString, textLength, lpSize);
 }
 
 void CGMFontLayer::_TextOut(std::wstring wstrText, int& pen_x, int& pen_y)
 {
-	pen_x += static_cast<int>(wstrText.size() * 8);
-	(void)pen_y;
+	SIZE size = { 0, 0 };
+	if (_GetTextExtentPoint32(wstrText, &size))
+	{
+		pen_x += size.cx;
+		if (pen_y < size.cy)
+		{
+			pen_y = size.cy;
+		}
+	}
 }
 
 void CGMFontLayer::runtime_writebuffer(int off_x, int off_y, _FT_Bitmap* pBitmap)
@@ -104,27 +130,17 @@ void CGMFontLayer::runtime_render_map(int pen_x, int pen_y, int RealTextX, int R
 
 void CGMFontLayer::RenderText(int iPos_x, int iPos_y, const unicode::t_char* pszText, int iWidth, int iHeight, int iSort, OUT SIZE* lpTextSize, bool background)
 {
-	(void)iPos_x;
-	(void)iPos_y;
-	(void)iWidth;
-	(void)iHeight;
-	(void)iSort;
-	(void)background;
-
-	size_t length = 0;
-	if (pszText != nullptr)
+	if (pszText == NULL || g_pRenderText == NULL)
 	{
-		while (pszText[length] != 0)
+		if (lpTextSize)
 		{
-			++length;
+			lpTextSize->cx = 0;
+			lpTextSize->cy = 0;
 		}
+		return;
 	}
 
-	if (lpTextSize)
-	{
-		lpTextSize->cx = static_cast<LONG>(length * 8);
-		lpTextSize->cy = static_cast<LONG>(getmetrics());
-	}
+	g_pRenderText->RenderText(iPos_x, iPos_y, pszText, iWidth, iHeight, iSort, lpTextSize, background);
 }
 
 void CGMFontLayer::RenderWave(int iPos_x, int iPos_y, const unicode::t_char* pszText, int iWidth, int iHeight, int iSort, OUT SIZE* lpTextSize)
@@ -138,6 +154,19 @@ void CGMFontLayer::runtime_render_map()
 
 int CGMFontLayer::getmetrics()
 {
+	if (g_pRenderText)
+	{
+		HDC hdc = g_pRenderText->GetFontDC();
+		if (hdc)
+		{
+			TEXTMETRICW tm = {};
+			if (GetTextMetricsW(hdc, &tm))
+			{
+				return tm.tmHeight > 0 ? tm.tmHeight : 16;
+			}
+		}
+	}
+
 	return 16;
 }
 

@@ -28,6 +28,8 @@ Os principais bloqueios conhecidos no momento sao:
 - Distribuicao de assets já suporta manifesto remoto/local e pacote `.zip` com extração no Android; falta publicar/validar em ambiente de servidor definitivo.
 - Validacao CRC foi integrada com sidecar opcional (`.crc32`), mas falta politica final de integridade para todos os pacotes.
 - Integracao completa de teclado virtual/IME Android ainda pendente.
+- Validacao final em runtime da ligacao C++/JNI do HWID Android ainda pendente.
+- Validacao funcional completa de `server select` -> `character scene` ainda pendente.
 - Validacao funcional em runtime no dispositivo Android ainda pendente.
 - Ajustes adicionais de UX mobile, entrada de texto e distribuicao de assets ainda sao necessarios para considerar o port pronto para uso final.
 
@@ -61,7 +63,7 @@ Este roadmap e a visao de alto nivel do projeto. O detalhamento tecnico por arqu
 - Fluxo `WEBZEN_SCENE` -> `LOG_IN_SCENE` validado por log; foco atual em consolidar `server select` e progressao completa para `CHARACTER_SCENE`.
 - Fechar validacao funcional do caminho de login (request/receive de server list) com comportamento consistente no Android.
 - Avancar substituicoes pendentes de fonte/GDI para Android.
-- Somente depois reativar e estabilizar downloader HTTP remoto.
+- Downloader HTTP remoto já foi reativado com estabilização de transporte para arquivos grandes; falta validação E2E no servidor definitivo.
 
 ## Build
 
@@ -93,13 +95,29 @@ Para reproduzir o build local usado nesta etapa:
 
 ## Changelog
 
+### 2026-04-20
+
+- Integrada a implementação real de `MuCrypto` no Android (`Main/source/Platform/MuCryptoStub.cpp`), substituindo o comportamento pass-through anterior.
+- Integrada a árvore `Main/dependencies/cryptopp-src` no CMake Android com ajustes de flags e fontes.
+- Corrigida falha de link do Crypto++ mantendo `dll.cpp` e `default.cpp` no build (instanciações de template exigidas).
+- Build nativo Android validado localmente após os ajustes: `./gradlew ':app:buildCMakeDebug[arm64-v8a]' --no-daemon`.
+- Tentativa de migrar `CGMFontLayer` real no Android foi documentada, mas a troca definitiva segue pendente até integrar FreeType no CMake Android.
+- Reforçada a ponte GDI Android (`AndroidWin32Compat` + `Win32SecondaryStubs`) para conectar `HDC/HBITMAP/HFONT` ao `AndroidTextRenderer`, incluindo ciclo de vida de `DIBSection`.
+- `AndroidTextRenderer` agora inicializa no bootstrap Android e encerra no cleanup do `android_main`.
+- `CGMFontLayerStub` no Android passou a delegar `RenderText` para `g_pRenderText`, removendo o fallback puramente “métrico” enquanto a versão FreeType continua pendente.
+- Implementado tratamento de botão `Back` (`AKEYCODE_BACK`) no `OnInputEvent` Android, finalizando a `NativeActivity` via `ANativeActivity_finish()`; validação final em device permanece pendente.
+- Validação em runtime do `Back` concluída via ADB (`pidof` ativo antes e ausente após `adb shell input keyevent 4`).
+- Transporte HTTP do WinINet compat no Android foi migrado para modo streaming em `AndroidWin32Compat` (`HttpSendRequest` + `InternetReadFile`), evitando carregar arquivo inteiro na memória para downloads grandes.
+- `HTTPConnecter::OpenRemoteFile` passou a aceitar ausência de `Content-Length` e seguir download até EOF, reduzindo falhas com respostas streamed/chunked.
+- Build nativo Android segue verde após os ajustes de transporte: `./gradlew ':app:buildCMakeDebug[arm64-v8a]' --no-daemon`.
+
 ### 2026-04-16
 
-- Corrigido bloqueio de fluxo de login no Android: `create_hwid_system()` deixou de usar placeholder fixo e passou a gerar HWID determinístico real via JNI (`MainActivity.getAndroidHardwareId`).
-- Validado em runtime que o servidor voltou a responder `ReceiveServerList` após HWID real (`Packet head=0xF4`, `ReceiveServerList total=1`).
-- Adicionado fallback de compatibilidade em `ServerListManager` para grupos ausentes no `ServerList.bmd` (caso comum em server privado), evitando `serverGroups=0` permanente e habilitando a janela de seleção no Android.
-- Ajustado render do `LOG_IN_SCENE` leve no Android para desenhar fundo/logo original do login (bitmaps), removendo o efeito de tela totalmente preta.
-- Estado atual validado no emulador: app permanece estável, conexão/login server ativa, `loginMain=1`, `serverSel=1`, `serverGroups=1`, sem crash fatal.
+- Auditoria de consistência entre documentação e código atual executada.
+- Confirmado no código atual: endpoint Android permanece fixo em `74.63.218.132:44404`, envio de `SendRequestServerHWID()`/`SendRequestServerList()` segue presente e o log `ReceiveServerList total=%d` continua instrumentado.
+- Corrigida divergência de documentação/código: `create_hwid_system()` agora consulta `MainActivity.getAndroidHardwareId()` via JNI no Android.
+- Corrigida divergência de documentação/código: `ServerListManager.cpp` agora cria grupo fallback quando o índice não existe no `ServerList.bmd`.
+- Estado real do bloqueio funcional em 16/04: fluxo base até `LOG_IN_SCENE` segue como progresso válido, mas a validação final em runtime desses ajustes e a progressão completa de `server select`/`character scene` ainda permanecem pendentes.
 
 ### 2026-04-15
 

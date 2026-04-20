@@ -48,6 +48,7 @@
 # Ferramentas locais e caches do ambiente
 .tools/
 .gradle-home/
+.gradle-local/
 
 # Gradle e Android Studio
 .gradle/

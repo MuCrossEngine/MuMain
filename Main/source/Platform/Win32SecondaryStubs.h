@@ -27,10 +27,20 @@ inline HBITMAP CreateDIBSection(HDC, const BITMAPINFO* pbmi, UINT,
     int w = pbmi->bmiHeader.biWidth;
     int h = abs((int)pbmi->bmiHeader.biHeight);
     int bpp = pbmi->bmiHeader.biBitCount / 8;
+    if (bpp <= 0)
+    {
+        bpp = 4;
+    }
     size_t sz = (size_t)w * h * bpp;
     *ppvBits = calloc(1, sz);
+    if (!*ppvBits)
+    {
+        return nullptr;
+    }
     // Return the buffer pointer itself as the HBITMAP handle
-    return (HBITMAP)*ppvBits;
+    HBITMAP hbm = (HBITMAP)*ppvBits;
+    AndroidCompatRegisterDIBSection(hbm, w, h, bpp, *ppvBits);
+    return hbm;
 }
 
 // DeleteObject for a DIB frees the pixel buffer
@@ -70,8 +80,8 @@ inline BOOL GetTextExtentPoint32W(HDC hdc, const wchar_t* str, int len, SIZE* sz
 #define GetTextExtentPoint32 GetTextExtentPoint32A
 
 // ── HDC management stubs ─────────────────────────────────────────────────────
-inline HDC  CreateCompatibleDC(HDC)                   { return (HDC)(void*)1; }
-inline BOOL DeleteDC(HDC)                             { return TRUE; }
+inline HDC  CreateCompatibleDC(HDC)                   { return AndroidCompatCreateCompatibleDC(); }
+inline BOOL DeleteDC(HDC hdc)                         { AndroidCompatDeleteCompatibleDC(hdc); return TRUE; }
 inline BOOL SelectObject_bitmap(HDC, HBITMAP)         { return TRUE; }
 inline int  FillRect(HDC, const RECT*, HBRUSH)        { return 1; }
 inline HBRUSH GetStockObject(int)                     { return (HBRUSH)(void*)1; }

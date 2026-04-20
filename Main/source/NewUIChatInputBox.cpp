@@ -11,7 +11,11 @@
 
 //using namespace SEASON3B;
 
-SEASON3B::CNewUIChatInputBox::CNewUIChatInputBox() : MAX_CHAT_SIZE_UTF16((int)(MAX_CHAT_SIZE / (g_pMultiLanguage->GetNumByteForOneCharUTF8())))
+SEASON3B::CNewUIChatInputBox::CNewUIChatInputBox()
+	: MAX_CHAT_SIZE_UTF16((int)(MAX_CHAT_SIZE /
+		((g_pMultiLanguage && g_pMultiLanguage->GetNumByteForOneCharUTF8() > 0)
+			? g_pMultiLanguage->GetNumByteForOneCharUTF8()
+			: 1)))
 {
 	Init();
 }

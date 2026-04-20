@@ -1314,8 +1314,14 @@ void CMixRecipeMgr::OpenRecipeFile(const unicode::t_char* szFileName)
 		unicode::_sprintf(Text, "%s - File not exist.", szFileName);
 		g_ErrorReport.Write(Text);
 		MessageBox(gwinhandle->GethWnd(), Text, NULL, MB_OK);
+#ifdef __ANDROID__
+		// Android builds may run with partial data packs during bring-up.
+		// Keep running with empty mix recipes instead of terminating.
+		return;
+#else
 		SendMessage(gwinhandle->GethWnd(), WM_DESTROY, 0, 0);
 		exit(0);
+#endif
 	}
 
 	int iNumMixRecipes[MAX_MIX_TYPES];
@@ -1333,9 +1339,16 @@ void CMixRecipeMgr::OpenRecipeFile(const unicode::t_char* szFileName)
 			unicode::_sprintf(Text, "%s - Version not matched.", szFileName);
 			g_ErrorReport.Write(Text);
 			MessageBox(gwinhandle->GethWnd(), Text, NULL, MB_OK);
+#ifdef __ANDROID__
+			// Android builds may run with partial data packs during bring-up.
+			// Keep running with empty/partial mix recipes instead of terminating.
+			fclose(fp);
+			return;
+#else
 			SendMessage(gwinhandle->GethWnd(), WM_DESTROY, 0, 0);
 			fclose(fp);
 			exit(0);
+#endif
 		}
 		for (i = 0; i < iNumMixRecipes[j]; ++i)
 		{

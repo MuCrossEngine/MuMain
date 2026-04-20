@@ -30,7 +30,14 @@ namespace
 };
 
 
-SEASON3B::CNewUIMyShopInventory::CNewUIMyShopInventory() : m_SourceIndex(-1), m_TargetIndex(-1), m_EnablePersonalShop(false), MAX_SHOPTITLE_UTF16(min(26, (int)(MAX_SHOPTITLE / g_pMultiLanguage->GetNumByteForOneCharUTF8())))
+SEASON3B::CNewUIMyShopInventory::CNewUIMyShopInventory()
+	: m_SourceIndex(-1),
+	m_TargetIndex(-1),
+	m_EnablePersonalShop(false),
+	MAX_SHOPTITLE_UTF16(min(26, (int)(MAX_SHOPTITLE /
+		((g_pMultiLanguage && g_pMultiLanguage->GetNumByteForOneCharUTF8() > 0)
+			? g_pMultiLanguage->GetNumByteForOneCharUTF8()
+			: 1))))
 {
 	m_pNewUIMng = NULL;
 	m_pNewInventoryCtrl = NULL;

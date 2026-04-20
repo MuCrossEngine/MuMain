@@ -176,7 +176,7 @@ Atualizar os checkboxes conforme cada item for concluído.
 - [x] `MovieScene` / `dshow.h` — já dentro de `#ifdef MOVIE_DIRECTSHOW`
 - [x] `GCCertification.cpp` / `LauncherHelper.cpp` / `UsefulDef.cpp` — guards adicionados
 - [x] `Util.cpp` — UUID/RPC → Android stub
-- [x] `create_hwid_system()` — Android via JNI com HWID determinístico (formato 8-8-8-8)
+- [x] `create_hwid_system()` — implementação Android ligada ao helper JNI de HWID determinístico (`getAndroidHardwareId`); validação final de runtime ainda pendente nesta rodada
 - [x] `AndroidWin32Compat.h` — CreateFile/ReadFile/WriteFile/CloseHandle shims via fopen
 - [x] `AndroidWin32Compat.h` — GetCursorPos/ScreenToClient → MouseX/MouseY globals
 - [x] `AndroidWin32Compat.h` — sprintf_s/vsprintf_s/wsprintf → snprintf shims
@@ -205,11 +205,11 @@ Atualizar os checkboxes conforme cada item for concluído.
   - [x] Verifica integridade CRC32 (sidecar opcional `<arquivo>.crc32` via `Util/CCRC32.H`)
   - [x] Refresh periódico do manifesto local (6h) para forçar rechecagem remota de assets
   - [x] Fluxo de pacote compactado `.zip` + extração para `getExternalFilesDir()` via JNI (`MainActivity.extractZipArchive`) com marcador `.extracted`
-- [ ] Definir URL base do servidor de assets por parâmetro de execução (`MU_ASSET_SERVER` → intent extra `MU_ASSET_SERVER`) — **retomar no final**
-- [ ] Publicar template de manifesto de produção no repositório (`docs/assets-server/Data/assets-manifest.txt`) — **retomar no final**
-- [ ] Adicionar ferramenta para geração automática do manifesto de produção com CRC (`tools/generate_assets_manifest.sh`) — **retomar no final**
-- [ ] Gerar manifesto completo de arquivos em `Data/assets-manifest.txt` — **retomar no final**
-- [ ] Estabilizar transporte HTTP Android para arquivos grandes no runtime — **retomar no final**
+- [x] Definir URL base do servidor de assets por parâmetro de execução (`MU_ASSET_SERVER` → intent extra `MU_ASSET_SERVER`)
+- [x] Publicar template de manifesto de produção no repositório (`docs/assets-server/Data/assets-manifest.txt`)
+- [x] Adicionar ferramenta para geração automática do manifesto de produção com CRC (`tools/generate_assets_manifest.sh`)
+- [x] Gerar manifesto completo de arquivos em `Data/assets-manifest.txt`
+- [x] Estabilizar transporte HTTP Android para arquivos grandes no runtime (streaming no WinINet compat + fallback sem `Content-Length`)
 
 ---
 
@@ -229,23 +229,62 @@ Atualizar os checkboxes conforme cada item for concluído.
 - [ ] Framerate estável ≥ 30 FPS em device mid-range
 - [ ] Sem memory leaks (usar Android Studio Profiler)
 - [ ] Sem ANR (Application Not Responding)
-- [ ] Rotação de tela desabilitada (portrait fixo)
-- [ ] Back button fecha o jogo corretamente
+- [x] Rotação de tela desabilitada (orientação fixa em `landscape` no AndroidManifest)
+- [x] Back button fecha o jogo corretamente *(validado via ADB em 2026-04-20: `pidof` ativo antes e vazio após `input keyevent 4`)*
 
 ### Última validação (2026-04-16)
 
-- Build Android: `./gradlew :app:installDebug --no-daemon` ✅
-- Fluxo de login Android validado com logs de rede:
-  - `SendRequestServerHWID sock=... hwid=...` com valor não-placeholder ✅
-  - `Packet head=0xF4 size=43 ...` + `ReceiveServerList total=1` ✅
-- Compatibilidade para lista de servidor em ambiente privado:
-  - `ReceiveServerList[0] idx=0 ...`
-  - fallback `MakeServerGroup` ativado quando índice não existe no `ServerList.bmd` (`serverGroups` passou de `0` para `1`) ✅
-- Estado de UI no login após correções:
-  - `loginMain=1`, `serverSel=1`, `serverGroups=1` em loop estável ✅
-  - fundo/logo de login renderizando no Android (sem tela preta total) ✅
+- Auditoria de documentação x código executada. Resultado:
+  - build Android continua validado localmente (`assembleDebug`) ✅
+  - endpoint Android fixo `74.63.218.132:44404` continua implementado no bootstrap ✅
+  - envio de `SendRequestServerHWID()` e `SendRequestServerList()` continua presente no protocolo ✅
+  - recepção `ReceiveServerList total=%d` continua instrumentada em runtime ✅
+- Divergências encontradas que ainda **não** podem ser marcadas como concluídas:
+  - validação final de runtime do HWID JNI ainda não foi refeita após a correção de código desta rodada ❌
+  - validação final de runtime do fallback para grupos ausentes no `ServerList.bmd` ainda não foi refeita após a correção de código desta rodada ❌
+  - shim de polling/reconnect do login Android está presente no `ZzzScene.cpp`; falta apenas revalidação final de runtime nesta rodada ❌
 - Estado atual do bloqueio funcional:
-  - sequência completa de interação touch até `loginWin=1` ainda depende de calibração fina dos cliques no emulador; base de render/rede e janelas principais está ativa.
+  - fluxo `WEBZEN_SCENE` -> `LOG_IN_SCENE` e base de rede seguem estruturados, mas a validação completa de `server select`/`character scene` permanece pendente no estado atual do código.
+
+### Atualizações da rodada 2026-04-16 (código)
+
+- `Util.cpp`
+  - `create_hwid_system()` agora consulta `MainActivity.getAndroidHardwareId()` via JNI em vez de manter placeholder fixo no C++.
+- `ServerListManager.cpp`
+  - `MakeServerGroup()` agora cria grupo fallback quando o índice não existe em `ServerList.bmd`, preservando compatibilidade com servidores privados/custom.
+- Estado desta rodada:
+  - implementação de código concluída;
+  - `get_errors` sem erros nas unidades alteradas;
+  - validação final em runtime ainda pendente.
+
+### Atualizações da rodada 2026-04-20 (código)
+
+- `Main/source/Platform/MuCryptoStub.cpp`
+  - substituído stub pass-through por implementação real de `MuCrypto` (mesmo fluxo de algoritmos/modulus do cliente legado).
+- `Main/android/app/src/main/cpp/CMakeLists.txt`
+  - integrada árvore `Main/dependencies/cryptopp-src` no build Android.
+  - corrigido filtro de fontes do Crypto++ para **manter** `dll.cpp`/`default.cpp` (instanciações de template exigidas no link).
+- validação técnica:
+  - `./gradlew ':app:buildCMakeDebug[arm64-v8a]' --no-daemon` concluído com sucesso após os ajustes.
+- tentativa adicional nesta rodada:
+  - `CGMFontLayer.cpp` recebeu caminho Android com fallback para fontes por arquivo (`GameAssetPath` + `/system/fonts`), mas o build Android ainda não pode migrar do `CGMFontLayerStub.cpp` sem integrar FreeType no CMake Android (símbolos `FT_*` indefinidos no link).
+  - conclusão: item de fonte/render de texto continua pendente na Fase 5 até integração formal do FreeType no Android.
+- `Platform/AndroidWin32Compat.h` + `Platform/Win32SecondaryStubs.h`
+  - reforçada a ponte GDI Android (`CreateFont`, `CreateCompatibleDC`, `CreateDIBSection`, `SelectObject`, `GetCurrentObject`) para registrar estado real de `HDC/HBITMAP/HFONT` e encaminhar para `AndroidTextRenderer`.
+  - `DeleteObject` agora libera buffers de `DIBSection` registrados no Android e remove vínculo de bitmaps nos DCs.
+- `Platform/CGMFontLayerStub.cpp`
+  - fallback Android agora renderiza via `g_pRenderText` (em vez de retorno apenas métrico), reaproveitando o pipeline de texto já conectado ao `AndroidTextRenderer`.
+- `Main/android/app/src/main/cpp/android_main.cpp`
+  - `AndroidTextRenderer::Init()` adicionado no bootstrap e `AndroidTextRenderer::Shutdown()` no cleanup do `android_main`.
+  - tratamento explícito de `AKEYCODE_BACK` no callback `OnInputEvent`: consome o evento e chama `ANativeActivity_finish()` para fechamento consistente no Android.
+- `Platform/AndroidWin32Compat.h`
+  - transporte HTTP do WinINet compat mudou para modo streaming (`HttpSendRequest` + `InternetReadFile`), reduzindo uso de memória em downloads grandes.
+  - fallback buffered mantido quando a resposta chega em `Transfer-Encoding: chunked`.
+- `GameShop/FileDownloader/HTTPConnecter.cpp`
+  - `OpenRemoteFile()` agora aceita ausência de `Content-Length` e permite download até EOF (compatível com respostas streamed/chunked).
+- validação técnica complementar:
+  - `./gradlew ':app:buildCMakeDebug[arm64-v8a]' --no-daemon` permanece **verde** após os ajustes da ponte GDI e do transporte HTTP.
+  - validação runtime de back button via ADB concluída (`PID_BEFORE` presente e `PID_AFTER` vazio após `adb shell input keyevent 4`).
 
 ### Validação anterior (2026-04-15)
 
@@ -317,7 +356,7 @@ adb logcat -s MUAssets:V           # download e carregamento de assets
 
 ## Problemas Conhecidos / TODOs
 
-- **CSimpleModulus**: atualmente stub pass-through. Implementar crypto real se o servidor exigir.
+- **MuCrypto/CSimpleModulus**: implementação real já integrada no Android (Crypto++); manter apenas validação final de compatibilidade com servidor alvo.
 - **IME (texto unicode)**: campos de texto precisam de integração completa com Android InputMethodManager via JNI para suporte a caracteres especiais.
 - **Inline `__asm`**: ~12 arquivos têm blocos `__asm` que não compilam no ARM. Identificar e substituir por equivalentes C++.
 - **glprocs.lib**: funções proprietárias de extensão OpenGL. Avaliar quais são usadas e se têm equivalente ES3.
@@ -326,4 +365,4 @@ adb logcat -s MUAssets:V           # download e carregamento de assets
 
 ---
 
-*Última atualização: 2026-04-16 — fluxo Android de login/server select estabilizado em rede/render para o endpoint `74.63.218.132:44404`: HWID JNI determinístico ativo, resposta de server list confirmada em runtime, fallback de grupos ausentes no `ServerList.bmd` aplicado para compatibilidade com servidor privado e render de fundo/logo de login restaurado no caminho leve (`SceneLogin=1`). Próxima pendência prática permanece na validação de interação completa até `loginWin` e progressão para `CHARACTER_SCENE`.*
+*Última atualização: 2026-04-20 — integração de `MuCrypto` real no Android concluída com inclusão do Crypto++ no build nativo e validação de compilação `arm64-v8a`; transporte HTTP Android também foi estabilizado em modo streaming para arquivos grandes, com fallback para respostas chunked e compatibilidade sem `Content-Length`. O endpoint Android `74.63.218.132:44404`, o envio de HWID e o fluxo base até `LOG_IN_SCENE` permanecem como direção ativa. Pendências práticas: revalidação de runtime (HWID/fallback server group) e progressão funcional completa de `server select` até `CHARACTER_SCENE`, além da migração final do texto Android após integração de FreeType.*

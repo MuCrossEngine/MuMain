@@ -136,7 +136,29 @@ bool CServerListManager::MakeServerGroup(IN int iServerGroupIndex, OUT CServerGr
 {
 	const SServerGroupInfo* pServerGroupInfo = GetServerGroupInfoInScript(iServerGroupIndex);
 	if (NULL == pServerGroupInfo)
-		return false;
+	{
+		::sprintf(pServerGroup->m_szName, "Server-%d", iServerGroupIndex + 1);
+		::sprintf(pServerGroup->m_szDescription, "Server Group %d", iServerGroupIndex + 1);
+		pServerGroup->m_iSequence = iServerGroupIndex;
+		pServerGroup->m_iWidthPos = (iServerGroupIndex == 0)
+			? CServerGroup::SBP_CENTER
+			: ((iServerGroupIndex % 2) ? CServerGroup::SBP_LEFT : CServerGroup::SBP_RIGHT);
+		pServerGroup->m_iServerIndex = iServerGroupIndex;
+		pServerGroup->m_bPvPServer = true;
+
+		for (int i = 0; i < MAX_SERVER_LOW; ++i)
+		{
+			pServerGroup->m_abyNonPvpServer[i] = 0;
+		}
+
+		char szLog[128] = { 0, };
+		::sprintf(szLog, "[ServerListManager] Missing ServerList.bmd group %d, using fallback.\r\n", iServerGroupIndex);
+		g_ErrorReport.Write(szLog);
+		#ifdef __ANDROID__
+		__android_log_print(ANDROID_LOG_INFO, "MUAndroid", "Missing ServerList.bmd group %d, using fallback", iServerGroupIndex);
+		#endif
+		return true;
+	}
 
 	::strcpy(pServerGroup->m_szName, pServerGroupInfo->m_szName);
 	::strcpy(pServerGroup->m_szDescription, pServerGroupInfo->m_strDescript.c_str());

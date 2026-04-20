@@ -71,6 +71,11 @@
 #include "CGMHeadChat.h"
 #include "ConnectVersionHex.h"
 
+#ifdef __ANDROID__
+#include <android/log.h>
+#define MU_ANDROID_LOGI(...) __android_log_print(ANDROID_LOG_INFO, "MUAndroid", __VA_ARGS__)
+#endif
+
 extern CUITextInputBox* g_pSingleTextInputBox;
 extern CUITextInputBox* g_pSinglePasswdInputBox;
 extern int g_iChatInputType;
@@ -234,6 +239,11 @@ int DeleteGuildIndex = -1;
 int  ErrorMessage = NULL;
 int	 ErrorMessageNext = NULL;
 
+#ifdef __ANDROID__
+static bool g_AndroidLoginServerListRequested = false;
+static DWORD g_AndroidLoginServerListTick = 0;
+#endif
+
 int SelectedHero = -1;
 
 int TestTime = 0;
@@ -329,8 +339,8 @@ bool CheckAbuseNameFilter(char* Text)
 bool CheckName()
 {
 	if (CheckAbuseNameFilter(InputText[0]) || CheckAbuseFilter(InputText[0]) ||
-		FindText(InputText[0], " ") || FindText(InputText[0], "¡¡") ||
-		FindText(InputText[0], ".") || FindText(InputText[0], "¡¤") || FindText(InputText[0], "¡­") ||
+		FindText(InputText[0], " ") || FindText(InputText[0], "ï¿½ï¿½") ||
+		FindText(InputText[0], ".") || FindText(InputText[0], "ï¿½ï¿½") || FindText(InputText[0], "ï¿½ï¿½") ||
 		FindText(InputText[0], "Webzen") || FindText(InputText[0], "WebZen") || FindText(InputText[0], "webzen") || FindText(InputText[0], "WEBZEN") ||
 		FindText(InputText[0], GlobalText[457]) || FindText(InputText[0], GlobalText[458]))
 		return true;
@@ -434,7 +444,12 @@ void CreateWebzenScene()
 	if (CreateSocket(szServerIpAddress, g_ServerPort))
 	{
 		SendRequestServerHWID();
+	#ifdef __ANDROID__
+		GMConnectHex->SetUpdateVersion(false);
+		MU_ANDROID_LOGI("CreateWebzenScene: bypassing launcher update handshake on Android");
+	#else
 		SendRequestServerUpdate(GMConnectHex->GetClientVersion());
+	#endif
 	}
 	else
 	{
@@ -1584,9 +1599,21 @@ void CreateLogInScene()
 
 	CurrentProtocolState = REQUEST_JOIN_SERVER;
 
+#ifdef __ANDROID__
+	g_AndroidLoginServerListRequested = false;
+	g_AndroidLoginServerListTick = 0;
+#endif
+
 	if (g_pReconnectUI->ReconnectCreateConnection(szServerIpAddress, g_ServerPort))
 	{
 		SendRequestServerHWID();
+
+	#ifdef __ANDROID__
+		SendRequestServerList();
+		g_AndroidLoginServerListRequested = true;
+		g_AndroidLoginServerListTick = GetTickCount();
+		MU_ANDROID_LOGI("CreateLogInScene: requested server list after HWID");
+	#endif
 	}
 
 	EnableSocket = true;
@@ -1689,6 +1716,22 @@ void NewMoveLogInScene()
 		ReleaseLogoSceneData();
 		ClearCharacters();
 	}
+
+#ifdef __ANDROID__
+	if (CurrentProtocolState == REQUEST_JOIN_SERVER &&
+		EnableSocket == true &&
+		g_ServerListManager->GetTotalServer() <= 0)
+	{
+		const DWORD dwNow = GetTickCount();
+		if (g_AndroidLoginServerListRequested == false || dwNow - g_AndroidLoginServerListTick >= 3000)
+		{
+			SendRequestServerList();
+			g_AndroidLoginServerListRequested = true;
+			g_AndroidLoginServerListTick = dwNow;
+			MU_ANDROID_LOGI("NewMoveLogInScene: retry SendRequestServerList total=%d", g_ServerListManager->GetTotalServer());
+		}
+	}
+#endif
 	g_ConsoleDebug->UpdateMainScene();
 }
 
@@ -2886,9 +2929,11 @@ void MainScene(HDC hDC)
 	sprintf(GrabFileName, GMProtect->GetScreenPath(), st.wMonth, st.wDay, st.wHour, st.wMinute, GrabScreen);
 	char Text[256];
 	sprintf(Text, GlobalText[459], GrabFileName);
-	char lpszTemp[64];
-	wsprintf(lpszTemp, " [%s / %s]", g_ServerListManager->GetSelectServerName(), Hero->ID);
-	strcat(Text, lpszTemp);
+	char lpszTemp[256];
+	const char* serverName = g_ServerListManager->GetSelectServerName();
+	const char* heroId = (Hero) ? Hero->ID : "";
+	snprintf(lpszTemp, sizeof(lpszTemp), " [%s / %s]", serverName ? serverName : "", heroId);
+	strncat(Text, lpszTemp, sizeof(Text) - strlen(Text) - 1);
 	int iCaptureMode = 1;
 
 	if (HIBYTE(GetAsyncKeyState(VK_SHIFT)))

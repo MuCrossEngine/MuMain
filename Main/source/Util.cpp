@@ -301,9 +301,63 @@ std::string WStringToString(const std::wstring& wstr)
 void create_hwid_system(char* ComputerHardwareId)
 {
 #ifdef __ANDROID__
-    // On Android generate a deterministic ID from the Android device serial / Build.FINGERPRINT
-    // For now produce a fixed placeholder; replace with JNI call to android.os.Build if needed
-    sprintf(ComputerHardwareId, "ANDROID-00000000-00000000-00000000");
+	if (ComputerHardwareId == NULL)
+	{
+		return;
+	}
+
+	strcpy(ComputerHardwareId, "ANDROID-00000000-00000000-00000000");
+
+	ANativeActivity* activity = AndroidCompatNativeActivity();
+	if (activity == NULL || activity->vm == NULL || activity->clazz == NULL)
+	{
+		return;
+	}
+
+	JNIEnv* env = NULL;
+	bool attached = false;
+	if (activity->vm->GetEnv((void**)&env, JNI_VERSION_1_6) != JNI_OK)
+	{
+		if (activity->vm->AttachCurrentThread(&env, NULL) != JNI_OK || env == NULL)
+		{
+			return;
+		}
+		attached = true;
+	}
+
+	jclass cls = env->GetObjectClass(activity->clazz);
+	if (cls != NULL)
+	{
+		jmethodID method = env->GetMethodID(cls, "getAndroidHardwareId", "()Ljava/lang/String;");
+		if (method != NULL)
+		{
+			jstring jHardwareId = (jstring)env->CallObjectMethod(activity->clazz, method);
+			if (!env->ExceptionCheck() && jHardwareId != NULL)
+			{
+				const char* hardwareId = env->GetStringUTFChars(jHardwareId, NULL);
+				if (hardwareId != NULL && hardwareId[0] != '\0')
+				{
+					strncpy(ComputerHardwareId, hardwareId, 35);
+					ComputerHardwareId[35] = '\0';
+				}
+				if (hardwareId != NULL)
+				{
+					env->ReleaseStringUTFChars(jHardwareId, hardwareId);
+				}
+				env->DeleteLocalRef(jHardwareId);
+			}
+			else if (env->ExceptionCheck())
+			{
+				env->ExceptionClear();
+			}
+		}
+		env->DeleteLocalRef(cls);
+	}
+
+	if (attached)
+	{
+		activity->vm->DetachCurrentThread();
+	}
 #else
 	DWORD VolumeSerialNumber;
 
