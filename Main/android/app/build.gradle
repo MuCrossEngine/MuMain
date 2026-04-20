@@ -16,14 +16,21 @@ android {
         externalNativeBuild {
             cmake {
                 cppFlags "-std=c++17 -fexceptions -frtti"
-                abiFilters 'arm64-v8a', 'armeabi-v7a'
+                abiFilters 'arm64-v8a', 'armeabi-v7a', 'x86_64', 'x86'
                 arguments "-DANDROID_STL=c++_shared",
                           "-DANDROID_PLATFORM=android-26"
             }
         }
 
         ndk {
-            abiFilters 'arm64-v8a', 'armeabi-v7a'
+            abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'
+        }
+    }
+
+    // Disable splits for single universal APK
+    splits {
+        abi {
+            enable false
         }
     }
 
@@ -32,10 +39,13 @@ android {
             debuggable true
             jniDebuggable true
             minifyEnabled false
+            // Force universal APK
+            matchingFallbacks = ['armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64']
         }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.debug
         }
     }
 
