@@ -458,8 +458,8 @@ set(GAME_SOURCES
     ${SOURCE_DIR}/MonkSystem.cpp
 
     # ── Sound ────────────────────────────────────────────────────────────────
-    ${SOURCE_DIR}/DSplaysound.cpp
-    ${SOURCE_DIR}/DSwaveIO.cpp
+    #${SOURCE_DIR}/DSplaysound.cpp  # Windows DirectSound - replaced by AudioOpenSLES.cpp
+    #${SOURCE_DIR}/DSwaveIO.cpp   # Windows Wave API - no longer needed
 
     # ── UI misc ──────────────────────────────────────────────────────────────
     ${SOURCE_DIR}/MsgWin.cpp
