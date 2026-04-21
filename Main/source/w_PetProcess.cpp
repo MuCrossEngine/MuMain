@@ -12,6 +12,7 @@
 #include "w_PetProcess.h"
 #include "ReadScript.h"
 #include "./Utilities/Log/ErrorReport.h"
+#include "Platform/GameAssetPath.h"
 
 PetInfoPtr PetInfo::Make()
 {
@@ -190,7 +191,7 @@ bool PetProcess::LoadData()
 	int _ver;
 	int _array;
 
-	FILE* fp = fopen(FileName, "rb");
+	FILE* fp = GameAssetPath::OpenFile(FileName, "rb");
 	if (fp == NULL)
 	{
 		char Text[256];

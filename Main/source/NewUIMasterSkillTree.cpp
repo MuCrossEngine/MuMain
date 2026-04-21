@@ -3,6 +3,7 @@
 #include "DSPlaySound.h"
 #include "CSItemOption.h"
 #include "NewUIMasterSkillTree.h"
+#include "Platform/GameAssetPath.h"
 
 #if MAIN_UPDATE > 303
 MASTER_SKILL_DATA stMasterSkillTreeData[MAX_MASTER_SKILL_DATA];
@@ -110,7 +111,7 @@ void SEASON3B::CNewUIMasterSkillTree::OpenMasterSkillTreeData(const char* FileNa
 {
 	memset(stMasterSkillTreeData, 0, sizeof(stMasterSkillTreeData));
 
-	FILE* fp = fopen(FileName, "rb");
+	FILE* fp = GameAssetPath::OpenFile(FileName, "rb");
 
 	if (fp)
 	{
@@ -162,7 +163,7 @@ void SEASON3B::CNewUIMasterSkillTree::OpenMasterSkillTooltip(const char* FileNam
 {
 	memset(stMasterSkillTooltip, 0, sizeof(stMasterSkillTooltip));
 
-	FILE* fp = fopen(FileName, "rb");
+	FILE* fp = GameAssetPath::OpenFile(FileName, "rb");
 
 	if (fp)
 	{

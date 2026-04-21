@@ -9,6 +9,10 @@ MapProcessPtr g_MapProcess;
 
 MapProcess& TheMapProcess()
 {
+	if (!g_MapProcess)
+	{
+		g_MapProcess = MapProcess::Make();
+	}
 	assert(g_MapProcess);
 	return *g_MapProcess;
 }

@@ -170,16 +170,15 @@ void CWINHANDLE::InitSize(mu_uint32 RenderSizeX, mu_uint32 RenderSizeY)
 	}
 	else
 	{
-		if (WindowWidth >= 1920)
-		{
-			g_fScreenRate_x = 1.6f;
-			g_fScreenRate_y = 1.6f;
-		}
-		else
-		{
-			g_fScreenRate_x = 1.25f;
-			g_fScreenRate_y = 1.25f;
-		}
+		const float byWidth = (float)WindowWidth / 640.0f;
+		const float byHeight = (float)WindowHeight / 480.0f;
+		float uniScale = (byWidth < byHeight) ? byWidth : byHeight;
+
+		if (uniScale < 1.25f)
+			uniScale = 1.25f;
+
+		g_fScreenRate_x = uniScale;
+		g_fScreenRate_y = uniScale;
 	}
 
 	iWinWidth = ((float)WindowWidth / g_fScreenRate_x);

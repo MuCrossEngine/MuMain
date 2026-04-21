@@ -289,6 +289,7 @@ inline void AndroidCompatSetNativeActivity(ANativeActivity* activity)
 
 void AndroidShowSoftKeyboard();
 void AndroidHideSoftKeyboard();
+void AndroidRequestImmediateSwap();
 
 inline AndroidCompatWindowState* AndroidCompatGetWindowState(HWND hWnd)
 {

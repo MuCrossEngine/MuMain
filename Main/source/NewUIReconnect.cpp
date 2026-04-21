@@ -15,6 +15,13 @@ SEASON3B::CNewUIReconnect::CNewUIReconnect()
 	m_pNewUIMng = NULL;
 	m_Pos.x = 0;
 	m_Pos.y = 0;
+	memset(GameServerAddress, 0, sizeof(GameServerAddress));
+	GameServerPort = 0;
+	memset(ReconnectAccount, 0, sizeof(ReconnectAccount));
+	memset(ReconnectPassword, 0, sizeof(ReconnectPassword));
+	memset(ReconnectName, 0, sizeof(ReconnectName));
+	memset(ReconnectMapServerAddress, 0, sizeof(ReconnectMapServerAddress));
+	ReconnectMapServerPort = 0;
 	ReconnectStatus = RECONNECT_STATUS_NONE;
 	ReconnectProgress = RECONNECT_PROGRESS_NONE;
 	ReconnectCurTime = 0;
@@ -425,11 +432,11 @@ BOOL SEASON3B::CNewUIReconnect::ReconnectCreateConnection(char* address, WORD po
 {
 	if (gmProtect->ReconnectTime > 0)
 	{
-		if (PORT_RANGE(port) != 0 && GameServerAddress != address)
+		if (PORT_RANGE(port) != 0)
 		{
 			if (strcmp(ReconnectMapServerAddress, address) != 0 || ReconnectMapServerPort != port)
 			{
-				wsprintf(GameServerAddress, "%s", address);
+				snprintf(GameServerAddress, sizeof(GameServerAddress), "%s", address);
 
 				GameServerPort = port;
 

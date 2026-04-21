@@ -20,6 +20,7 @@
 #include "CMVP1stDirection.h"
 #include "UIManager.h"
 #include "NewUISystem.h"
+#include "Platform/GameAssetPath.h"
 
 
 
@@ -5001,7 +5002,7 @@ void CSlideHelpMgr::OpenSlideTextFile(const char* szFileName)
 		}
 	}
 
-	FILE* fp = fopen(szFileName, "rb");
+	FILE* fp = GameAssetPath::OpenFile(szFileName, "rb");
 	if (fp == NULL)
 	{
 		char Text[256];

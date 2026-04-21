@@ -9,6 +9,7 @@
 #include "SkillManager.h"
 #include "CGMProtect.h"
 #include "CGMJewelOfAction.h"
+#include "Platform/GameAssetPath.h"
 #if(CB_GETMIXRATE)
 #include "CB_GetMixRate.h"
 #endif
@@ -678,7 +679,7 @@ BOOL CMixRecipes::GetRecipeName(MIX_RECIPE* pRecipe, unicode::t_char* pszNameOut
 			}
 			return FALSE;
 		}
-		assert(optionTextlist.size() == 2 && "¿É¼ÇÀº 2°³¿©¾ß ÇÔ");
+		assert(optionTextlist.size() == 2 && "ï¿½É¼ï¿½ï¿½ï¿½ 2ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½");
 		if (iNameLine == 1)
 		{
 			unicode::_strcpy(pszNameOut, optionTextlist[0].c_str());
@@ -1307,7 +1308,7 @@ void CMixRecipeMgr::OpenRecipeFile(const unicode::t_char* szFileName)
 		m_MixRecipe[j].Reset();
 	}
 
-	FILE* fp = fopen(szFileName, "rb");
+	FILE* fp = GameAssetPath::OpenFile(szFileName, "rb");
 	if (fp == NULL)
 	{
 		unicode::t_char Text[256];
@@ -1363,7 +1364,7 @@ void CMixRecipeMgr::OpenRecipeFile(const unicode::t_char* szFileName)
 
 int CMixRecipeMgr::GetMixInventoryType()
 {
-	assert(m_iMixType >= MIXTYPE_GOBLIN_NORMAL && m_iMixType < MAX_MIX_TYPES && "Á¤ÀÇµÇÁö ¾ÊÀº Á¶ÇÕÃ¢");
+	assert(m_iMixType >= MIXTYPE_GOBLIN_NORMAL && m_iMixType < MAX_MIX_TYPES && "ï¿½ï¿½ï¿½Çµï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Ã¢");
 	return m_iMixType;
 }
 

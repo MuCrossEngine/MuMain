@@ -42,6 +42,7 @@ protected:
 	int			m_icntRightServerGroup;
 	int			m_icntServer;
 	bool		m_bTestServerBtn;
+	bool		m_bSingleServerAutoRequested;
 	
 	int				m_iSelectServerBtnIndex;
 	CServerGroup*	m_pSelectServerGroup;

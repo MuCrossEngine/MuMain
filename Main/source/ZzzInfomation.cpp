@@ -24,6 +24,7 @@
 #include "SkillManager.h"
 #include "CGMProtect.h"
 #include "CGMItemWings.h"
+#include "Platform/GameAssetPath.h"
 
 CLASS_ATTRIBUTE     ClassAttribute[MAX_CLASS];
 MONSTER_SCRIPT      MonsterScript[MAX_MONSTER];
@@ -43,7 +44,7 @@ CGlobalText TextGlobal;
 
 void SaveTextFile(char* FileName)
 {
-	FILE* fp = fopen(FileName, "wb");
+	FILE* fp = GameAssetPath::OpenFile(FileName, "wb");
 
 	int Size = MAX_GLOBAL_TEXT_STRING;
 	BYTE* Buffer = new BYTE[Size];
@@ -64,7 +65,7 @@ int  AbuseNameFilterNumber = 0;
 
 void OpenFilterFile(char* FileName)
 {
-	FILE* fp = fopen(FileName, "rb");
+	FILE* fp = GameAssetPath::OpenFile(FileName, "rb");
 	if (fp == NULL)
 	{
 		char Text[256];
@@ -103,7 +104,7 @@ void OpenFilterFile(char* FileName)
 
 void OpenNameFilterFile(char* FileName)
 {
-	FILE* fp = fopen(FileName, "rb");
+	FILE* fp = GameAssetPath::OpenFile(FileName, "rb");
 	if (fp == NULL)
 	{
 		char Text[256];
@@ -153,7 +154,7 @@ void OpenNameFilterFile(char* FileName)
 
 void OpenGateScript(char* FileName)
 {
-	FILE* fp = fopen(FileName, "rb");
+	FILE* fp = GameAssetPath::OpenFile(FileName, "rb");
 	if (fp != NULL)
 	{
 		int Size = sizeof(GATE_ATTRIBUTE);
@@ -183,7 +184,7 @@ void OpenMonsterSkillScript(char* FileName)
 {
 	memset(MonsterSkill, -1, sizeof(Script_Skill));
 
-	FILE* fp = fopen(FileName, "rb");
+	FILE* fp = GameAssetPath::OpenFile(FileName, "rb");
 	if (fp != NULL)
 	{
 		int Size = (sizeof(Script_Skill) + sizeof(int));
@@ -221,7 +222,7 @@ void OpenMonsterSkillScript(char* FileName)
 
 void OpenNpcScript(char* FileName)
 {
-	if ((SMDFile = fopen(FileName, "rb")) == NULL)
+	if ((SMDFile = GameAssetPath::OpenFile(FileName, "rb")) == NULL)
 	{
 		char Text[256];
 		sprintf(Text, "%s - File not exist.", FileName);
@@ -252,13 +253,13 @@ void OpenSkillScript(char* FileName)
 {
 	//copy_new_file(FileName, "Data\\Local\\Skill2.bmd");
 
-	FILE* fp = fopen(FileName, "rb");
+	FILE* fp = GameAssetPath::OpenFile(FileName, "rb");
 
 	if (fp != NULL)
 	{
 		int Size = sizeof(SKILL_ATTRIBUTE);
 
-		// ÀÐ±â
+		// ï¿½Ð±ï¿½
 		BYTE* Buffer = new BYTE[Size * MAX_SKILLS];
 		fread(Buffer, Size * MAX_SKILLS, 1, fp);
 		// crc Ã¼Å©
@@ -353,7 +354,7 @@ DIALOG_SCRIPT g_DialogScript[MAX_DIALOG];
 
 void OpenDialogFile(char* FileName)
 {
-	FILE* fp = fopen(FileName, "rb");
+	FILE* fp = GameAssetPath::OpenFile(FileName, "rb");
 	if (fp == NULL)
 	{
 		char Text[256];
@@ -386,9 +387,9 @@ int ConvertItemType(BYTE* Item)
 
 void PrintItem(char* FileName)
 {
-	FILE* fp = fopen(FileName, "wt");
-	fprintf(fp, "                ÀÌ¸§  ÃÖ¼Ò°ø°Ý·Â ÃÖ´ë°ø°Ý·Â ¹æ¾î·Â ¹æ¾îÀ² ÇÊ¿äÈû ÇÊ¿ä¹ÎÃ¸ ÇÊ¿ä¿¡³ÊÁö\n");
-	//fprintf(fp,"                ÀÌ¸§    Ä«¿À½º¼º°øÈ®·ü\n");
+	FILE* fp = GameAssetPath::OpenFile(FileName, "wt");
+	fprintf(fp, "                ï¿½Ì¸ï¿½  ï¿½Ö¼Ò°ï¿½ï¿½Ý·ï¿½ ï¿½Ö´ï¿½ï¿½ï¿½Ý·ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ê¿ï¿½ï¿½ï¿½ ï¿½Ê¿ï¿½ï¿½Ã¸ ï¿½Ê¿ä¿¡ï¿½ï¿½ï¿½ï¿½\n");
+	//fprintf(fp,"                ï¿½Ì¸ï¿½    Ä«ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È®ï¿½ï¿½\n");
 	bool Excellent = true;
 	for (int i = 0; i < 16 * MAX_ITEM_INDEX; i++)
 	{
@@ -2195,7 +2196,7 @@ int ItemValue(ITEM* ip, int goldType)
 #ifdef PBG_ADD_NEWCHAR_MONK_ITEM
 					|| (ip->Type >= ITEM_WING + 49 && ip->Type <= ITEM_WING + 50)
 #endif //PBG_ADD_NEWCHAR_MONK_ITEM
-					)    //  ³¯°³.
+					)    //  ï¿½ï¿½ï¿½ï¿½.
 				{
 					int iOption = ip->SpecialValue[i];
 					if (AT_LIFE_REGENERATION == ip->Special[i])
@@ -2610,12 +2611,12 @@ int MonsterKey = 0;
 
 void OpenMonsterScript(char* FileName)
 {
-	if ((SMDFile = fopen(FileName, "rb")) == NULL)
+	if ((SMDFile = GameAssetPath::OpenFile(FileName, "rb")) == NULL)
 		return;
 	SMDToken Token;
 	while (true)
 	{
-		Token = (*GetToken)();//¹øÈ£
+		Token = (*GetToken)();//ï¿½ï¿½È£
 		if (Token == END)
 			break;
 		if (Token == NAME && strcmp("end", TokenString) == NULL)
@@ -3106,7 +3107,7 @@ void CHARACTER_MACHINE::CalculateDamage()
 	Character.AttackDamageMaxRight += g_SocketItemMgr.m_StatusBonus.m_iAttackDamageMaxBonus;
 	Character.AttackDamageMinLeft += g_SocketItemMgr.m_StatusBonus.m_iAttackDamageMinBonus;
 	Character.AttackDamageMaxLeft += g_SocketItemMgr.m_StatusBonus.m_iAttackDamageMaxBonus;
-	if (g_isCharacterBuff((&Hero->Object), eBuff_BlessingOfXmax))	//Å©¸®½º¸¶½ºÀÇ Ãàº¹
+	if (g_isCharacterBuff((&Hero->Object), eBuff_BlessingOfXmax))	//Å©ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½àº¹
 	{
 		int _Temp = 0;
 		_Temp = Character.Level / 3 + 45;
@@ -3117,7 +3118,7 @@ void CHARACTER_MACHINE::CalculateDamage()
 		Character.AttackDamageMaxLeft += _Temp;
 	}
 
-	if (g_isCharacterBuff((&Hero->Object), eBuff_StrengthOfSanta))	//»êÅ¸ÀÇ °­È­
+	if (g_isCharacterBuff((&Hero->Object), eBuff_StrengthOfSanta))	//ï¿½ï¿½Å¸ï¿½ï¿½ ï¿½ï¿½È­
 	{
 		int _Temp = 30;
 
@@ -3158,7 +3159,7 @@ void CHARACTER_MACHINE::CalculateMagicDamage()
 	DWORD    DamageMin = 0;
 	DWORD    DamageMax = 0;
 
-	// ³¯°³
+	// ï¿½ï¿½ï¿½ï¿½
 	if (Equipment[EQUIPMENT_WING].Type != -1)
 	{
 		Script_Item* p = GMItemMng->find(Equipment[EQUIPMENT_WING].Type);
@@ -4002,7 +4003,7 @@ void CHARACTER_MACHINE::CalculateNextExperince()
 		// Normalizamos el nivel actual proporcionalmente al sistema de nivel 400
 		float normalized_level = static_cast<float>(Character.Level) / Character.MaxCharacterLevel * 400.0f;
 
-		// Cálculo de la experiencia base utilizando el nivel normalizado, en punto flotante para precisión
+		// Cï¿½lculo de la experiencia base utilizando el nivel normalizado, en punto flotante para precisiï¿½n
 		float baseExperience = (9.0f + normalized_level) * normalized_level * normalized_level * 10.0f;
 
 		// Ajuste adicional si el nivel normalizado es mayor que 255
@@ -4012,7 +4013,7 @@ void CHARACTER_MACHINE::CalculateNextExperince()
 			baseExperience += (9.0f + LevelOver_N) * LevelOver_N * LevelOver_N * 1000.0f;
 		}
 
-		// Convertir el resultado final de experiencia a DWORD para evitar pérdida de precisión
+		// Convertir el resultado final de experiencia a DWORD para evitar pï¿½rdida de precisiï¿½n
 		Character.Experience = Character.NextExperince;
 		Character.NextExperince = static_cast<DWORD>(baseExperience);
 	}

@@ -162,7 +162,10 @@ bool SEASON3B::CNewUISystem::Create()
 		return false;
 #endif
 
-	m_pNewOptionWindow = new CNewUIOptionWindow;
+	if (m_pNewOptionWindow == NULL)
+	{
+		m_pNewOptionWindow = new CNewUIOptionWindow;
+	}
 	if (m_pNewOptionWindow->Create(m_pNewUIMng, AddMiddleX(190), 70) == false)
 	{
 		return false;
@@ -670,7 +673,10 @@ bool SEASON3B::CNewUISystem::LoadMainSceneInterface()
 	if (m_iCamWebzen == NULL)
 		return false;
 
-	m_NewUIReconnect = new CNewUIReconnect;
+	if (m_NewUIReconnect == NULL)
+	{
+		m_NewUIReconnect = new CNewUIReconnect;
+	}
 
 	if (m_NewUIReconnect->Create(m_pNewUIMng, PositionX_The_Mid(352), PositionY_The_Mid(113)) == false)
 	{
@@ -2463,6 +2469,14 @@ CNewUIWindowMenu* SEASON3B::CNewUISystem::GetUI_NewWindowMenu() const
 
 CNewUIOptionWindow* SEASON3B::CNewUISystem::GetUI_NewOptionWindow() const
 {
+#ifdef __ANDROID__
+	if (m_pNewOptionWindow == NULL)
+	{
+		CNewUISystem* pThis = const_cast<CNewUISystem*>(this);
+		pThis->m_pNewOptionWindow = new CNewUIOptionWindow;
+		__android_log_print(ANDROID_LOG_INFO, "MUAndroid", "GetUI_NewOptionWindow: created fallback option window for lazy startup");
+	}
+#endif
 	return m_pNewOptionWindow;
 }
 
@@ -2681,6 +2695,14 @@ CGFxEffectHandle* SEASON3B::CNewUISystem::GetUI_gfxHangle() const
 
 CNewUIReconnect* SEASON3B::CNewUISystem::GetUI_pNewUIReconnect() const
 {
+#ifdef __ANDROID__
+	if (m_NewUIReconnect == NULL)
+	{
+		CNewUISystem* pThis = const_cast<CNewUISystem*>(this);
+		pThis->m_NewUIReconnect = new CNewUIReconnect;
+		__android_log_print(ANDROID_LOG_INFO, "MUAndroid", "GetUI_pNewUIReconnect: created fallback reconnect UI for lazy startup");
+	}
+#endif
 	return m_NewUIReconnect;
 }
 

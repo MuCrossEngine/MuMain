@@ -242,7 +242,16 @@ int	 ErrorMessageNext = NULL;
 #ifdef __ANDROID__
 static bool g_AndroidLoginServerListRequested = false;
 static DWORD g_AndroidLoginServerListTick = 0;
+static DWORD g_AndroidLoginSceneEnterTick = 0;
+static int g_AndroidLoginReconnectAttempts = 0;
 #endif
+
+static const DWORD kWebzenMinLoadingMs = 2000;
+static const DWORD kMainLoadingMinMs = 1500;
+static DWORD g_WebzenLoadingStartTick = 0;
+static bool g_WebzenDataLoaded = false;
+static DWORD g_LoadingSceneStartTick = 0;
+static bool g_MainSceneInterfaceLoaded = false;
 
 int SelectedHero = -1;
 
@@ -395,42 +404,61 @@ void MovieScene(HDC hDC)
 #endif // MOVIE_DIRECTSHOW
 
 bool InitWebzenScene = false;
+bool WebzenLoadingPresented = false;
+
+static bool LoadTitleBitmapWithFallback(const char* szPrimary, GLuint uiTextureIndex, GLuint uiFilter = GL_LINEAR, GLuint uiWrapMode = GL_CLAMP_TO_EDGE)
+{
+	if (LoadBitmap(szPrimary, uiTextureIndex, uiFilter, uiWrapMode, false))
+	{
+		return true;
+	}
+
+	if (LoadBitmap("Interface\\InGameShop\\MainBackPanel\\backpanel0.tga", uiTextureIndex, uiFilter, uiWrapMode, false))
+	{
+		return true;
+	}
+
+	return LoadBitmap("Interface\\HUD\\Look-1\\Menu03_new.jpg", uiTextureIndex, uiFilter, uiWrapMode, false);
+}
 
 void CreateWebzenScene()
 {
 	CUIMng& rUIMng = CUIMng::Instance();
+	WebzenLoadingPresented = false;
+	g_WebzenDataLoaded = false;
+	g_WebzenLoadingStartTick = 0;
 
 	OpenFont();
 	ClearInput();
 
 	FogEnable = false;
 
-	LoadBitmap("Interface\\New_lo_back_01.jpg", BITMAP_TITLE, GL_LINEAR);
-	LoadBitmap("Interface\\New_lo_back_02.jpg", BITMAP_TITLE + 1, GL_LINEAR);
-	LoadBitmap("Interface\\MU_TITLE.tga", BITMAP_TITLE + 2, GL_LINEAR);
-	LoadBitmap("Interface\\lo_121518.tga", BITMAP_TITLE + 3, GL_LINEAR);
-	LoadBitmap("Interface\\New_lo_webzen_logo.tga", BITMAP_TITLE + 4, GL_LINEAR);
-	LoadBitmap("Interface\\lo_back_s5_03.jpg", BITMAP_TITLE + 6, GL_LINEAR);
-	LoadBitmap("Interface\\lo_back_s5_04.jpg", BITMAP_TITLE + 7, GL_LINEAR);
-	LoadBitmap("Interface\\HUD\\lo_download.jpg", BITMAP_TITLE + 5, GL_LINEAR, GL_REPEAT);
+	LoadTitleBitmapWithFallback("Interface\\New_lo_back_01.jpg", BITMAP_TITLE, GL_LINEAR);
+	LoadTitleBitmapWithFallback("Interface\\New_lo_back_02.jpg", BITMAP_TITLE + 1, GL_LINEAR);
+	LoadTitleBitmapWithFallback("Interface\\MU_TITLE.tga", BITMAP_TITLE + 2, GL_LINEAR);
+	LoadTitleBitmapWithFallback("Interface\\lo_121518.tga", BITMAP_TITLE + 3, GL_LINEAR);
+	LoadTitleBitmapWithFallback("Interface\\New_lo_webzen_logo.tga", BITMAP_TITLE + 4, GL_LINEAR);
+	LoadTitleBitmapWithFallback("Interface\\lo_back_s5_03.jpg", BITMAP_TITLE + 6, GL_LINEAR);
+	LoadTitleBitmapWithFallback("Interface\\lo_back_s5_04.jpg", BITMAP_TITLE + 7, GL_LINEAR);
+	LoadTitleBitmapWithFallback("Interface\\HUD\\lo_download.jpg", BITMAP_TITLE + 5, GL_LINEAR, GL_REPEAT);
 
 	if (rand() % 100 <= 70)
 	{
-		LoadBitmap("Interface\\lo_back_im01.jpg", BITMAP_TITLE + 8, GL_LINEAR);
-		LoadBitmap("Interface\\lo_back_im02.jpg", BITMAP_TITLE + 9, GL_LINEAR);
-		LoadBitmap("Interface\\lo_back_im03.jpg", BITMAP_TITLE + 10, GL_LINEAR);
-		LoadBitmap("Interface\\lo_back_im04.jpg", BITMAP_TITLE + 11, GL_LINEAR);
-		LoadBitmap("Interface\\lo_back_im05.jpg", BITMAP_TITLE + 12, GL_LINEAR);
-		LoadBitmap("Interface\\lo_back_im06.jpg", BITMAP_TITLE + 13, GL_LINEAR);
+		LoadTitleBitmapWithFallback("Interface\\lo_back_im01.jpg", BITMAP_TITLE + 8, GL_LINEAR);
+		LoadTitleBitmapWithFallback("Interface\\lo_back_im02.jpg", BITMAP_TITLE + 9, GL_LINEAR);
+		LoadTitleBitmapWithFallback("Interface\\lo_back_im03.jpg", BITMAP_TITLE + 10, GL_LINEAR);
+		LoadTitleBitmapWithFallback("Interface\\lo_back_im04.jpg", BITMAP_TITLE + 11, GL_LINEAR);
+		LoadTitleBitmapWithFallback("Interface\\lo_back_im05.jpg", BITMAP_TITLE + 12, GL_LINEAR);
+		LoadTitleBitmapWithFallback("Interface\\lo_back_im06.jpg", BITMAP_TITLE + 13, GL_LINEAR);
 	}
 	else
 	{
-		LoadBitmap("Interface\\lo_back_s5_im01.jpg", BITMAP_TITLE + 8, GL_LINEAR);
-		LoadBitmap("Interface\\lo_back_s5_im02.jpg", BITMAP_TITLE + 9, GL_LINEAR);
-		LoadBitmap("Interface\\lo_back_s5_im03.jpg", BITMAP_TITLE + 10, GL_LINEAR);
-		LoadBitmap("Interface\\lo_back_s5_im04.jpg", BITMAP_TITLE + 11, GL_LINEAR);
-		LoadBitmap("Interface\\lo_back_s5_im05.jpg", BITMAP_TITLE + 12, GL_LINEAR);
-		LoadBitmap("Interface\\lo_back_s5_im06.jpg", BITMAP_TITLE + 13, GL_LINEAR);
+		LoadTitleBitmapWithFallback("Interface\\lo_back_s5_im01.jpg", BITMAP_TITLE + 8, GL_LINEAR);
+		LoadTitleBitmapWithFallback("Interface\\lo_back_s5_im02.jpg", BITMAP_TITLE + 9, GL_LINEAR);
+		LoadTitleBitmapWithFallback("Interface\\lo_back_s5_im03.jpg", BITMAP_TITLE + 10, GL_LINEAR);
+		LoadTitleBitmapWithFallback("Interface\\lo_back_s5_im04.jpg", BITMAP_TITLE + 11, GL_LINEAR);
+		LoadTitleBitmapWithFallback("Interface\\lo_back_s5_im05.jpg", BITMAP_TITLE + 12, GL_LINEAR);
+		LoadTitleBitmapWithFallback("Interface\\lo_back_s5_im06.jpg", BITMAP_TITLE + 13, GL_LINEAR);
 	}
 
 	rUIMng.CreateTitleSceneUI();
@@ -471,15 +499,34 @@ void WebzenScene(HDC hDC)
 	{
 		CUIMng& rUIMng = CUIMng::Instance();
 
-		LoadBitmap("Interface\\lo_lo.jpg", BITMAP_TITLE + 5, GL_LINEAR, GL_REPEAT);
+		LoadTitleBitmapWithFallback("Interface\\lo_lo.jpg", BITMAP_TITLE + 5, GL_LINEAR, GL_REPEAT);
 
 		EnableAlphaTest();
 
-		OpenBasicData(hDC);
+		if (!WebzenLoadingPresented)
+		{
+			CUIMng::Instance().RenderTitleSceneUI(hDC, 11, 12);
+			WebzenLoadingPresented = true;
+			g_WebzenLoadingStartTick = GetTickCount();
+			return;
+		}
 
-		g_pNewUISystem->LoadMainSceneInterface();
+		if (!g_WebzenDataLoaded)
+		{
+		#ifdef __ANDROID__
+			MU_ANDROID_LOGI("WebzenScene: skipping OpenBasicData on Android low-memory startup path");
+		#else
+			OpenBasicData(hDC);
+		#endif
+			g_WebzenDataLoaded = true;
+		}
 
 		CUIMng::Instance().RenderTitleSceneUI(hDC, 11, 12);
+
+		if (GetTickCount() - g_WebzenLoadingStartTick < kWebzenMinLoadingMs)
+		{
+			return;
+		}
 
 		rUIMng.ReleaseTitleSceneUI();
 
@@ -510,11 +557,30 @@ void WebzenScene(HDC hDC)
 
 	EnableAlphaTest();
 
-	OpenBasicData(hDC);
+	if (!WebzenLoadingPresented)
+	{
+		CUIMng::Instance().RenderTitleSceneUI(hDC, 11, 12);
+		WebzenLoadingPresented = true;
+		g_WebzenLoadingStartTick = GetTickCount();
+		return;
+	}
 
-	g_pNewUISystem->LoadMainSceneInterface();
+	if (!g_WebzenDataLoaded)
+	{
+	#ifdef __ANDROID__
+		MU_ANDROID_LOGI("WebzenScene: skipping OpenBasicData on Android low-memory startup path");
+	#else
+		OpenBasicData(hDC);
+	#endif
+		g_WebzenDataLoaded = true;
+	}
 
 	CUIMng::Instance().RenderTitleSceneUI(hDC, 11, 12);
+
+	if (GetTickCount() - g_WebzenLoadingStartTick < kWebzenMinLoadingMs)
+	{
+		return;
+	}
 
 	rUIMng.ReleaseTitleSceneUI();
 	DeleteBitmap(BITMAP_TITLE);
@@ -1517,6 +1583,14 @@ void CreateLogInScene()
 {
 	EnableMainRender = true;
 
+#ifdef __ANDROID__
+	if (gmProtect->SceneLogin != 1)
+	{
+		MU_ANDROID_LOGI("CreateLogInScene: forcing Android compatibility mode SceneLogin=1 (was %d)", gmProtect->SceneLogin);
+		gmProtect->SceneLogin = 1;
+	}
+#endif
+
 	if (gmProtect->SceneLogin == 1)
 	{
 		vec3_t Angle, Position;
@@ -1602,6 +1676,8 @@ void CreateLogInScene()
 #ifdef __ANDROID__
 	g_AndroidLoginServerListRequested = false;
 	g_AndroidLoginServerListTick = 0;
+	g_AndroidLoginSceneEnterTick = GetTickCount();
+	g_AndroidLoginReconnectAttempts = 0;
 #endif
 
 	if (g_pReconnectUI->ReconnectCreateConnection(szServerIpAddress, g_ServerPort))
@@ -1730,6 +1806,22 @@ void NewMoveLogInScene()
 			g_AndroidLoginServerListTick = dwNow;
 			MU_ANDROID_LOGI("NewMoveLogInScene: retry SendRequestServerList total=%d", g_ServerListManager->GetTotalServer());
 		}
+
+		if (g_AndroidLoginReconnectAttempts < 2 &&
+			dwNow - g_AndroidLoginSceneEnterTick >= 12000)
+		{
+			SocketClient.Close();
+			if (g_pReconnectUI->ReconnectCreateConnection(szServerIpAddress, g_ServerPort))
+			{
+				SendRequestServerHWID();
+				SendRequestServerList();
+				g_AndroidLoginServerListRequested = true;
+				g_AndroidLoginServerListTick = dwNow;
+				g_AndroidLoginSceneEnterTick = dwNow;
+				++g_AndroidLoginReconnectAttempts;
+				MU_ANDROID_LOGI("NewMoveLogInScene: reconnect attempt=%d", g_AndroidLoginReconnectAttempts);
+			}
+		}
 	}
 #endif
 	g_ConsoleDebug->UpdateMainScene();
@@ -1745,7 +1837,11 @@ bool NewRenderLogInScene(HDC hDC)
 	if (gmProtect->SceneLogin == 1)
 	{
 		glClearColor(0.f, 0.f, 0.f, 1.f);
+	#ifdef __ANDROID__
+		BeginOpengl(0, 25, 640, 430);
+	#else
 		BeginOpengl(0, 80, 640, 320);
+	#endif
 
 		if (!CUIMng::Instance().m_CreditWin.IsShow())
 		{
@@ -1945,11 +2041,12 @@ void LoadingScene(HDC hDC)
 		LoadingWorld = 9999999;
 
 		InitLoading = true;
+		g_LoadingSceneStartTick = GetTickCount();
 
-		LoadBitmap("Interface\\LSBg01.JPG", BITMAP_TITLE, GL_LINEAR);
-		LoadBitmap("Interface\\LSBg02.JPG", BITMAP_TITLE + 1, GL_LINEAR);
-		LoadBitmap("Interface\\LSBg03.JPG", BITMAP_TITLE + 2, GL_LINEAR);
-		LoadBitmap("Interface\\LSBg04.JPG", BITMAP_TITLE + 3, GL_LINEAR);
+		LoadTitleBitmapWithFallback("Interface\\LSBg01.JPG", BITMAP_TITLE, GL_LINEAR);
+		LoadTitleBitmapWithFallback("Interface\\LSBg02.JPG", BITMAP_TITLE + 1, GL_LINEAR);
+		LoadTitleBitmapWithFallback("Interface\\LSBg03.JPG", BITMAP_TITLE + 2, GL_LINEAR);
+		LoadTitleBitmapWithFallback("Interface\\LSBg04.JPG", BITMAP_TITLE + 3, GL_LINEAR);
 
 		::StopMp3(g_lpszMp3[MUSIC_LOGIN_THEME]);
 
@@ -1968,6 +2065,21 @@ void LoadingScene(HDC hDC)
 	EndOpengl();
 	glFlush();
 	SwapBuffers(hDC);
+
+	if (GetTickCount() - g_LoadingSceneStartTick < kMainLoadingMinMs)
+	{
+		return;
+	}
+
+	if (!g_MainSceneInterfaceLoaded)
+	{
+		if (!g_pNewUISystem->LoadMainSceneInterface())
+		{
+			g_ErrorReport.Write("> LoadingScene: LoadMainSceneInterface failed, retrying.\r\n");
+			return;
+		}
+		g_MainSceneInterfaceLoaded = true;
+	}
 
 	SAFE_DELETE(rUIMng.m_pLoadingScene);
 

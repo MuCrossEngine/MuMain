@@ -15,6 +15,7 @@
 #include <sys/stat.h>
 #include <cstdio>
 #include <vector>
+#include <filesystem>
 
 #define LOG_TAG "MUAndroid"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO,  LOG_TAG, __VA_ARGS__)
@@ -205,29 +206,19 @@ static void SyncLegacyScreenMetrics(int width, int height)
     }
     else
     {
-        if (WindowWidth >= 1920)
-        {
-            g_fScreenRate_x = 1.6f;
-            g_fScreenRate_y = 1.6f;
-        }
-        else
-        {
-            g_fScreenRate_x = 1.25f;
-            g_fScreenRate_y = 1.25f;
-        }
-    }
-
-    if (g_fScreenRate_x <= 0.0f || g_fScreenRate_y <= 0.0f)
-    {
         g_fScreenRate_x = static_cast<float>(WindowWidth) / 640.0f;
         g_fScreenRate_y = static_cast<float>(WindowHeight) / 480.0f;
     }
 
-    CInput::Instance().Create(gwinhandle->GethWnd(), WindowWidth, WindowHeight);
+    const long logicalWidth = static_cast<long>(WindowWidth / g_fScreenRate_x);
+    const long logicalHeight = static_cast<long>(WindowHeight / g_fScreenRate_y);
+    CInput::Instance().Create(gwinhandle->GethWnd(), static_cast<long>(WindowWidth), static_cast<long>(WindowHeight));
 
-    LOGI("Screen sync: window=%ux%u scale=%.3f/%.3f screenType=%d",
+    LOGI("Screen sync: window=%ux%u logical=%ldx%ld scale=%.3f/%.3f screenType=%d",
          WindowWidth,
          WindowHeight,
+         logicalWidth,
+         logicalHeight,
          g_fScreenRate_x,
          g_fScreenRate_y,
          screenType);
@@ -326,6 +317,21 @@ static bool PathExists(const std::string& path)
 
     struct stat st;
     return stat(path.c_str(), &st) == 0;
+}
+
+static void RemovePathRecursive(const std::string& path)
+{
+    if (path.empty())
+    {
+        return;
+    }
+
+    std::error_code ec;
+    std::filesystem::remove_all(std::filesystem::path(path), ec);
+    if (ec)
+    {
+        LOGE("RemovePathRecursive failed: %s (%s)", path.c_str(), ec.message().c_str());
+    }
 }
 
 static bool CopyBinaryFile(const std::string& sourcePath, const std::string& targetPath)
@@ -449,6 +455,14 @@ void AndroidHideSoftKeyboard()
     CallMainActivityVoidMethod("hideSoftKeyboard");
 }
 
+void AndroidRequestImmediateSwap()
+{
+    if (g_eglWindow != nullptr)
+    {
+        g_eglWindow->SwapBuffers();
+    }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Initialization — mirrors WinMain() init sequence
 // ─────────────────────────────────────────────────────────────────────────────
@@ -520,10 +534,10 @@ static bool InitGame(android_app* app)
 
     // 2.1 Ensure login-world files exist. External downloader mirrors can be
     // partial, so keep this world materialized from APK assets when missing.
-    if (!AreLoginWorldFilesPresent())
     {
         std::string loginWorldTarget = GameAssetPath::Resolve("Data/World95");
-        LOGI("InitGame: login world files missing, copying Data/World95");
+        LOGI("InitGame: refreshing Data/World95 from bundled assets");
+        RemovePathRecursive(loginWorldTarget);
         if (!AndroidCopyAssetDirectory("Data/World95", loginWorldTarget.c_str()))
         {
             LOGE("InitGame: failed to copy login world assets -> %s", loginWorldTarget.c_str());
@@ -584,33 +598,8 @@ static bool InitGame(android_app* app)
     // 7.1 Minimal WinMain parity for legacy globals used before MAIN_SCENE.
     InitLegacyCoreState();
 
-    // 7.2 Runtime parity with WinMain (required before LOG_IN_SCENE world load)
-    if (!g_BuffSystem)
-    {
-        g_BuffSystem = BuffStateSystem::Make();
-    }
-
-    if (!g_MapProcess)
-    {
-        g_MapProcess = MapProcess::Make();
-    }
-
-    if (!g_petProcess)
-    {
-        g_petProcess = PetProcess::Make();
-    }
-
-    LOGI("InitGame: runtime systems ready Buff=%p Map=%p Pet=%p", g_BuffSystem.get(), g_MapProcess.get(), g_petProcess.get());
-
-    // 7.5 NewUI system (Windows does this in WinMain; essential for LoadMainSceneInterface)
-    if (!g_pNewUISystem->Create())
-    {
-        LOGE("InitGame: g_pNewUISystem->Create() failed");
-    }
-    else
-    {
-        LOGI("InitGame: g_pNewUISystem->Create() OK");
-    }
+    // 7.2 Runtime systems are initialized lazily on Android to reduce startup memory peaks.
+    LOGI("InitGame: runtime systems deferred (lazy init enabled)");
 
     // 8. Game data loading starts in WEBZEN_SCENE and advances via Scene() dispatcher
     LOGI("InitGame: bootstrap complete, entering game loop");
@@ -711,6 +700,21 @@ static void OnAppCmd(android_app* app, int32_t cmd)
 
     case APP_CMD_LOST_FOCUS:
         g_focused = false;
+        break;
+
+    case APP_CMD_WINDOW_RESIZED:
+    case APP_CMD_CONFIG_CHANGED:
+        if (app->window && g_renderBackendInitialized)
+        {
+            const int width = ANativeWindow_getWidth(app->window);
+            const int height = ANativeWindow_getHeight(app->window);
+            if (width > 0 && height > 0)
+            {
+                RenderBackend::SetScreenSize(width, height);
+                SyncLegacyScreenMetrics(width, height);
+                LOGI("OnAppCmd: resized/config changed -> %dx%d", width, height);
+            }
+        }
         break;
 
     case APP_CMD_DESTROY:

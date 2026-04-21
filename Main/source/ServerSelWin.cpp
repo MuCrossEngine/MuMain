@@ -16,6 +16,10 @@
 #include "GameCensorship.h"
 #include "ServerListManager.h"
 
+#ifdef __ANDROID__
+#include <android/log.h>
+#endif
+
 #define	SSW_GAP_WIDTH	28
 #define	SSW_GAP_HEIGHT	5
 #define	SSW_GB_POS_X	16
@@ -41,6 +45,7 @@ void CServerSelWin::Create()
 	CWin::Create(0, 0, -2);
 
 	m_iSelectServerBtnIndex = -1;
+	m_bSingleServerAutoRequested = false;
 
 	int i;
 
@@ -211,6 +216,7 @@ void CServerSelWin::UpdateDisplay()
 		return;
 
 	CServerGroup* pServerGroup = NULL;
+	int iFirstServerGroupBtnPos = -1;
 
 	g_ServerListManager->SetFirst();
 
@@ -224,6 +230,8 @@ void CServerSelWin::UpdateDisplay()
 			m_aServerGroupBtn[0].SetText(pServerGroup->m_szName, adwServerGBtnClr);
 			pServerGroup->m_iBtnPos = 0;
 			m_bTestServerBtn = true;
+			if (iFirstServerGroupBtnPos == -1)
+				iFirstServerGroupBtnPos = pServerGroup->m_iBtnPos;
 		}
 		else if( pServerGroup->m_iWidthPos == CServerGroup::SBP_LEFT )
 		{
@@ -232,6 +240,8 @@ void CServerSelWin::UpdateDisplay()
 
 			m_aServerGroupBtn[m_icntLeftServerGroup+1].SetText(pServerGroup->m_szName, adwServerGBtnClr);
 			pServerGroup->m_iBtnPos = m_icntLeftServerGroup+1;
+			if (iFirstServerGroupBtnPos == -1)
+				iFirstServerGroupBtnPos = pServerGroup->m_iBtnPos;
 
 			m_icntLeftServerGroup++;
 		}
@@ -242,9 +252,17 @@ void CServerSelWin::UpdateDisplay()
 
 			m_aServerGroupBtn[SSW_LEFT_SERVER_G_MAX+m_icntRightServerGroup+1].SetText(pServerGroup->m_szName, adwServerGBtnClr);
 			pServerGroup->m_iBtnPos = SSW_LEFT_SERVER_G_MAX+m_icntRightServerGroup+1;
+			if (iFirstServerGroupBtnPos == -1)
+				iFirstServerGroupBtnPos = pServerGroup->m_iBtnPos;
 
 			m_icntRightServerGroup++;
 		}	
+	}
+
+	if (m_iSelectServerBtnIndex == -1 && iFirstServerGroupBtnPos != -1)
+	{
+		m_iSelectServerBtnIndex = iFirstServerGroupBtnPos;
+		m_aServerGroupBtn[m_iSelectServerBtnIndex].SetCheck(true);
 	}
 
 	ShowServerGBtns();

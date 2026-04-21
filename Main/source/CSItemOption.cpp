@@ -17,6 +17,7 @@
 #include "UIControls.h"
 #include "NewUISystem.h"
 #include "SkillManager.h"
+#include "Platform/GameAssetPath.h"
 
 extern float g_fScreenRate_x;
 extern float g_fScreenRate_y;
@@ -130,7 +131,7 @@ BYTE CSItemOption::Search_From_EquippedSetItemNameSequence(char* szSetItemname)
 
 bool CSItemOption::OpenItemSetType(const char* filename)
 {
-	FILE* fp = fopen(filename, "rb");
+	FILE* fp = GameAssetPath::OpenFile(filename, "rb");
 	if (fp != NULL)
 	{
 		int Size = sizeof(ITEM_SET_TYPE);
@@ -186,7 +187,7 @@ bool CSItemOption::OpenItemSetType(const char* filename)
 
 bool CSItemOption::OpenItemSetOption(const char* filename)
 {
-	FILE* fp = fopen(filename, "rb");
+	FILE* fp = GameAssetPath::OpenFile(filename, "rb");
 	if (fp != NULL)
 	{
 		int Size = sizeof(ITEM_SET_OPTION);

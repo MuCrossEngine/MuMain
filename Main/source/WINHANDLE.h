@@ -19,6 +19,10 @@ typedef unsigned long long mu_uint64;
 typedef float  mu_float;
 typedef double mu_double;
 #include "Resolutions.h"
+extern float g_fScreenRate_x;
+extern float g_fScreenRate_y;
+extern unsigned int WindowWidth;
+extern unsigned int WindowHeight;
 class CWINHANDLE
 {
 public:
@@ -34,8 +38,16 @@ public:
     void Resize(mu_uint32, mu_uint32) {}
     void SetFontSize(mu_uint32)   {}
     HINSTANCE GetInstance()       { return nullptr; }
-    mu_float GetScreenX() { return static_cast<mu_float>(WindowSizeX); }
-    mu_float GetScreenY() { return static_cast<mu_float>(WindowSizeY); }
+	mu_float GetScreenX() {
+		if (WindowWidth > 0)
+			return static_cast<mu_float>(WindowWidth);
+		return static_cast<mu_float>(WindowSizeX);
+	}
+	mu_float GetScreenY() {
+		if (WindowHeight > 0)
+			return static_cast<mu_float>(WindowHeight);
+		return static_cast<mu_float>(WindowSizeY);
+	}
     ResolutionConfig* LoadCurrentConfig() { return nullptr; }
     void SetDisplayIndex(mu_uint8, mu_boolean = true) {}
     mu_uint8 GetDisplayIndex()    { return 0; }

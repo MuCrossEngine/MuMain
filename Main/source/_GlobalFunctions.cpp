@@ -10,6 +10,10 @@ BuffStateSystemPtr			g_BuffSystem;
 
 BuffStateSystem& TheBuffStateSystem() 
 {
+	if (!g_BuffSystem)
+	{
+		g_BuffSystem = BuffStateSystem::Make();
+	}
 	assert( g_BuffSystem ); 
 	return *g_BuffSystem;
 }

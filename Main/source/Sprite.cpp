@@ -38,6 +38,10 @@ void CSprite::Create(int nOrgWidth, int nOrgHeight, int nTexID, int nMaxFrame, S
 	m_fOrgHeight = (float)nOrgHeight;
 	m_nTexID = nTexID;
 	m_pTexture = Bitmaps.FindTexture(m_nTexID);
+	if (-1 < m_nTexID && m_pTexture == NULL)
+	{
+		m_nTexID = -1;
+	}
 
 	m_fScrHeight = (float)WindowHeight / fScaleY;
 
@@ -52,7 +56,7 @@ void CSprite::Create(int nOrgWidth, int nOrgHeight, int nTexID, int nMaxFrame, S
 
 	m_nNowFrame = -1;
 
-	if (-1 < m_nTexID)
+	if (-1 < m_nTexID && m_pTexture != NULL)
 	{
 		m_aTexCoord[LT].fTU = 0.5f / m_pTexture->Width;
 		m_aTexCoord[LT].fTV = 0.5f / m_pTexture->Height;
@@ -196,12 +200,12 @@ void CSprite::SetSize(int nWidth, int nHeight, CHANGE_PRAM eChangedPram)
 
 int CSprite::GetTexWidth()
 {
-	return -1 < m_nTexID ? (int)m_pTexture->Width : 0;
+	return (-1 < m_nTexID && m_pTexture != NULL) ? (int)m_pTexture->Width : 0;
 }
 
 int CSprite::GetTexHeight()
 {
-	return -1 < m_nTexID ? (int)m_pTexture->Height : 0;
+	return (-1 < m_nTexID && m_pTexture != NULL) ? (int)m_pTexture->Height : 0;
 }
 
 void CSprite::Show(bool bShow)

@@ -19,7 +19,7 @@ CWsctlc::CWsctlc()
 	m_pPacketQueue = new CPacketQueue;
 	m_LogPrint = 0;
 	m_logfp = NULL;
-	m_socket = NULL;
+	m_socket = INVALID_SOCKET;
 #ifdef PBG_LOG_PACKET_WINSOCKERROR
 	remove(PACKET_LOG_FILE);
 #endif //PBG_LOG_PACKET_WINSOCKERROR
@@ -115,7 +115,7 @@ BOOL CWsctlc::Startup()
 		MessageBox(NULL, "WINSOCK", "Error", MB_OK);
 		return FALSE;
 	}
-	m_socket = NULL;
+	m_socket = INVALID_SOCKET;
 	m_iMaxSockets = wsaData.iMaxSockets;
 	LogPrintOn();
 	return TRUE;
@@ -190,17 +190,36 @@ int CWsctlc::Create(HWND hWnd, BOOL bGame)
 		MessageBox(NULL, lpszMessage, "Error", MB_OK);
 		return FALSE;
 	}
+
+#ifdef __ANDROID__
+	{
+		unsigned long nonBlocking = 1;
+		if (ioctlsocket(m_socket, 0x8004667e, &nonBlocking) == SOCKET_ERROR)
+		{
+			g_ErrorReport.Write("[Socket] failed to set non-blocking mode on Android. errno=%d\r\n", WSAGetLastError());
+		}
+	}
+#endif
+
 	m_hWnd = hWnd;
 	return TRUE;
 }
 
 BOOL CWsctlc::Close()
 {
+	SOCKET closingSocket = m_socket;
+	m_socket = INVALID_SOCKET;
+
+	if (closingSocket == INVALID_SOCKET)
+	{
+		return TRUE;
+	}
+
 	if (m_bGame)
 	{
 		if (g_bGameServerConnected == TRUE)
 		{
-			if (CheckSocketPort(m_socket) != 0)
+			if (CheckSocketPort(closingSocket) != 0)
 			{
 				g_pReconnectUI->ReconnectOnCloseSocket();
 			}
@@ -212,7 +231,7 @@ BOOL CWsctlc::Close()
 	linger.l_onoff = 1;
 	linger.l_linger = 0;
 
-	int iRetVal = setsockopt(m_socket, SOL_SOCKET, SO_LINGER, (char*)&linger, sizeof(linger));
+	int iRetVal = setsockopt(closingSocket, SOL_SOCKET, SO_LINGER, (char*)&linger, sizeof(linger));
 
 	if (iRetVal == SOCKET_ERROR)
 	{
@@ -232,20 +251,26 @@ BOOL CWsctlc::Close()
 	}
 	g_ErrorReport.Write("[Socket Closed][Clear PacketQueue]\r\n");
 
-	closesocket(m_socket);
-	m_socket = INVALID_SOCKET;
+	closesocket(closingSocket);
 	return TRUE;
 }
 
 BOOL CWsctlc::Close(SOCKET& socket)
 {
+	SOCKET closingSocket = socket;
+	socket = INVALID_SOCKET;
+
+	if (closingSocket == INVALID_SOCKET)
+	{
+		return TRUE;
+	}
+
 	if (m_bGame)
 	{
 		g_bGameServerConnected = FALSE;
 	}
 
-	closesocket(socket);
-	socket = INVALID_SOCKET;
+	closesocket(closingSocket);
 	return TRUE;
 }
 
@@ -287,12 +312,46 @@ int CWsctlc::Connect(char* ip_addr, unsigned short port, DWORD WinMsgNum)
 	nResult = connect(m_socket, (LPSOCKADDR)&addr, sizeof(addr));
 	if (nResult == SOCKET_ERROR)
 	{
+		int nError = WSAGetLastError();
 #ifdef _DEBUG		
-		LogPrint("Connect error (%d)", WSAGetLastError());
+		LogPrint("Connect error (%d)", nError);
 #endif // _DEBUG
-		if (WSAGetLastError() != WSAEWOULDBLOCK)
+		if (nError != WSAEWOULDBLOCK && nError != WSAEINPROGRESS)
 		{
 			closesocket(m_socket);
+			m_socket = INVALID_SOCKET;
+			return FALSE;
+		}
+
+		fd_set writeSet;
+		fd_set exceptSet;
+		FD_ZERO(&writeSet);
+		FD_ZERO(&exceptSet);
+		FD_SET(m_socket, &writeSet);
+		FD_SET(m_socket, &exceptSet);
+
+		timeval connectTimeout;
+		connectTimeout.tv_sec = 3;
+		connectTimeout.tv_usec = 0;
+
+		int nSelect = select((int)(m_socket + 1), NULL, &writeSet, &exceptSet, &connectTimeout);
+		if (nSelect <= 0 || FD_ISSET(m_socket, &exceptSet))
+		{
+			closesocket(m_socket);
+			m_socket = INVALID_SOCKET;
+			return FALSE;
+		}
+
+		int nSocketError = 0;
+	#ifdef __ANDROID__
+		socklen_t nSocketErrorLen = sizeof(nSocketError);
+	#else
+		int nSocketErrorLen = sizeof(nSocketError);
+	#endif
+		if (getsockopt(m_socket, SOL_SOCKET, SO_ERROR, (char*)&nSocketError, &nSocketErrorLen) == SOCKET_ERROR || nSocketError != 0)
+		{
+			closesocket(m_socket);
+			m_socket = INVALID_SOCKET;
 			return FALSE;
 		}
 	}
@@ -308,6 +367,7 @@ int CWsctlc::Connect(char* ip_addr, unsigned short port, DWORD WinMsgNum)
 	if (nResult == SOCKET_ERROR)
 	{
 		closesocket(m_socket);
+		m_socket = INVALID_SOCKET;
 		//cLogProc.Add("Client WSAAsyncSelect error %d", WSAGetLastError());
 		return FALSE;
 	}
@@ -471,7 +531,7 @@ int CWsctlc::nRecv()
 		}
 
 
-		if (size <= 0 || size > MAX_RECVBUF) // Verificación extra de tamaño inválido
+		if (size <= 0 || size > MAX_RECVBUF) // Verificaciï¿½n extra de tamaï¿½o invï¿½lido
 		{
 #ifdef _DEBUG
 			LogPrint("size %d", size);
