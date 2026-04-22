@@ -716,9 +716,9 @@ static int32_t OnInputEvent(android_app* app, AInputEvent* event)
     if (AInputEvent_getType(event) == AINPUT_EVENT_TYPE_KEY)
     {
         const int32_t keyCode = AKeyEvent_getKeyCode(event);
+        const int32_t action = AKeyEvent_getAction(event);
         if (keyCode == AKEYCODE_BACK)
         {
-            const int32_t action = AKeyEvent_getAction(event);
             if (action == AKEY_EVENT_ACTION_UP)
             {
                 g_running = false;
@@ -728,6 +728,53 @@ static int32_t OnInputEvent(android_app* app, AInputEvent* event)
                 }
             }
             return 1;
+        }
+
+        HWND focused = GetFocus();
+        if (focused && AndroidCompatIsEditControl(focused) && action == AKEY_EVENT_ACTION_DOWN)
+        {
+            const int32_t metaState = AKeyEvent_getMetaState(event);
+            const bool shiftPressed = (metaState & AMETA_SHIFT_ON) != 0;
+
+            switch (keyCode)
+            {
+            case AKEYCODE_DEL:
+                SendMessageW(focused, WM_CHAR, VK_BACK, 0);
+                return 1;
+            case AKEYCODE_ENTER:
+            case AKEYCODE_NUMPAD_ENTER:
+                SendMessageW(focused, WM_CHAR, VK_RETURN, 0);
+                return 1;
+            case AKEYCODE_TAB:
+                SendMessageW(focused, WM_CHAR, VK_TAB, 0);
+                return 1;
+            case AKEYCODE_SPACE:
+                SendMessageW(focused, WM_CHAR, ' ', 0);
+                return 1;
+            default:
+                break;
+            }
+
+            if (keyCode >= AKEYCODE_A && keyCode <= AKEYCODE_Z)
+            {
+                const wchar_t ch = static_cast<wchar_t>((shiftPressed ? L'A' : L'a') + (keyCode - AKEYCODE_A));
+                SendMessageW(focused, WM_CHAR, ch, 0);
+                return 1;
+            }
+
+            if (keyCode >= AKEYCODE_0 && keyCode <= AKEYCODE_9)
+            {
+                const wchar_t ch = static_cast<wchar_t>(L'0' + (keyCode - AKEYCODE_0));
+                SendMessageW(focused, WM_CHAR, ch, 0);
+                return 1;
+            }
+
+            if (keyCode >= AKEYCODE_NUMPAD_0 && keyCode <= AKEYCODE_NUMPAD_9)
+            {
+                const wchar_t ch = static_cast<wchar_t>(L'0' + (keyCode - AKEYCODE_NUMPAD_0));
+                SendMessageW(focused, WM_CHAR, ch, 0);
+                return 1;
+            }
         }
     }
 

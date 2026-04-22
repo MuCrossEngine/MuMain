@@ -314,6 +314,13 @@ void ReceiveServerList(BYTE* ReceiveBuffer)
 	}
 
 	CUIMng& rUIMng = CUIMng::Instance();
+	if (SceneFlag != LOG_IN_SCENE || !InitLogIn)
+	{
+		g_ErrorReport.Write("ReceiveServerList deferred: login UI not initialized yet.\r\n");
+		g_ConsoleDebug->Write(MCD_RECEIVE, "0xF4 [ReceiveServerList deferred]");
+		return;
+	}
+
 	if (!rUIMng.m_CreditWin.IsShow())
 	{
 		rUIMng.ShowWin(&rUIMng.m_ServerSelWin);
@@ -401,6 +408,19 @@ void ReceiveServerConnect(BYTE* ReceiveBuffer)
 	if (bReconnectOk)
 	{
 		g_bGameServerConnected = TRUE;
+
+#ifdef __ANDROID__
+		CUIMng& rUIMng = CUIMng::Instance();
+		if (!rUIMng.m_CreditWin.IsShow())
+		{
+			CurrentProtocolState = RECEIVE_JOIN_SERVER_SUCCESS;
+			rUIMng.ShowWin(&rUIMng.m_LoginWin);
+			if (rUIMng.m_LoginWin.GetIDInputBox())
+			{
+				rUIMng.m_LoginWin.GetIDInputBox()->GiveFocus(TRUE);
+			}
+		}
+#endif
 	}
 
 	char Text[100];

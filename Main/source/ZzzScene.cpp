@@ -386,6 +386,44 @@ void MovieScene(HDC hDC)
 
 bool InitWebzenScene = false;
 
+#ifdef __ANDROID__
+static bool s_bAndroidLoginCoreDataLoaded = false;
+
+static void OpenAndroidLoginCoreData()
+{
+	if (s_bAndroidLoginCoreDataLoaded)
+	{
+		return;
+	}
+
+	::LoadBitmap("Interface\\message_ok_b_all.tga", BITMAP_BUTTON);
+	::LoadBitmap("Interface\\loding_cancel_b_all.tga", BITMAP_BUTTON + 1);
+	::LoadBitmap("Interface\\message_close_b_all.tga", BITMAP_BUTTON + 2);
+	::LoadBitmap("Interface\\message_back.tga", BITMAP_MESSAGE_WIN);
+	::LoadBitmap("Interface\\delete_secret_number.tga", BITMAP_MSG_WIN_INPUT);
+	::LoadBitmap("Interface\\op1_stone.jpg", BITMAP_SYS_WIN, GL_NEAREST, GL_REPEAT);
+	::LoadBitmap("Interface\\op1_back1.tga", BITMAP_SYS_WIN + 1);
+	::LoadBitmap("Interface\\op1_back2.tga", BITMAP_SYS_WIN + 2);
+	::LoadBitmap("Interface\\op1_back3.jpg", BITMAP_SYS_WIN + 3, GL_NEAREST, GL_REPEAT);
+	::LoadBitmap("Interface\\op1_back4.jpg", BITMAP_SYS_WIN + 4, GL_NEAREST, GL_REPEAT);
+	::LoadBitmap("Interface\\op1_b_all.tga", BITMAP_TEXT_BTN);
+	::LoadBitmap("Interface\\op2_back1.tga", BITMAP_OPTION_WIN);
+	::LoadBitmap("Interface\\op2_ch.tga", BITMAP_CHECK_BTN);
+	::LoadBitmap("Interface\\op2_volume3.tga", BITMAP_SLIDER);
+	::LoadBitmap("Interface\\op2_volume2.jpg", BITMAP_SLIDER + 1, GL_NEAREST, GL_REPEAT);
+	::LoadBitmap("Interface\\op2_volume1.tga", BITMAP_SLIDER + 2);
+
+	OpenTextData();
+
+	if (g_pNewUISystem)
+	{
+		g_pNewUISystem->LoadMainSceneInterface();
+	}
+
+	s_bAndroidLoginCoreDataLoaded = true;
+}
+#endif
+
 void CreateWebzenScene()
 {
 	CUIMng& rUIMng = CUIMng::Instance();
@@ -469,7 +507,7 @@ void WebzenScene(HDC hDC)
 		EnableAlphaTest();
 
 #ifdef __ANDROID__
-		// Skip heavy base-data preload during Android startup to avoid LMK.
+		OpenAndroidLoginCoreData();
 #else
 		OpenBasicData(hDC);
 
@@ -508,7 +546,7 @@ void WebzenScene(HDC hDC)
 	EnableAlphaTest();
 
 #ifdef __ANDROID__
-	// Skip heavy base-data preload during Android startup to avoid LMK.
+	OpenAndroidLoginCoreData();
 #else
 	OpenBasicData(hDC);
 
