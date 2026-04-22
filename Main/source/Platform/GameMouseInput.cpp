@@ -84,7 +84,6 @@ namespace GameMouseInput
     {
         MouseLButton     = false;
         MouseLButtonPop  = true;
-        MouseLButtonPush = false;
         SetVKey(VK_LBUTTON, SEASON3B::CNewKeyInput::KEY_RELEASE);
     }
 
@@ -100,7 +99,6 @@ namespace GameMouseInput
     {
         MouseRButton     = false;
         MouseRButtonPop  = true;
-        MouseRButtonPush = false;
         SetVKey(VK_RBUTTON, SEASON3B::CNewKeyInput::KEY_RELEASE);
     }
 
@@ -203,14 +201,17 @@ namespace GameMouseInput
 
     void Update()
     {
-        // After FireLButtonUp/FireRButtonUp we set KEY_RELEASE; clear to KEY_NONE here
-        // (KEY_PRESS → KEY_REPEAT is handled by CNewKeyInput::UpdateInput on Windows;
-        //  on Android we just clear release state so IsNone() works next frame)
+        // Advance virtual key states after scene/input update has consumed this frame.
         if (g_pNewKeyInput)
         {
-            if (!MouseLButton)
+            if (g_pNewKeyInput->IsPress(VK_LBUTTON) && MouseLButton)
+                g_pNewKeyInput->SetKeyState(VK_LBUTTON, SEASON3B::CNewKeyInput::KEY_REPEAT);
+            else if (g_pNewKeyInput->IsRelease(VK_LBUTTON) && !MouseLButton)
                 g_pNewKeyInput->SetKeyState(VK_LBUTTON, SEASON3B::CNewKeyInput::KEY_NONE);
-            if (!MouseRButton)
+
+            if (g_pNewKeyInput->IsPress(VK_RBUTTON) && MouseRButton)
+                g_pNewKeyInput->SetKeyState(VK_RBUTTON, SEASON3B::CNewKeyInput::KEY_REPEAT);
+            else if (g_pNewKeyInput->IsRelease(VK_RBUTTON) && !MouseRButton)
                 g_pNewKeyInput->SetKeyState(VK_RBUTTON, SEASON3B::CNewKeyInput::KEY_NONE);
         }
 

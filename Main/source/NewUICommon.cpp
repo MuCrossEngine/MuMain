@@ -606,6 +606,8 @@ void SEASON3B::CNewKeyInput::ScanAsyncKeyState()
 {
 	if (gwinhandle->CheckWndActive())
 	{
+#ifdef __ANDROID__
+#else
 		for (int key = 0; key < 256; key++)
 		{
 			if (HIBYTE(GetAsyncKeyState(key)) & 0x80)
@@ -634,6 +636,7 @@ void SEASON3B::CNewKeyInput::ScanAsyncKeyState()
 				}
 			}
 		}
+#endif
 
 		if (IsPress(VK_RETURN) && IsEnterPressed() == false)
 		{
@@ -764,7 +767,7 @@ bool SEASON3B::CCheckBox::UpdateMouseEvent()
 const POINT& SEASON3B::CCheckBox::GetPos()
 {
 	return m_Pos;
-	// TODO: Insertar una instrucción "return" aquí
+	// TODO: Insertar una instrucciï¿½n "return" aquï¿½
 }
 
 void SEASON3B::CCheckBox::SetPos(int x, int y)
@@ -793,7 +796,7 @@ SEASON3B::stMacroUIImage::~stMacroUIImage()
 
 const POINT& SEASON3B::stMacroUIImage::GetPos()
 {
-	// TODO: Insertar una instrucción "return" aquí
+	// TODO: Insertar una instrucciï¿½n "return" aquï¿½
 	return m_Pos;
 }
 
@@ -824,7 +827,7 @@ SEASON3B::stMacroUIText::~stMacroUIText()
 
 const POINT& SEASON3B::stMacroUIText::GetPos()
 {
-	// TODO: Insertar una instrucción "return" aquí
+	// TODO: Insertar una instrucciï¿½n "return" aquï¿½
 	return m_Pos;
 }
 
@@ -865,7 +868,7 @@ SEASON3B::CSlideBar::~CSlideBar()
 
 const POINT& SEASON3B::CSlideBar::GetPos()
 {
-	// TODO: Insertar una instrucción "return" aquí
+	// TODO: Insertar una instrucciï¿½n "return" aquï¿½
 	return m_Pos;
 }
 
@@ -1257,7 +1260,7 @@ void SEASON3B::runtime_number_mask(int groupid, float RenderFrameX, float Render
 		{
 			char digit = numStr[i];
 			int digitValue = digit - '0';
-			float posX = startX + i * desface; // Desplazar cada dígito en 32 píxeles
+			float posX = startX + i * desface; // Desplazar cada dï¿½gito en 32 pï¿½xeles
 
 			SEASON3B::RenderImageF(BITMAP_group_effra_light, posX, RenderFrameY, size, size, (digitValue * uw), (groupid * vh), uw, vh);
 			//glColor4f(0.6, 0.6, 0.6, 0.5);
@@ -1271,7 +1274,7 @@ void SEASON3B::runtime_number_mask(int groupid, float RenderFrameX, float Render
 	{
 		char digit = numStr[i];
 		int digitValue = digit - '0';
-		float posX = startX + i * desface; // Desplazar cada dígito en 32 píxeles
+		float posX = startX + i * desface; // Desplazar cada dï¿½gito en 32 pï¿½xeles
 		SEASON3B::RenderImageF(BITMAP_normal_effra_light, posX, RenderFrameY, size, size, (digitValue * uw), 0.0, uw, vh);
 	}
 }

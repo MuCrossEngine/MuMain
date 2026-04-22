@@ -154,9 +154,9 @@ bool CServerListManager::MakeServerGroup(IN int iServerGroupIndex, OUT CServerGr
 		char szLog[128] = { 0, };
 		::sprintf(szLog, "[ServerListManager] Missing ServerList.bmd group %d, using fallback.\r\n", iServerGroupIndex);
 		g_ErrorReport.Write(szLog);
-		#ifdef __ANDROID__
+#ifdef __ANDROID__
 		__android_log_print(ANDROID_LOG_INFO, "MUAndroid", "Missing ServerList.bmd group %d, using fallback", iServerGroupIndex);
-		#endif
+#endif
 		return true;
 	}
 

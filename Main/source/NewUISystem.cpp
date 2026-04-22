@@ -218,28 +218,14 @@ bool SEASON3B::CNewUISystem::LoadMainSceneInterface()
 	if (m_pNewSlideWindow)
 		m_pNewSlideWindow->Show(true);
 
-#ifdef __ANDROID__
-	__android_log_print(ANDROID_LOG_INFO, "MUAndroid", "LoadMainSceneInterface: Show() calls done, creating UI components...");
-#endif
-
 	float WinOpen0 = pos_right() + 640.f;
 	float WinOpen1 = (WinOpen0 - WIN_WINDOW_SIZEX);
 	float WinOpen2 = (WinOpen1 - WIN_WINDOW_SIZEX);
 	float WinOpen3 = (WinOpen2 - WIN_WINDOW_SIZEX);
 
-#ifdef __ANDROID__
-	__android_log_print(ANDROID_LOG_INFO, "MUAndroid", "LoadMainSceneInterface: pos_right()=%f WinOpen0=%f", pos_right(), WinOpen0);
-#endif
-
 	m_pNewItemMng = new CNewUIItemMng;
-#ifdef __ANDROID__
-	__android_log_print(ANDROID_LOG_INFO, "MUAndroid", "LoadMainSceneInterface: CNewUIItemMng created=%p", m_pNewItemMng);
-#endif
 
 	m_pNewChatInputBox = new CNewUIChatInputBox;
-#ifdef __ANDROID__
-	__android_log_print(ANDROID_LOG_INFO, "MUAndroid", "LoadMainSceneInterface: CNewUIChatInputBox allocated=%p m_pNewUIMng=%p m_pNewChatLogWindow=%p", m_pNewChatInputBox, m_pNewUIMng, m_pNewChatLogWindow);
-#endif
 #if MAIN_UPDATE > 603
 	if (false == m_pNewChatInputBox->Create(m_pNewUIMng, m_pNewChatLogWindow, pos_left(), (int)pos_botton() + 372))
 		return false;
@@ -247,34 +233,19 @@ bool SEASON3B::CNewUISystem::LoadMainSceneInterface()
 	if (false == m_pNewChatInputBox->Create(m_pNewUIMng, m_pNewChatLogWindow, pos_left(), (int)pos_botton() + 382))
 		return false;
 #endif
-#ifdef __ANDROID__
-	__android_log_print(ANDROID_LOG_INFO, "MUAndroid", "LoadMainSceneInterface: ChatInputBox created");
-#endif
 	SetFocus(gwinhandle->GethWnd());
 
 	m_pNewUIHotKey = new CNewUIHotKey;
 	if (false == m_pNewUIHotKey->Create(m_pNewUIMng))
 		return false;
 
-#ifdef __ANDROID__
-	__android_log_print(ANDROID_LOG_INFO, "MUAndroid", "LoadMainSceneInterface: HotKey created");
-#endif
-
 	m_pNewMainFrameWindow = new CNewUIMainFrameWindow;
 	if (m_pNewMainFrameWindow->Create(m_pNewUIMng, m_pNewUI3DRenderMng) == false)
 		return false;
 
-#ifdef __ANDROID__
-	__android_log_print(ANDROID_LOG_INFO, "MUAndroid", "LoadMainSceneInterface: MainFrameWindow created");
-#endif
-
 	m_pNewSkillList = new CNewUISkillList;
 	if (m_pNewSkillList->Create(m_pNewUIMng, m_pNewUI3DRenderMng) == false)
 		return false;
-
-#ifdef __ANDROID__
-	__android_log_print(ANDROID_LOG_INFO, "MUAndroid", "LoadMainSceneInterface: SkillList created");
-#endif
 
 	m_pNewFriendWindow = new CNewUIFriendWindow;
 	if (m_pNewFriendWindow->Create(m_pNewUIMng) == false)
@@ -2474,7 +2445,6 @@ CNewUIOptionWindow* SEASON3B::CNewUISystem::GetUI_NewOptionWindow() const
 	{
 		CNewUISystem* pThis = const_cast<CNewUISystem*>(this);
 		pThis->m_pNewOptionWindow = new CNewUIOptionWindow;
-		__android_log_print(ANDROID_LOG_INFO, "MUAndroid", "GetUI_NewOptionWindow: created fallback option window for lazy startup");
 	}
 #endif
 	return m_pNewOptionWindow;
@@ -2700,7 +2670,6 @@ CNewUIReconnect* SEASON3B::CNewUISystem::GetUI_pNewUIReconnect() const
 	{
 		CNewUISystem* pThis = const_cast<CNewUISystem*>(this);
 		pThis->m_NewUIReconnect = new CNewUIReconnect;
-		__android_log_print(ANDROID_LOG_INFO, "MUAndroid", "GetUI_pNewUIReconnect: created fallback reconnect UI for lazy startup");
 	}
 #endif
 	return m_NewUIReconnect;

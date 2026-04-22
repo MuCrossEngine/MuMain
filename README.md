@@ -30,7 +30,7 @@ Os principais bloqueios conhecidos no momento sao:
 - Integracao completa de teclado virtual/IME Android ainda pendente.
 - Validacao final em runtime da ligacao C++/JNI do HWID Android ainda pendente.
 - Validacao funcional completa de `server select` -> `character scene` ainda pendente.
-- Validacao funcional em runtime no dispositivo Android ainda pendente.
+- Validacao funcional em runtime no dispositivo Android está parcial: fluxo `LoginMain -> ServerSel click -> ReceiveServerConnect -> LoginWin` foi comprovado; falta progressao completa ate `CHARACTER_SCENE`.
 - Ajustes adicionais de UX mobile, entrada de texto e distribuicao de assets ainda sao necessarios para considerar o port pronto para uso final.
 
 ## Roadmap de execucao
@@ -60,8 +60,8 @@ Este roadmap e a visao de alto nivel do projeto. O detalhamento tecnico por arqu
 ### Curto prazo (proximas iteracoes)
 
 - Consolidar compatibilidade de render legada (`ZzzBMD`, `ZzzLodTerrain`, `ZzzEffect*`).
-- Fluxo `WEBZEN_SCENE` -> `LOG_IN_SCENE` validado por log; foco atual em consolidar `server select` e progressao completa para `CHARACTER_SCENE`.
-- Fechar validacao funcional do caminho de login (request/receive de server list) com comportamento consistente no Android.
+- Fluxo `WEBZEN_SCENE` -> `LOG_IN_SCENE` e clique/conexao de server list validados; foco atual em consolidar progressao completa para `CHARACTER_SCENE`.
+- Manter estabilidade do caminho de login Android sem regressão ao remover instrumentações temporárias.
 - Avancar substituicoes pendentes de fonte/GDI para Android.
 - Downloader HTTP remoto já foi reativado com estabilização de transporte para arquivos grandes; falta validação E2E no servidor definitivo.
 
@@ -94,6 +94,26 @@ Para reproduzir o build local usado nesta etapa:
 - Comando: `gradlew.bat assembleDebug --stacktrace`
 
 ## Changelog
+
+### 2026-04-22
+
+- Fluxo Android validado em runtime no emulador, com evidência de marcos de login/rede:
+	- `ServerSelWin click ... connectIndex=1`
+	- `ReceiveServerConnect: target=74.63.218.132:55901`
+	- `ReceiveServerConnect: Android compat open LoginWin after connect`
+- Executado sanity pass em estado limpo (sem instrumentação temporária):
+	- build `assembleDebug` concluído;
+	- `adb install -r` + `pm clear` + cold start concluídos;
+	- processo e activity em foreground confirmados;
+	- sem assinatura de `FATAL EXCEPTION`, `SIGSEGV` ou `ANR` na rodada.
+- Limpeza concluída de toda instrumentação temporária usada apenas para calibração de taps e prova end-to-end.
+- Ajustado pipeline de fonte no Android para remover ilegibilidade do fallback tipo bitmap:
+	- `Platform/AndroidTextRenderer` passou a respeitar o formato real do `DIBSection` (24bpp/32bpp), evitando escrita fora de layout e degradação visual do texto.
+	- `Platform/AndroidWin32Compat` passou a propagar `bytesPerPixel` do bitmap selecionado para o renderer.
+- Build nativo Android validado após o ajuste de fonte/render de texto: `./gradlew ':app:buildCMakeDebug[arm64-v8a]' --no-daemon --stacktrace`.
+- Ajustado cálculo de escala em runtime Android para telas com resolução/aspect ratio altos:
+	- `android_main.cpp` (`SyncLegacyScreenMetrics`) deixou de aplicar escala uniforme 4:3 no caminho `ScreenType == 1`.
+	- efeito esperado: remoção de barras laterais pretas (pillarbox) em dispositivos wide/ultra-wide.
 
 ### 2026-04-20
 

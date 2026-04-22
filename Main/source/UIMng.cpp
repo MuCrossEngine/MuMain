@@ -18,10 +18,6 @@
 #include "ServerListManager.h"
 #include "ConnectVersionHex.h"
 
-#ifdef __ANDROID__
-#include "Platform/AndroidWin32Compat.h"
-#endif
-
 #define	DOCK_EXTENT		10
 
 //#define	UIM_TS_BG_BLACK		0
@@ -170,18 +166,7 @@ void CUIMng::RenderTitleSceneUI(HDC hDC, DWORD dwNow, DWORD dwTotal)
 	::EndBitmap();
 	::EndOpengl();
 	::glFlush();
-	#ifdef __ANDROID__
-	if (hDC == nullptr)
-	{
-		AndroidRequestImmediateSwap();
-	}
-	else
-	{
-		::SwapBuffers(hDC);
-	}
-	#else
 	::SwapBuffers(hDC);
-	#endif
 }
 
 void CUIMng::Create()
@@ -254,10 +239,6 @@ void CUIMng::CreateLoginScene()
 
 	m_CreditWin.Create();
 	m_WinList.AddHead(&m_CreditWin);
-
-	ShowWin(&m_LoginMainWin);
-	ShowWin(&m_ServerSelWin);
-	m_ServerSelWin.UpdateDisplay();
 
 	m_bSysMenuWinShow = false;
 	m_nScene = UIM_SCENE_LOGIN;

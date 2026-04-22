@@ -352,6 +352,37 @@ adb logcat -s MUNetwork:V          # protocolo de rede
 adb logcat -s MUAssets:V           # download e carregamento de assets
 ```
 
+### Checklist operacional (2026-04-22)
+
+- [x] Build limpo Android: `cd Main/android && ./gradlew assembleDebug --no-daemon`
+- [x] Reinstalação + estado limpo: `adb install -r .../app-debug.apk` + `adb shell pm clear com.mucrossengine.client`
+- [x] Cold start validado: `adb shell am start -n com.mucrossengine.client/.MainActivity`
+- [x] Saúde de runtime validada: processo ativo (`pidof`) + activity em foreground (`dumpsys activity top`)
+- [x] Sem assinatura de crash na rodada (`FATAL EXCEPTION`, `SIGSEGV`, `ANR`)
+- [x] Evidência de fluxo login/server connect coletada nesta data:
+  - `ServerSelWin click ... connectIndex=1`
+  - `ReceiveServerConnect: target=74.63.218.132:55901`
+  - `ReceiveServerConnect: Android compat open LoginWin after connect`
+- [x] Instrumentação temporária de validação removida dos fontes após a prova end-to-end
+
+### Atualizações da rodada 2026-04-22 (fonte/render)
+
+- `Platform/AndroidTextRenderer.h/cpp`
+  - `SetDCBitmap` passou a receber `bytesPerPixel` e o raster agora respeita `DIBSection` 24bpp/32bpp ao escrever pixels.
+  - eliminada escrita presumindo stride fixo de 4 bytes por pixel, evitando corrupção visual/memória no caminho de texto Android.
+- `Platform/AndroidWin32Compat.h`
+  - propagação de `bytesPerPixel` do bitmap selecionado no `HDC` para o `AndroidTextRenderer` durante `SelectObject`.
+- validação técnica:
+  - `./gradlew ':app:buildCMakeDebug[arm64-v8a]' --no-daemon --stacktrace` concluído com sucesso após os ajustes.
+
+### Atualizações da rodada 2026-04-22 (resolução/aspect)
+
+- `Main/android/app/src/main/cpp/android_main.cpp`
+  - `SyncLegacyScreenMetrics` foi ajustado para evitar escala uniforme 4:3 no caminho Android quando `ScreenType == 1`.
+  - o cálculo passa a usar escala por eixo (`WindowWidth/640`, `WindowHeight/480`) para eliminar barras laterais pretas em telas wide/ultra-wide.
+- validação técnica:
+  - `./gradlew ':app:buildCMakeDebug[arm64-v8a]' --no-daemon --stacktrace` concluído com sucesso após o ajuste de resolução.
+
 ---
 
 ## Problemas Conhecidos / TODOs
@@ -365,4 +396,4 @@ adb logcat -s MUAssets:V           # download e carregamento de assets
 
 ---
 
-*Última atualização: 2026-04-20 — integração de `MuCrypto` real no Android concluída com inclusão do Crypto++ no build nativo e validação de compilação `arm64-v8a`; transporte HTTP Android também foi estabilizado em modo streaming para arquivos grandes, com fallback para respostas chunked e compatibilidade sem `Content-Length`. O endpoint Android `74.63.218.132:44404`, o envio de HWID e o fluxo base até `LOG_IN_SCENE` permanecem como direção ativa. Pendências práticas: revalidação de runtime (HWID/fallback server group) e progressão funcional completa de `server select` até `CHARACTER_SCENE`, além da migração final do texto Android após integração de FreeType.*
+*Última atualização: 2026-04-22 — sanity pass em estado limpo concluído (build/reinstall/cold-start), validação guiada confirmou fluxo end-to-end `LoginMain -> ServerSel click -> ReceiveServerConnect -> LoginWin`, e toda instrumentação temporária usada para calibração foi removida dos fontes. A direção ativa permanece: consolidar progressão funcional completa até `CHARACTER_SCENE` e finalizar migração de texto Android com integração formal de FreeType.*

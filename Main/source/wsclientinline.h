@@ -147,9 +147,6 @@ __forceinline void  SendRequestServerHWID()
 	char ComputerHardwareId[36] = { 0, };
 
 	create_hwid_system(ComputerHardwareId);
-	#ifdef __ANDROID__
-	__android_log_print(ANDROID_LOG_INFO, "MUAndroid", "SendRequestServerHWID hwid=%s", ComputerHardwareId);
-	#endif
 
 	CStreamPacketEngine spe;
 	spe.Init(0xC1, 0xF4);

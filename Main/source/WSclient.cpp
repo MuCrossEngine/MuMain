@@ -321,10 +321,6 @@ void ReceiveServerList(BYTE* ReceiveBuffer)
 		rUIMng.ShowWin(&rUIMng.m_LoginMainWin);
 	}
 
-#ifdef __ANDROID__
-	__android_log_print(ANDROID_LOG_INFO, "MUAndroid", "ReceiveServerList total=%d", TotalServer);
-#endif
-
 	g_ErrorReport.Write("Success Receive Server List.\r\n");
 	g_ConsoleDebug->Write(MCD_RECEIVE, "0xF4 [ReceiveServerList]");
 }
@@ -335,10 +331,74 @@ void ReceiveServerConnect(BYTE* ReceiveBuffer)
 	char MyAddressIp[16];
 	memset(MyAddressIp, 0, 16);
 	memcpy(MyAddressIp, (char*)Data->IP, 15);
+
+#ifdef __ANDROID__
+	auto IsPrivateIPv4 = [](const char* ip) -> bool
+	{
+		if (ip == NULL || ip[0] == '\0')
+		{
+			return false;
+		}
+
+		unsigned int a = 0, b = 0, c = 0, d = 0;
+		if (sscanf(ip, "%u.%u.%u.%u", &a, &b, &c, &d) != 4)
+		{
+			return false;
+		}
+
+		if (a == 10 || a == 127)
+		{
+			return true;
+		}
+
+		if (a == 172 && b >= 16 && b <= 31)
+		{
+			return true;
+		}
+
+		if (a == 192 && b == 168)
+		{
+			return true;
+		}
+
+		return false;
+	};
+
+	char fallbackIp[16] = { 0, };
+	bool hasFallbackIp = false;
+	if (IsPrivateIPv4(MyAddressIp))
+	{
+		if (szServerIpAddress != NULL && szServerIpAddress[0] != '\0' && !IsPrivateIPv4(szServerIpAddress))
+		{
+			strncpy(fallbackIp, szServerIpAddress, sizeof(fallbackIp) - 1);
+		}
+		else
+		{
+			strncpy(fallbackIp, "10.0.2.2", sizeof(fallbackIp) - 1);
+		}
+
+		hasFallbackIp = (strcmp(fallbackIp, MyAddressIp) != 0);
+	}
+#endif
+
 	g_ErrorReport.Write("[ReceiveServerConnect]");
 	SocketClient.Close();
 
-	if (g_pReconnectUI->ReconnectCreateConnection(MyAddressIp, Data->Port))
+	bool bReconnectOk = g_pReconnectUI->ReconnectCreateConnection(MyAddressIp, Data->Port);
+
+#ifdef __ANDROID__
+	if (!bReconnectOk && hasFallbackIp)
+	{
+		bReconnectOk = g_pReconnectUI->ReconnectCreateConnection(fallbackIp, Data->Port);
+		if (bReconnectOk)
+		{
+			strncpy(MyAddressIp, fallbackIp, sizeof(MyAddressIp) - 1);
+		}
+	}
+
+#endif
+
+	if (bReconnectOk)
 	{
 		g_bGameServerConnected = TRUE;
 	}
@@ -1759,9 +1819,13 @@ void ReceiveChat(BYTE* ReceiveBuffer)
 
 			CHARACTER* pFindGm = NULL;
 
-			for (int i = 0; i < MAX_CHARACTERS_CLIENT; i++)
+			for (int i = 0; gmCharacters != NULL && i < MAX_CHARACTERS_CLIENT; i++)
 			{
 				CHARACTER* c = gmCharacters->GetCharacter(i);
+				if (c == NULL)
+				{
+					continue;
+				}
 				OBJECT* o = &c->Object;
 				if (o->Live && o->Kind == KIND_PLAYER && (g_isCharacterBuff((&c->Object), eBuff_GMEffect) || (c->CtlCode == CTLCODE_20OPERATOR) || (c->CtlCode == CTLCODE_08OPERATOR)))
 				{
@@ -16495,4 +16559,3 @@ void UnRegisterBuff(eBuffState buff, OBJECT* o)
 		ClearBuffLogicalEffect(buff, o);
 	}
 }
-

@@ -53,6 +53,7 @@
 #include "CGMCharacter.h"
 #include "CGMFontLayer.h"
 #include "CGMModelManager.h"
+#include "MultiLanguage.h"
 #include "w_MapProcess.h"
 #include "w_PetProcess.h"
 #include "NewUISystem.h"
@@ -80,6 +81,20 @@ static bool                g_renderBackendInitialized = false;
 static CGMCharacter        g_androidCharacterManager;
 static CGMModelManager     g_androidModelManager;
 static bool                g_legacyCoreInitialized = false;
+static CMultiLanguage*     g_androidMultiLanguage = nullptr;
+extern std::string         g_strSelectedML;
+
+static void EnsureMultiLanguageInitialized()
+{
+    if (CMultiLanguage::GetSingletonPtr() != nullptr)
+    {
+        g_androidMultiLanguage = CMultiLanguage::GetSingletonPtr();
+        return;
+    }
+
+    const std::string selectedML = g_strSelectedML.empty() ? "ENG" : g_strSelectedML;
+    g_androidMultiLanguage = new CMultiLanguage(selectedML);
+}
 
 static void InitLegacyCoreState()
 {
@@ -118,11 +133,6 @@ static void InitLegacyCoreState()
     }
 
     g_legacyCoreInitialized = true;
-
-    LOGI("InitLegacyCoreState: gmCharacters=%p Hero=%p CharacterMachine=%p",
-         gmCharacters,
-         Hero,
-         CharacterMachine);
 }
 
 // JNI helper: get external files path from Java side
@@ -198,11 +208,8 @@ static void SyncLegacyScreenMetrics(int width, int height)
     }
     else if (screenType == 1)
     {
-        const float byWidth = static_cast<float>(WindowWidth) / 640.0f;
-        const float byHeight = static_cast<float>(WindowHeight) / 480.0f;
-        const float uniScale = (byWidth >= byHeight) ? byHeight : byWidth;
-        g_fScreenRate_x = uniScale;
-        g_fScreenRate_y = uniScale;
+        g_fScreenRate_x = static_cast<float>(WindowWidth) / 640.0f;
+        g_fScreenRate_y = static_cast<float>(WindowHeight) / 480.0f;
     }
     else
     {
@@ -213,15 +220,6 @@ static void SyncLegacyScreenMetrics(int width, int height)
     const long logicalWidth = static_cast<long>(WindowWidth / g_fScreenRate_x);
     const long logicalHeight = static_cast<long>(WindowHeight / g_fScreenRate_y);
     CInput::Instance().Create(gwinhandle->GethWnd(), static_cast<long>(WindowWidth), static_cast<long>(WindowHeight));
-
-    LOGI("Screen sync: window=%ux%u logical=%ldx%ld scale=%.3f/%.3f screenType=%d",
-         WindowWidth,
-         WindowHeight,
-         logicalWidth,
-         logicalHeight,
-         g_fScreenRate_x,
-         g_fScreenRate_y,
-         screenType);
 }
 
 static void CallMainActivityVoidMethod(const char* methodName)
@@ -468,12 +466,9 @@ void AndroidRequestImmediateSwap()
 // ─────────────────────────────────────────────────────────────────────────────
 static bool InitGame(android_app* app)
 {
-    LOGI("InitGame: starting bootstrap");
-
     // 1. Asset path — everything else depends on this
     std::string dataPath = GetExternalFilesDir(app);
     GameAssetPath::Init(dataPath);
-    LOGI("InitGame: asset path = %s", dataPath.c_str());
 
     if (!AndroidTextRenderer::Init())
     {
@@ -485,7 +480,6 @@ static bool InitGame(android_app* app)
     if (!assetServerUrl.empty())
     {
         GameDownloader::SetServerURL(assetServerUrl.c_str());
-        LOGI("InitGame: asset server override = %s", assetServerUrl.c_str());
     }
 
     // 2. Local bundled assets: copy Data/ from APK assets into external files
@@ -499,10 +493,6 @@ static bool InitGame(android_app* app)
 
     if (mustCopyData)
     {
-        LOGI("InitGame: copying bundled Data assets (marker=%d, dataReady=%d)",
-             markerExists ? 1 : 0,
-               bootstrapDataReady ? 1 : 0);
-
         if (!AndroidCopyAssetDirectory("Data", dataTarget.c_str()))
         {
             LOGE("InitGame: failed to copy bundled assets Data -> %s", dataTarget.c_str());
@@ -514,10 +504,6 @@ static bool InitGame(android_app* app)
             LOGE("InitGame: failed to write copy marker: %s", copyMarker.c_str());
             return false;
         }
-    }
-    else
-    {
-        LOGI("InitGame: bundled Data already materialized, skipping copy");
     }
 
     if (!AreBootstrapFilesPresent())
@@ -536,7 +522,6 @@ static bool InitGame(android_app* app)
     // partial, so keep this world materialized from APK assets when missing.
     {
         std::string loginWorldTarget = GameAssetPath::Resolve("Data/World95");
-        LOGI("InitGame: refreshing Data/World95 from bundled assets");
         RemovePathRecursive(loginWorldTarget);
         if (!AndroidCopyAssetDirectory("Data/World95", loginWorldTarget.c_str()))
         {
@@ -595,14 +580,11 @@ static bool InitGame(android_app* app)
     // 7. Global random table (used throughout the game)
     LegacyClientRuntime::InitRandomTable();
 
-    // 7.1 Minimal WinMain parity for legacy globals used before MAIN_SCENE.
+    // 7.1 Multi-language singleton is required by UI text input rendering.
+    EnsureMultiLanguageInitialized();
+
+    // 7.2 Minimal WinMain parity for legacy globals used before MAIN_SCENE.
     InitLegacyCoreState();
-
-    // 7.2 Runtime systems are initialized lazily on Android to reduce startup memory peaks.
-    LOGI("InitGame: runtime systems deferred (lazy init enabled)");
-
-    // 8. Game data loading starts in WEBZEN_SCENE and advances via Scene() dispatcher
-    LOGI("InitGame: bootstrap complete, entering game loop");
     return true;
 }
 
@@ -634,7 +616,6 @@ static void OnAppCmd(android_app* app, int32_t cmd)
     case APP_CMD_INIT_WINDOW:
         if (app->window)
         {
-            LOGI("APP_CMD_INIT_WINDOW");
             g_eglWindow = new AndroidEglWindow(app->window);
             if (!g_eglWindow->Create())
             {
@@ -679,7 +660,6 @@ static void OnAppCmd(android_app* app, int32_t cmd)
         break;
 
     case APP_CMD_TERM_WINDOW:
-        LOGI("APP_CMD_TERM_WINDOW");
         g_focused = false;
         if (g_renderBackendInitialized)
         {
@@ -712,7 +692,6 @@ static void OnAppCmd(android_app* app, int32_t cmd)
             {
                 RenderBackend::SetScreenSize(width, height);
                 SyncLegacyScreenMetrics(width, height);
-                LOGI("OnAppCmd: resized/config changed -> %dx%d", width, height);
             }
         }
         break;
@@ -742,7 +721,6 @@ static int32_t OnInputEvent(android_app* app, AInputEvent* event)
             const int32_t action = AKeyEvent_getAction(event);
             if (action == AKEY_EVENT_ACTION_UP)
             {
-                LOGI("OnInputEvent: BACK pressed, finishing activity");
                 g_running = false;
                 if (app && app->activity)
                 {
@@ -761,8 +739,6 @@ static int32_t OnInputEvent(android_app* app, AInputEvent* event)
 // ─────────────────────────────────────────────────────────────────────────────
 void android_main(android_app* app)
 {
-    LOGI("android_main: start");
-
     g_app = app;
     AndroidCompatSetNativeActivity(app->activity);
     app->onAppCmd    = OnAppCmd;
@@ -807,5 +783,4 @@ void android_main(android_app* app)
         delete g_eglWindow;
     }
 
-    LOGI("android_main: exit");
 }

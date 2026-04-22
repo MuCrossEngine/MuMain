@@ -55,7 +55,6 @@ bool runtime_load_protect()
 	g_ServerPort = kAndroidServerPort;
 
 	szServerIpAddress = g_AndroidServerIp;
-	__android_log_print(ANDROID_LOG_INFO, "MUAndroid", "Login server endpoint %s:%u", szServerIpAddress, g_ServerPort);
 
 	Version[0] = (kernelInfo.ClientVersion[0] + 1);
 	Version[1] = (kernelInfo.ClientVersion[2] + 2);

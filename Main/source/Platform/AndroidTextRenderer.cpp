@@ -38,6 +38,7 @@ struct DCState
     void*  bits    = nullptr;  // pixel buffer (BGRA)
     int    width   = 0;
     int    height  = 0;
+    int    bpp     = 4;
     int    fontSz  = 16;
     bool   bold    = false;
 };
@@ -77,7 +78,6 @@ static bool LoadFont(const char* paths[], std::vector<uint8_t>& outData, stbtt_f
         fclose(f);
         if (stbtt_InitFont(&outInfo, outData.data(), 0))
         {
-            LOGI("Font loaded: %s", paths[i]);
             return true;
         }
         outData.clear();
@@ -124,12 +124,13 @@ void SetDCFont(HDC hdc, HFONT font)
     s_dcMap[key].bold   = (h & 1) != 0;
 }
 
-void SetDCBitmap(HDC hdc, HBITMAP /*hbm*/, int width, int height, void* bits)
+void SetDCBitmap(HDC hdc, HBITMAP /*hbm*/, int width, int height, int bytesPerPixel, void* bits)
 {
     uintptr_t key = (uintptr_t)hdc;
     s_dcMap[key].bits   = bits;
     s_dcMap[key].width  = width;
     s_dcMap[key].height = height;
+    s_dcMap[key].bpp    = (bytesPerPixel == 3 || bytesPerPixel == 4) ? bytesPerPixel : 4;
 }
 
 void* GetDCBits(HDC hdc)
@@ -155,7 +156,7 @@ static int RenderGlyph(DCState& dc, stbtt_fontinfo& font, int codepoint, int px,
     std::vector<uint8_t> bitmap(gw * gh, 0);
     stbtt_MakeCodepointBitmap(&font, bitmap.data(), gw, gh, gw, scale, scale, codepoint);
 
-    // Blit into DC bitmap (BGRA format, 4 bytes per pixel)
+    // Blit into DC bitmap (BGR or BGRA depending on DIB format).
     uint8_t* dst = (uint8_t*)dc.bits;
     int ascent; int descent; int lineGap;
     stbtt_GetFontVMetrics(&font, &ascent, &descent, &lineGap);
@@ -170,14 +171,16 @@ static int RenderGlyph(DCState& dc, stbtt_fontinfo& font, int codepoint, int px,
             int px2 = x + x0 + gx;
             if (px2 < 0 || px2 >= dc.width) continue;
             uint8_t alpha = bitmap[gy * gw + gx];
-            if (alpha < 80) continue;
+            if (alpha < 32) continue;
 
-            int idx = (py * dc.width + px2) * 4;
-            // White text with alpha
+            int idx = (py * dc.width + px2) * dc.bpp;
             dst[idx + 0] = 255; // B
             dst[idx + 1] = 255; // G
             dst[idx + 2] = 255; // R
-            dst[idx + 3] = alpha;
+            if (dc.bpp == 4)
+            {
+                dst[idx + 3] = alpha;
+            }
         }
     }
     return (int)(advW * scale);

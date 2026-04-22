@@ -1746,7 +1746,7 @@ namespace AndroidTextRenderer
 {
     HFONT CreateFont(int heightPx, bool bold);
     void SetDCFont(HDC hdc, HFONT font);
-    void SetDCBitmap(HDC hdc, HBITMAP hbm, int width, int height, void* bits);
+    void SetDCBitmap(HDC hdc, HBITMAP hbm, int width, int height, int bytesPerPixel, void* bits);
 }
 
 struct AndroidCompatDIBSectionInfo
@@ -1855,7 +1855,7 @@ inline BOOL DeleteObject(HGDIOBJ hObject)
             if (entry.second.bitmap == (HBITMAP)hObject)
             {
                 entry.second.bitmap = nullptr;
-                AndroidTextRenderer::SetDCBitmap((HDC)entry.first, nullptr, 0, 0, nullptr);
+                AndroidTextRenderer::SetDCBitmap((HDC)entry.first, nullptr, 0, 0, 0, nullptr);
             }
         }
     }
@@ -1883,7 +1883,13 @@ inline HGDIOBJ SelectObject(HDC hdc, HGDIOBJ object)
     if (dibIt != dibRegistry.end())
     {
         dcInfo.bitmap = (HBITMAP)object;
-        AndroidTextRenderer::SetDCBitmap(hdc, (HBITMAP)object, dibIt->second.width, dibIt->second.height, dibIt->second.bits);
+        AndroidTextRenderer::SetDCBitmap(
+            hdc,
+            (HBITMAP)object,
+            dibIt->second.width,
+            dibIt->second.height,
+            dibIt->second.bytesPerPixel,
+            dibIt->second.bits);
     }
     else if (AndroidCompatFontHandleRegistry().find(key) != AndroidCompatFontHandleRegistry().end())
     {

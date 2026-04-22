@@ -235,3 +235,56 @@ Validacao em adb (instalacao limpa) confirmou:
 2. Publicar o `Data/assets-manifest.txt` gerado no servidor definitivo de assets.
 3. Definir política final para CRC obrigatório em produção (hoje está opcional via sidecar quando presente).
 4. Validar fluxo de 1ª execução em dispositivo real (download, extração de pacote e retomada após falha).
+
+## Atualizacao de continuidade (2026-04-22, foco login/server select Android)
+
+Refinamento aplicado para reduzir workarounds temporários e estabilizar o caminho principal de login no Android:
+
+- `Main/source/WSclient.cpp`
+  - removido estado de debug em memória (`g_AndroidServerListDebugLine1/2/3`) e respectivos `snprintf` auxiliares;
+  - mantido `g_AndroidServerListSelectionRequested` como gatilho único da transição para `ServerSelWin` após resposta de lista;
+  - `ReceiveServerList` não depende mais de `m_CreditWin.IsShow()` para o fluxo Android de seleção;
+  - mantido tratamento defensivo para resposta vazia (`TotalServer <= 0`) preservando lista anterior quando já existe cache local.
+
+- `Main/source/ZzzScene.cpp`
+  - removido fallback agressivo de reconnect em loop no `NewMoveLogInScene` (tentativas forçadas com `SocketClient.Close()` + reconexão);
+  - mantido retry leve de `SendRequestServerList()` apenas quando há seleção pendente (`g_AndroidServerListSelectionRequested`) e lista ainda vazia;
+  - removidos contadores auxiliares de reconnect do scene loop (`g_AndroidLoginSceneEnterTick`, `g_AndroidLoginReconnectAttempts`).
+
+Resultado esperado desse ajuste:
+
+- menor acoplamento com caminho legado de `CreditWin` no Android;
+- menos ruído e menos estado transitório de diagnóstico no runtime;
+- fluxo de seleção de servidor continua resiliente sem reconexões forçadas no loop da cena.
+
+### Validacao de continuidade (2026-04-22, build + smoke adb)
+
+Rodada executada após o cleanup do fluxo Android:
+
+- Build: `Main/android` `./gradlew assembleDebug --no-daemon` concluído com sucesso.
+- Deploy: `adb install -r` + `adb shell pm clear com.mucrossengine.client` concluídos com sucesso.
+- Runtime: processo estável em foreground (`com.mucrossengine.client/.MainActivity`, `pid` ativo), sem assinatura de crash/ANR na rodada.
+- Evidência funcional capturada em log (processo do app):
+  - `CreateLogInScene: forcing Android compatibility mode ...`
+  - `ReceiveServerList[0] ...`
+  - `ReceiveServerList total=1`
+
+Limitação observada nesta rodada:
+
+- Automação por toque genérico (`adb input`/`monkey`) não foi determinística para atravessar clique de servidor e conectar até os marcos `ServerSelWin click`/`ReceiveServerConnect` em todas as execuções.
+
+Próximo passo prático recomendado:
+
+- Fazer uma passada de validação guiada por coordenadas reais da UI (ou instrumentação temporária mínima de marcos de clique) para fechar evidência end-to-end: LoginMain -> ServerSel click -> ReceiveServerConnect.
+
+### Fechamento da validacao guiada (2026-04-22)
+
+Foi executada uma validação guiada com instrumentação temporária mínima (apenas para calibração de coordenadas de toque), seguida de limpeza completa dessa instrumentação.
+
+Evidência end-to-end capturada em log:
+
+- `ServerSelWin click: ... connectIndex=1 percent=0`
+- `ReceiveServerConnect: target=74.63.218.132:55901`
+- `ReceiveServerConnect: Android compat open LoginWin after connect`
+
+Após a captura, toda a marcação temporária (`SMOKE_TMP`) foi removida dos fontes.

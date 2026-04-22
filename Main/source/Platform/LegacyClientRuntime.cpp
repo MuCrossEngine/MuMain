@@ -46,7 +46,6 @@ namespace LegacyClientRuntime
         {
             WindowSizeX = ANativeWindow_getWidth(window);
             WindowSizeY = ANativeWindow_getHeight(window);
-            LOGI("SetWindow: %dx%d", WindowSizeX, WindowSizeY);
         }
     }
 
@@ -56,13 +55,11 @@ namespace LegacyClientRuntime
         srand((unsigned)time(nullptr));
         for (int i = 0; i < 100; i++)
             RandomTable[i] = rand() % 360;
-        LOGI("RandomTable initialized");
     }
 
     void Destroy()
     {
         g_hWnd = nullptr;
-        LOGI("LegacyClientRuntime destroyed");
     }
 }
 

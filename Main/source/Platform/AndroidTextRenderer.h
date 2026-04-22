@@ -22,7 +22,8 @@ namespace AndroidTextRenderer
 
     // ── GDI-compatible text output ───────────────────────────────────────────
     // Renders text into the pixel buffer associated with hdc.
-    // The DC's HBITMAP is the target; pixels are written as BGRA.
+    // The DC's HBITMAP is the target; pixels are written as BGR/BGRA
+    // according to the selected DIB bit depth.
     void TextOut(HDC hdc, int x, int y, const char* str, int len);
     void TextOutW(HDC hdc, int x, int y, const wchar_t* str, int len);
 
@@ -38,7 +39,7 @@ namespace AndroidTextRenderer
     // ── DC management ────────────────────────────────────────────────────────
     // Each DC has an associated bitmap buffer + current font.
     void  SetDCFont(HDC hdc, HFONT font);
-    void  SetDCBitmap(HDC hdc, HBITMAP hbm, int width, int height, void* bits);
+    void  SetDCBitmap(HDC hdc, HBITMAP hbm, int width, int height, int bytesPerPixel, void* bits);
     void* GetDCBits(HDC hdc);
 }
 
