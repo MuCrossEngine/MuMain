@@ -5358,8 +5358,19 @@ void OpenLogoSceneData()
 {
 	if (gmProtect->SceneLogin == 1)
 	{
+	#ifdef __ANDROID__
+		if (!LoadLogoBitmapWithFallback("Logo\\New_Login_Back01.jpg", BITMAP_LOG_IN + 9))
+		{
+			LoadLogoBitmapWithFallback("Logo\\Sky5.jpg", BITMAP_LOG_IN + 9);
+		}
+		if (!LoadLogoBitmapWithFallback("Logo\\New_Login_Back02.jpg", BITMAP_LOG_IN + 10))
+		{
+			LoadLogoBitmapWithFallback("Logo\\Sky0.jpg", BITMAP_LOG_IN + 10);
+		}
+	#else
 		LoadLogoBitmapWithFallback("Logo\\Sky5.jpg", BITMAP_LOG_IN + 9);
 		LoadLogoBitmapWithFallback("Logo\\Sky0.jpg", BITMAP_LOG_IN + 10);
+	#endif
 
 		gmClientModels->AccessModel(MODEL_SHIP, "Data\\Object1\\", "Ship01");
 		gmClientModels->OpenTexture(MODEL_SHIP, "Object1\\", GL_REPEAT, GL_LINEAR);

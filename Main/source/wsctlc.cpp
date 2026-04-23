@@ -402,6 +402,22 @@ int CWsctlc::sSend(SOCKET socket, char* buf, int len)
 
 	int nLeft = len;
 	int nDx = 0;
+#ifdef __ANDROID__
+	if (len >= 4)
+	{
+		const BYTE b0 = (BYTE)buf[0];
+		const BYTE b1 = (len > 1) ? (BYTE)buf[1] : 0;
+		const BYTE b2 = (len > 2) ? (BYTE)buf[2] : 0;
+		const BYTE b3 = (len > 3) ? (BYTE)buf[3] : 0;
+		const BYTE b4 = (len > 4) ? (BYTE)buf[4] : 0;
+
+		if ((b0 == 0xC1 && b2 == 0xF1) || b0 == 0xC3 || b0 == 0xC4)
+		{
+			MU_SOCKET_LOG("sSend: game=%d remote=%s:%u len=%d bytes=%02X %02X %02X %02X %02X",
+				m_bGame, m_RemoteIp[0] ? m_RemoteIp : "?", m_RemotePort, len, b0, b1, b2, b3, b4);
+		}
+	}
+#endif
 
 	while (1)
 	{
@@ -509,23 +525,26 @@ int CWsctlc::nRecv()
 	if (nResult == 0)
 	{
 	#ifdef __ANDROID__
-		MU_SOCKET_LOG("nRecv: remote closed connection game=%d remote=%s:%u", m_bGame, m_RemoteIp[0] ? m_RemoteIp : "?", m_RemotePort);
+		MU_SOCKET_LOG("FD_CLOSE: remote closed connection game=%d remote=%s:%u", m_bGame, m_RemoteIp[0] ? m_RemoteIp : "?", m_RemotePort);
+		Close();
 	#endif
 		return 1;
 	}
 	if (nResult == SOCKET_ERROR)
 	{
-		if (WSAGetLastError() == WSAEWOULDBLOCK)
+		const int nError = WSAGetLastError();
+		if (nError == WSAEWOULDBLOCK)
 		{
 			return 1;
 		}
 		else {
-#ifdef __ANDROID__
-			MU_SOCKET_LOG("nRecv: socket error=%d game=%d remote=%s:%u", WSAGetLastError(), m_bGame, m_RemoteIp[0] ? m_RemoteIp : "?", m_RemotePort);
-#endif
-#ifdef _DEBUG
-			LogPrint("recv() %d", WSAGetLastError());
-#endif
+	#ifdef __ANDROID__
+			MU_SOCKET_LOG("FD_CLOSE: socket error=%d game=%d remote=%s:%u", nError, m_bGame, m_RemoteIp[0] ? m_RemoteIp : "?", m_RemotePort);
+			Close();
+	#endif
+	#ifdef _DEBUG
+			LogPrint("recv() %d", nError);
+	#endif
 		}
 		return 1;
 	}

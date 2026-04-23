@@ -15,6 +15,10 @@
 #include "UIControls.h"
 #include "GameCensorship.h"
 #include "ServerListManager.h"
+#ifdef __ANDROID__
+#include <android/log.h>
+#define MU_FLOW_LOG(...) __android_log_print(ANDROID_LOG_INFO, "MUAndroidFlow", __VA_ARGS__)
+#endif
 
 #define	SSW_GAP_WIDTH	28
 #define	SSW_GAP_HEIGHT	5
@@ -140,7 +144,6 @@ void CServerSelWin::SetPosition(int nXCoord, int nYCoord)
 	m_aBtnDeco[0].SetPosition(m_aServerGroupBtn[1].GetXPos(), m_aServerGroupBtn[1].GetYPos());
 	m_aBtnDeco[1].SetPosition(m_aServerGroupBtn[SSW_LEFT_SERVER_G_MAX+1].GetXPos() + SERVER_GROUP_BTN_WIDTH,m_aServerGroupBtn[SSW_LEFT_SERVER_G_MAX+1].GetYPos());
 
-	int a = m_aServerGroupBtn[1].GetXPos();
 }
 
 void CServerSelWin::SetServerBtnPosition()
@@ -408,6 +411,11 @@ void CServerSelWin::UpdateWhileActive(double dDeltaTick)
 	{
 		if (m_aServerGroupBtn[i].IsClick())
 		{
+		#ifdef __ANDROID__
+			AndroidHideSoftKeyboard();
+			MU_FLOW_LOG("Server group click: slot=%d", i);
+		#endif
+			SetFocus(gwinhandle->GethWnd());
 			if(m_iSelectServerBtnIndex != -1 )
 			{
 				m_aServerGroupBtn[m_iSelectServerBtnIndex].SetCheck(false);
@@ -428,10 +436,18 @@ void CServerSelWin::UpdateWhileActive(double dDeltaTick)
 	{
 		if (m_aServerBtn[i].IsClick())
 		{
+		#ifdef __ANDROID__
+			AndroidHideSoftKeyboard();
+			MU_FLOW_LOG("Server button click: slot=%d", i);
+		#endif
+			SetFocus(gwinhandle->GethWnd());
 			pServerInfo = m_pSelectServerGroup->GetServerInfo(i);
 
 			if( pServerInfo == NULL )
 				return;
+		#ifdef __ANDROID__
+			MU_FLOW_LOG("Server info: connectIndex=%d percent=%d nonpvp=%d name=%s", pServerInfo->m_iConnectIndex, pServerInfo->m_iPercent, pServerInfo->m_byNonPvP, pServerInfo->m_bName);
+		#endif
 
 			if (pServerInfo->m_iPercent < 100)
 			{

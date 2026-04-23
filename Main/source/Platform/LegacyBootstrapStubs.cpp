@@ -5,6 +5,7 @@
 #include "../WSclient.h"
 #include "../ZzzScene.h"
 #include "GameAssetPath.h"
+#include <android/log.h>
 
 extern BYTE Version[SIZE_PROTOCOLVERSION];
 extern BYTE Serial[SIZE_PROTOCOLSERIAL + 1];
@@ -52,9 +53,29 @@ bool runtime_load_protect()
 		return false;
 	}
 
-	g_ServerPort = kAndroidServerPort;
+	// Keep parity with Windows CreateKeyEnv() for socket XOR transport key.
+	WORD keyEnv = 0;
+	for (int n = 0; n < (int)sizeof(kernelInfo.CustomerName); ++n)
+	{
+		const BYTE lhs = (BYTE)kernelInfo.CustomerName[n];
+		const BYTE rhs = (BYTE)kernelInfo.ClientSerial[n % (int)sizeof(kernelInfo.ClientSerial)];
+		keyEnv = (WORD)(keyEnv + (BYTE)(lhs ^ rhs));
+	}
+	GMProtect->EncDecKey[0] = (BYTE)(0xE2 + (keyEnv & 0xFF));
+	GMProtect->EncDecKey[1] = (BYTE)(0x02 + ((keyEnv >> 8) & 0xFF));
 
+	if (kernelInfo.IpAddress[0] != '\0')
+	{
+		strncpy(g_AndroidServerIp, kernelInfo.IpAddress, sizeof(g_AndroidServerIp) - 1);
+		g_AndroidServerIp[sizeof(g_AndroidServerIp) - 1] = '\0';
+	}
+
+	g_ServerPort = (kernelInfo.sin_port != 0) ? kernelInfo.sin_port : kAndroidServerPort;
 	szServerIpAddress = g_AndroidServerIp;
+	__android_log_print(ANDROID_LOG_INFO, "MUAndroidConfig",
+		"runtime_load_protect: ip=%s port=%u encKey=%u,%u",
+		szServerIpAddress, (unsigned int)g_ServerPort,
+		(unsigned int)GMProtect->EncDecKey[0], (unsigned int)GMProtect->EncDecKey[1]);
 
 	Version[0] = (kernelInfo.ClientVersion[0] + 1);
 	Version[1] = (kernelInfo.ClientVersion[2] + 2);

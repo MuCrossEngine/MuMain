@@ -6,6 +6,10 @@
 #include "NewUIMessageBox.h"
 #include "NewUIReconnect.h"
 #include "PersonalShopTitleImp.h"
+#ifdef __ANDROID__
+#include <android/log.h>
+#define MU_FLOW_LOG(...) __android_log_print(ANDROID_LOG_INFO, "MUAndroidFlow", __VA_ARGS__)
+#endif
 
 extern void UnRegisterBuff(eBuffState buff, OBJECT* o);
 extern void RegisterBuff(eBuffState buff, OBJECT* o, const int bufftime = 0);
@@ -430,13 +434,16 @@ void SEASON3B::CNewUIReconnect::ReconnecGameServerAuth()
 
 BOOL SEASON3B::CNewUIReconnect::ReconnectCreateConnection(char* address, WORD port)
 {
+	#ifdef __ANDROID__
+	MU_FLOW_LOG("ReconnectCreateConnection: address=%s port=%u", address ? address : "", (unsigned int)port);
+	#endif
 	if (gmProtect->ReconnectTime > 0)
 	{
 		if (PORT_RANGE(port) != 0 && GameServerAddress != address)
 		{
 			if (strcmp(ReconnectMapServerAddress, address) != 0 || ReconnectMapServerPort != port)
 			{
-				wsprintf(GameServerAddress, "%s", address);
+				snprintf(GameServerAddress, sizeof(GameServerAddress), "%s", address);
 
 				GameServerPort = port;
 

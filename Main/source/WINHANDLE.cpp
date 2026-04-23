@@ -532,6 +532,17 @@ LONG CWINHANDLE::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		MessageBox(NULL, GlobalText[16], "Error", MB_OK);
 		break;
 	case WM_ASYNCSELECTMSG:
+	{
+		SOCKET currentSocket = SocketClient.GetSocket();
+		SOCKET eventSocket = (SOCKET)wParam;
+
+		// Ignore async notifications from a socket that is already closed/replaced.
+		// This avoids closing a freshly reconnected socket due to stale FD_CLOSE events.
+		if (currentSocket == INVALID_SOCKET || eventSocket != currentSocket)
+		{
+			break;
+		}
+
 		switch (WSAGETSELECTEVENT(lParam))
 		{
 		case FD_CONNECT:
@@ -549,6 +560,7 @@ LONG CWINHANDLE::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			break;
 		}
 		break;
+	}
 	case WM_CTLCOLOREDIT:
 		SetBkColor((HDC)wParam, RGB(0, 0, 0));
 		SetTextColor((HDC)wParam, RGB(255, 255, 255));

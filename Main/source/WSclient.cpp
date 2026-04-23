@@ -82,6 +82,13 @@
 #include "CGMJewelOfAction.h"
 #include "CGMPhysicsManager.h"
 
+#ifdef __ANDROID__
+#include <android/log.h>
+#ifndef MU_FLOW_LOG
+#define MU_FLOW_LOG(...) __android_log_print(ANDROID_LOG_INFO, "MUAndroidFlow", __VA_ARGS__)
+#endif
+#endif
+
 extern BYTE m_AltarState[];
 extern int g_iChatInputType;
 extern BOOL g_bUseChatListBox;
@@ -297,6 +304,9 @@ void ReceiveServerList(BYTE* ReceiveBuffer)
 	BYTE Value2 = *(ReceiveBuffer + Offset++);
 
 	int TotalServer = MAKEWORD(Value2, Data->Value);
+#ifdef __ANDROID__
+	MU_FLOW_LOG("Recv [0xF4][0x06] totalServer=%d state=%d", TotalServer, CurrentProtocolState);
+#endif
 
 	g_ServerListManager->Release();
 
@@ -319,6 +329,10 @@ void ReceiveServerList(BYTE* ReceiveBuffer)
 		rUIMng.ShowWin(&rUIMng.m_ServerSelWin);
 		rUIMng.m_ServerSelWin.UpdateDisplay();
 		rUIMng.ShowWin(&rUIMng.m_LoginMainWin);
+	#ifdef __ANDROID__
+		AndroidHideSoftKeyboard();
+	#endif
+		SetFocus(gwinhandle->GethWnd());
 	}
 
 	g_ErrorReport.Write("Success Receive Server List.\r\n");
@@ -331,14 +345,85 @@ void ReceiveServerConnect(BYTE* ReceiveBuffer)
 	char MyAddressIp[16];
 	memset(MyAddressIp, 0, 16);
 	memcpy(MyAddressIp, (char*)Data->IP, 15);
+	#ifdef __ANDROID__
+	MU_FLOW_LOG("ReceiveServerConnect: ip=%s port=%u", MyAddressIp, (unsigned int)Data->Port);
+	#endif
+
+#ifdef __ANDROID__
+	auto IsPrivateIPv4 = [](const char* ip) -> bool
+	{
+		if (ip == NULL || ip[0] == '\0')
+		{
+			return false;
+		}
+
+		unsigned int a = 0, b = 0, c = 0, d = 0;
+		if (sscanf(ip, "%u.%u.%u.%u", &a, &b, &c, &d) != 4)
+		{
+			return false;
+		}
+
+		if (a == 10 || a == 127)
+		{
+			return true;
+		}
+
+		if (a == 172 && b >= 16 && b <= 31)
+		{
+			return true;
+		}
+
+		if (a == 192 && b == 168)
+		{
+			return true;
+		}
+
+		return false;
+	};
+
+	char fallbackIp[16] = { 0, };
+	bool hasFallbackIp = false;
+	if (IsPrivateIPv4(MyAddressIp))
+	{
+		if (szServerIpAddress != NULL && szServerIpAddress[0] != '\0' && !IsPrivateIPv4(szServerIpAddress))
+		{
+			strncpy(fallbackIp, szServerIpAddress, sizeof(fallbackIp) - 1);
+		}
+		else
+		{
+			strncpy(fallbackIp, "74.63.218.132", sizeof(fallbackIp) - 1);
+		}
+
+		hasFallbackIp = (strcmp(fallbackIp, MyAddressIp) != 0);
+	}
+#endif
 
 	g_ErrorReport.Write("[ReceiveServerConnect]");
 	SocketClient.Close();
 
-	if (g_pReconnectUI->ReconnectCreateConnection(MyAddressIp, Data->Port))
+	bool bReconnectOk = g_pReconnectUI->ReconnectCreateConnection(MyAddressIp, Data->Port);
+
+#ifdef __ANDROID__
+	if (!bReconnectOk && hasFallbackIp)
+	{
+		#ifdef __ANDROID__
+		MU_FLOW_LOG("ReceiveServerConnect: retry fallback ip=%s port=%u", fallbackIp, (unsigned int)Data->Port);
+		#endif
+		bReconnectOk = g_pReconnectUI->ReconnectCreateConnection(fallbackIp, Data->Port);
+		if (bReconnectOk)
+		{
+			strncpy(MyAddressIp, fallbackIp, sizeof(MyAddressIp) - 1);
+		}
+	}
+#endif
+
+	if (bReconnectOk)
 	{
 		g_bGameServerConnected = TRUE;
 	}
+	#ifdef __ANDROID__
+	MU_FLOW_LOG("ReceiveServerConnect: reconnectOk=%d finalIp=%s port=%u", bReconnectOk ? 1 : 0, MyAddressIp, (unsigned int)Data->Port);
+	#endif
 
 	char Text[100];
 	sprintf(Text, GlobalText[481], MyAddressIp, Data->Port);
@@ -427,12 +512,22 @@ void ReceiveJoinServer(BYTE* ReceiveBuffer)
 		switch (Data2->Result)
 		{
 		case 0x01:
+		#ifdef __ANDROID__
+			MU_FLOW_LOG("Recv [0xF1][0x00] success result=0x%02X", Data2->Result);
+		#endif
 			rUIMng.ShowWin(&rUIMng.m_LoginWin);
+		#ifdef __ANDROID__
+			AndroidHideSoftKeyboard();
+			SetFocus(gwinhandle->GethWnd());
+		#endif
 			HeroKey = ((int)(Data2->NumberH) << 8) + Data2->NumberL;
 			CurrentProtocolState = RECEIVE_JOIN_SERVER_SUCCESS;
 			break;
 
 		default:
+		#ifdef __ANDROID__
+			MU_FLOW_LOG("Recv [0xF1][0x00] fail result=0x%02X", Data2->Result);
+		#endif
 			g_ErrorReport.Write("Connectting error. ");
 			g_ErrorReport.WriteCurrentTime();
 			rUIMng.PopUpMsgWin(MESSAGE_SERVER_LOST);
@@ -12636,6 +12731,9 @@ void ProtocolCompiler(CWsctlc* pSocketClient, int iTranslation, int iParam)
 
 				if (iSize < 0)
 				{
+#ifdef __ANDROID__
+					MU_FLOW_LOG("ProtocolCompiler: decrypt failed code=0x%02X size=%d serialRecv=0x%02X", ReceiveBuffer[0], Size, g_byPacketSerialRecv);
+#endif
 					SendHackingChecked(0x06, 0);
 					g_byPacketSerialRecv++;
 					continue;
@@ -12645,6 +12743,9 @@ void ProtocolCompiler(CWsctlc* pSocketClient, int iTranslation, int iParam)
 				{
 					bEncrypted = FALSE;
 					g_byPacketSerialRecv = byDec[2];
+#ifdef __ANDROID__
+					MU_FLOW_LOG("ProtocolCompiler: decrypt serial mismatch recv=0x%02X dec=0x%02X code=0x%02X", g_byPacketSerialRecv, byDec[2], ReceiveBuffer[0]);
+#endif
 
 					g_ErrorReport.Write("Decrypt error : g_byPacketSerialRecv(0x%02X), byDec(0x%02X)\r\n", g_byPacketSerialRecv, byDec[2]);
 					g_ErrorReport.Write("Dump : \r\n");
@@ -13920,9 +14021,6 @@ void settings_invasion_manager(BYTE* ReceiveBuffer)
 	}
 }
 #include "Protocol.h"
-#ifdef __ANDROID__
-#include <android/log.h>
-#endif
 BOOL TranslateProtocol(int HeadCode, BYTE* ReceiveBuffer, int Size, BOOL bEncrypted)
 {
 	//===Hook Protocol Custom
@@ -13938,6 +14036,9 @@ BOOL TranslateProtocol(int HeadCode, BYTE* ReceiveBuffer, int Size, BOOL bEncryp
 		LPPHEADER_DEFAULT_SUBCODE Data = (LPPHEADER_DEFAULT_SUBCODE)ReceiveBuffer;
 
 		g_ConsoleDebug->Write(MCD_RECEIVE, "Recv [0xF1][0x%02x][0x%02x]", Data->SubCode, Data->Value);
+#ifdef __ANDROID__
+		MU_FLOW_LOG("TranslateProtocol: F1 sub=0x%02X val=0x%02X state=%d size=%d", Data->SubCode, Data->Value, CurrentProtocolState, Size);
+#endif
 
 		switch (Data->SubCode)
 		{
@@ -14216,6 +14317,9 @@ BOOL TranslateProtocol(int HeadCode, BYTE* ReceiveBuffer, int Size, BOOL bEncryp
 			LPPHEADER_DEFAULT_SUBCODE_WORD Data = (LPPHEADER_DEFAULT_SUBCODE_WORD)ReceiveBuffer;
 			subcode = Data->SubCode;
 		}
+#ifdef __ANDROID__
+		MU_FLOW_LOG("TranslateProtocol: F4 sub=0x%02X state=%d size=%d", subcode, CurrentProtocolState, Size);
+#endif
 		switch (subcode)
 		{
 		case 0x03:

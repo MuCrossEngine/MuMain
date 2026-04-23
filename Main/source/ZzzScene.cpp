@@ -70,6 +70,9 @@
 #include "CameraManager.h"
 #include "CGMHeadChat.h"
 #include "ConnectVersionHex.h"
+#ifdef __ANDROID__
+#include "Platform/GameAssetPath.h"
+#endif
 
 extern CUITextInputBox* g_pSingleTextInputBox;
 extern CUITextInputBox* g_pSinglePasswdInputBox;
@@ -101,8 +104,8 @@ short   g_shCameraLevel = 0;
 
 int g_iLengthAuthorityCode = 20;
 
-WORD g_ServerPort = 44405;
-char* szServerIpAddress = "192.168.0.104";
+WORD g_ServerPort = 44404;
+char* szServerIpAddress = "74.63.218.132";
 
 #ifdef MOVIE_DIRECTSHOW
 int  SceneFlag = MOVIE_SCENE;
@@ -386,6 +389,79 @@ void MovieScene(HDC hDC)
 
 bool InitWebzenScene = false;
 
+#ifdef __ANDROID__
+static bool s_bAndroidLoginCoreDataLoaded = false;
+
+static bool AndroidAssetExists(const char* relativePath)
+{
+	FILE* fp = MU_FOPEN(relativePath, "rb");
+	if (fp != NULL)
+	{
+		fclose(fp);
+		return true;
+	}
+
+	return false;
+}
+
+static bool AndroidCanUseOriginalLoginScene(BYTE sceneLogin)
+{
+	switch (sceneLogin)
+	{
+	case 2:
+		return AndroidAssetExists("Data\\World55\\EncTerrain55.map")
+			&& AndroidAssetExists("Data\\Object55\\Object01.bmd");
+
+	case 3:
+		return AndroidAssetExists("Data\\World78\\EncTerrain78.map")
+			&& AndroidAssetExists("Data\\Object78\\Object01.bmd");
+
+	case 4:
+		return AndroidAssetExists("Data\\World94\\Encterrain94.map")
+			&& AndroidAssetExists("Data\\Object94\\Object01.bmd");
+
+	case 0:
+	default:
+		return AndroidAssetExists("Data\\World73\\EncTerrain73.map")
+			&& AndroidAssetExists("Data\\Object73\\Object01.bmd");
+	}
+}
+
+static void OpenAndroidLoginCoreData()
+{
+	if (s_bAndroidLoginCoreDataLoaded)
+	{
+		return;
+	}
+
+	::LoadBitmap("Interface\\message_ok_b_all.tga", BITMAP_BUTTON);
+	::LoadBitmap("Interface\\loding_cancel_b_all.tga", BITMAP_BUTTON + 1);
+	::LoadBitmap("Interface\\message_close_b_all.tga", BITMAP_BUTTON + 2);
+	::LoadBitmap("Interface\\message_back.tga", BITMAP_MESSAGE_WIN);
+	::LoadBitmap("Interface\\delete_secret_number.tga", BITMAP_MSG_WIN_INPUT);
+	::LoadBitmap("Interface\\op1_stone.jpg", BITMAP_SYS_WIN, GL_NEAREST, GL_REPEAT);
+	::LoadBitmap("Interface\\op1_back1.tga", BITMAP_SYS_WIN + 1);
+	::LoadBitmap("Interface\\op1_back2.tga", BITMAP_SYS_WIN + 2);
+	::LoadBitmap("Interface\\op1_back3.jpg", BITMAP_SYS_WIN + 3, GL_NEAREST, GL_REPEAT);
+	::LoadBitmap("Interface\\op1_back4.jpg", BITMAP_SYS_WIN + 4, GL_NEAREST, GL_REPEAT);
+	::LoadBitmap("Interface\\op1_b_all.tga", BITMAP_TEXT_BTN);
+	::LoadBitmap("Interface\\op2_back1.tga", BITMAP_OPTION_WIN);
+	::LoadBitmap("Interface\\op2_ch.tga", BITMAP_CHECK_BTN);
+	::LoadBitmap("Interface\\op2_volume3.tga", BITMAP_SLIDER);
+	::LoadBitmap("Interface\\op2_volume2.jpg", BITMAP_SLIDER + 1, GL_NEAREST, GL_REPEAT);
+	::LoadBitmap("Interface\\op2_volume1.tga", BITMAP_SLIDER + 2);
+
+	OpenTextData();
+
+	if (g_pNewUISystem)
+	{
+		g_pNewUISystem->LoadMainSceneInterface();
+	}
+
+	s_bAndroidLoginCoreDataLoaded = true;
+}
+#endif
+
 void CreateWebzenScene()
 {
 	CUIMng& rUIMng = CUIMng::Instance();
@@ -434,7 +510,11 @@ void CreateWebzenScene()
 	if (CreateSocket(szServerIpAddress, g_ServerPort))
 	{
 		SendRequestServerHWID();
+	#ifdef __ANDROID__
+		GMConnectHex->SetUpdateVersion(false);
+	#else
 		SendRequestServerUpdate(GMConnectHex->GetClientVersion());
+	#endif
 	}
 	else
 	{
@@ -459,9 +539,13 @@ void WebzenScene(HDC hDC)
 		LoadBitmap("Interface\\lo_lo.jpg", BITMAP_TITLE + 5, GL_LINEAR, GL_REPEAT);
 
 		EnableAlphaTest();
+	#ifdef __ANDROID__
+		OpenAndroidLoginCoreData();
+	#else
 		OpenBasicData(hDC);
 
 		g_pNewUISystem->LoadMainSceneInterface();
+	#endif
 
 		CUIMng::Instance().RenderTitleSceneUI(hDC, 11, 12);
 
@@ -493,9 +577,13 @@ void WebzenScene(HDC hDC)
 	CUIMng& rUIMng = CUIMng::Instance();
 
 	EnableAlphaTest();
+	#ifdef __ANDROID__
+	OpenAndroidLoginCoreData();
+	#else
 	OpenBasicData(hDC);
 
 	g_pNewUISystem->LoadMainSceneInterface();
+	#endif
 
 	CUIMng::Instance().RenderTitleSceneUI(hDC, 11, 12);
 
@@ -1501,9 +1589,23 @@ bool NewRenderCharacterScene(HDC hDC)
 void CreateLogInScene()
 {
 	EnableMainRender = true;
+	#ifdef __ANDROID__
+	if (gmProtect->SceneLogin != 1 && !AndroidCanUseOriginalLoginScene(gmProtect->SceneLogin))
+	{
+		gmProtect->SceneLogin = 1;
+	}
+	AndroidHideSoftKeyboard();
+	#endif
 
 	if (gmProtect->SceneLogin == 1)
 	{
+	#ifdef __ANDROID__
+		World = -1;
+		OpenLogoSceneData();
+		CurrentCameraCount = -1;
+		Vector(0.0, 0.0, 0.0, CameraAngle);
+		Vector(0.0, 0.0, 0.0, CameraPosition);
+	#else
 		vec3_t Angle, Position;
 
 		World = -1;
@@ -1555,6 +1657,7 @@ void CreateLogInScene()
 		CurrentCameraCount = -1;
 		Vector(0.0, 0.0, 0.0, CameraAngle);
 		Vector(0.0, 0.0, 0.0, CameraPosition);
+	#endif
 	}
 	else
 	{
@@ -1715,6 +1818,14 @@ bool NewRenderLogInScene(HDC hDC)
 		RenderParticles();
 		EndSprite();
 		BeginBitmap();
+	#ifdef __ANDROID__
+		{
+			const float fWidth = 320.0f;
+			const float fHeight = 325.0f;
+			RenderNoBitmap(BITMAP_LOG_IN + 9, 0.0f, 25.0f, fWidth, fHeight, 0.0f, 0.0f, 511.75f / 512.f, 512.f / 512.f);
+			RenderNoBitmap(BITMAP_LOG_IN + 10, fWidth, 25.0f, fWidth, fHeight, 0.0f, 0.0f, 511.75f / 512.f, 512.f / 512.f);
+		}
+	#endif
 
 		//g_fMULogoAlpha += 0.02f;
 		//if (g_fMULogoAlpha > 10.0f)
