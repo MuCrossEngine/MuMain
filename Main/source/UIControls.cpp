@@ -4214,11 +4214,25 @@ void CUITextInputBox::SetFont(HFONT hFont)
 BOOL CUITextInputBox::DoMouseAction()
 {
 	BOOL bResult = FALSE;
-	if (::CheckMouseIn(m_iPos_x, m_iPos_y - 4, m_iWidth, m_iHeight + 8) == TRUE)
+	float fMouseX = (float)MouseX;
+	float fMouseY = (float)MouseY;
+#ifdef __ANDROID__
+	if (g_fScreenRate_x > 0.0f) fMouseX /= g_fScreenRate_x;
+	if (g_fScreenRate_y > 0.0f) fMouseY /= g_fScreenRate_y;
+#endif
+
+	auto IsMouseInLocal = [&](float x, float y, float width, float height) -> BOOL
+	{
+		if (fMouseX >= x && fMouseX < x + width && fMouseY >= y && fMouseY < y + height)
+			return TRUE;
+		return FALSE;
+	};
+
+	if (IsMouseInLocal((float)m_iPos_x, (float)m_iPos_y - 4.0f, (float)m_iWidth, (float)m_iHeight + 8.0f) == TRUE)
 	{
 		if (MouseLButtonPush && GetState() == UISTATE_NORMAL)
 		{
-			if (::CheckMouseIn(m_iPos_x + m_iWidth - 15, m_iPos_y - 4, 13, 13))
+			if (IsMouseInLocal((float)m_iPos_x + m_iWidth - 15.0f, (float)m_iPos_y - 4.0f, 13.0f, 13.0f))
 			{
 				if (m_bScrollBtnClick == FALSE)
 				{
@@ -4236,7 +4250,7 @@ BOOL CUITextInputBox::DoMouseAction()
 						m_bScrollBtnClick++;
 				}
 			}
-			if (::CheckMouseIn(m_iPos_x + m_iWidth - 15, m_iPos_y + m_iHeight - 9, 13, 13))
+			if (IsMouseInLocal((float)m_iPos_x + m_iWidth - 15.0f, (float)m_iPos_y + m_iHeight - 9.0f, 13.0f, 13.0f))
 			{
 				if (m_bScrollBtnClick == FALSE)
 				{
@@ -4255,17 +4269,17 @@ BOOL CUITextInputBox::DoMouseAction()
 				}
 			}
 			if (SendMessageW(m_hEditWnd, EM_GETLINECOUNT, 0, 0) < m_iNumLines);
-			else if (::CheckMouseIn(m_iPos_x + m_iWidth - 14, m_fScrollBarPos_y,
+			else if (IsMouseInLocal((float)m_iPos_x + m_iWidth - 14.0f, m_fScrollBarPos_y,
 				m_fScrollBarWidth, m_fScrollBarHeight))
 			{
 				if (GetState() == UISTATE_NORMAL && g_dwActiveUIID == 0)
 				{
 					g_dwActiveUIID = GetUIID();
 					SetState(UISTATE_SCROLL);
-					m_fScrollBarClickPos_y = MouseY - m_fScrollBarPos_y;
+					m_fScrollBarClickPos_y = fMouseY - m_fScrollBarPos_y;
 				}
 			}
-			else if (::CheckMouseIn(m_iPos_x + m_iWidth - 14, m_fScrollBarRange_top,
+			else if (IsMouseInLocal((float)m_iPos_x + m_iWidth - 14.0f, m_fScrollBarRange_top,
 				m_fScrollBarWidth, m_fScrollBarPos_y - m_fScrollBarRange_top))
 			{
 				if (GetParentUIID() > 0 && g_pWindowMgr->IsRenderFrame() == FALSE);
@@ -4284,7 +4298,7 @@ BOOL CUITextInputBox::DoMouseAction()
 						m_bScrollBarClick++;
 				}
 			}
-			else if (::CheckMouseIn(m_iPos_x + m_iWidth - 14, m_fScrollBarPos_y + m_fScrollBarHeight,
+			else if (IsMouseInLocal((float)m_iPos_x + m_iWidth - 14.0f, m_fScrollBarPos_y + m_fScrollBarHeight,
 				m_fScrollBarWidth, m_fScrollBarRange_bottom - m_fScrollBarPos_y - m_fScrollBarHeight))
 			{
 				if (GetParentUIID() > 0 && g_pWindowMgr->IsRenderFrame() == FALSE);
@@ -4325,7 +4339,7 @@ BOOL CUITextInputBox::DoMouseAction()
 		if (MouseLButtonPush)
 		{
 			MouseOnWindow = true;
-			m_fScrollBarPos_y = (float)MouseY - m_fScrollBarClickPos_y;
+			m_fScrollBarPos_y = fMouseY - m_fScrollBarClickPos_y;
 			int iCurrentRenderEndLine = (m_fScrollBarPos_y - m_fScrollBarRange_top + 0.5f) / (m_fScrollBarRange_bottom - m_fScrollBarRange_top) * (float)SendMessage(m_hEditWnd, EM_GETLINECOUNT, 0, 0);
 			SetScrollPos(m_hEditWnd, SB_VERT, iCurrentRenderEndLine, TRUE);
 			SendMessageW(m_hEditWnd, EM_LINESCROLL, 0, -10000);

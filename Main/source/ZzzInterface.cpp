@@ -257,8 +257,14 @@ void ClearInput(BOOL bClearWhisperTarget)
 
 	if (g_iChatInputType == 1)
 	{
-		g_pSingleTextInputBox->SetText(NULL);
-		g_pSinglePasswdInputBox->SetText(NULL);
+		if (g_pSingleTextInputBox)
+		{
+			g_pSingleTextInputBox->SetText(NULL);
+		}
+		if (g_pSinglePasswdInputBox)
+		{
+			g_pSinglePasswdInputBox->SetText(NULL);
+		}
 	}
 }
 

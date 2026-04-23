@@ -24,6 +24,8 @@
             android:label="MU Cross Engine"
             android:configChanges="orientation|screenSize|keyboardHidden|keyboard|navigation"
             android:screenOrientation="landscape"
+            android:resizeableActivity="true"
+            android:maxAspectRatio="4.0"
             android:launchMode="singleTop"
             android:exported="true">
 

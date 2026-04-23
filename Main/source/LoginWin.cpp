@@ -20,10 +20,82 @@
 #include "ServerListManager.h"
 #include "./ExternalObject/leaf/regkey.h"
 #include "CB_DangKyInGame.h"
+#ifdef __ANDROID__
+#include "Platform/GameAssetPath.h"
+#endif
 
 extern float g_fScreenRate_x;
 extern float g_fScreenRate_y;
 extern int g_iChatInputType;
+
+#ifdef __ANDROID__
+static void TrimLineEnd(char* text)
+{
+	if (!text)
+	{
+		return;
+	}
+
+	const size_t length = strlen(text);
+	if (length == 0)
+	{
+		return;
+	}
+
+	size_t end = length;
+	while (end > 0)
+	{
+		const char c = text[end - 1];
+		if (c == '\n' || c == '\r' || c == ' ' || c == '\t')
+		{
+			text[end - 1] = '\0';
+			--end;
+		}
+		else
+		{
+			break;
+		}
+	}
+}
+
+static bool LoadAndroidAutofillCredentials(char* outId, size_t idSize, char* outPass, size_t passSize)
+{
+	if (!outId || !outPass || idSize == 0 || passSize == 0)
+	{
+		return false;
+	}
+
+	FILE* fp = MU_FOPEN("Data/Local/android_login_autofill.txt", "rb");
+	if (!fp)
+	{
+		return false;
+	}
+
+	char idBuf[64] = { 0 };
+	char passBuf[64] = { 0 };
+
+	const bool hasId = (fgets(idBuf, sizeof(idBuf), fp) != NULL);
+	const bool hasPass = (fgets(passBuf, sizeof(passBuf), fp) != NULL);
+	fclose(fp);
+
+	if (!hasId || !hasPass)
+	{
+		return false;
+	}
+
+	TrimLineEnd(idBuf);
+	TrimLineEnd(passBuf);
+
+	if (idBuf[0] == '\0' || passBuf[0] == '\0')
+	{
+		return false;
+	}
+
+	strncpy_s(outId, idSize, idBuf, _TRUNCATE);
+	strncpy_s(outPass, passSize, passBuf, _TRUNCATE);
+	return true;
+}
+#endif
 
 CLoginWin::CLoginWin()
 {
@@ -138,6 +210,17 @@ void CLoginWin::Create()
 	m_pIDInputBox->SetTabTarget(m_pPassInputBox);
 	m_pPassInputBox->SetTabTarget(m_pIDInputBox);
 
+#ifdef __ANDROID__
+	char autoId[MAX_ID_SIZE + 1] = "louismk6";
+	char autoPass[MAX_PASSWORD_SIZE + 1] = "1212";
+	LoadAndroidAutofillCredentials(autoId, sizeof(autoId), autoPass, sizeof(autoPass));
+
+	m_pIDInputBox->SetText(autoId);
+	m_pPassInputBox->SetText(autoPass);
+	strncpy_s(m_ID[MAX_ACCOUNT_REG], autoId, _TRUNCATE);
+	strncpy_s(m_Psz[MAX_ACCOUNT_REG], autoPass, _TRUNCATE);
+#endif
+
 	FirstLoad = TRUE;
 }
 
@@ -154,11 +237,8 @@ void CLoginWin::SetPosition(int nXCoord, int nYCoord)
 	m_asprInputBox[LIW_ACCOUNT].SetPosition(nXCoord + 109, nYCoord + 106);
 	m_asprInputBox[LIW_PASSWORD].SetPosition(nXCoord + 109, nYCoord + 131);
 
-	if (g_iChatInputType == 1)
-	{
-		m_pIDInputBox->SetPosition(int((m_asprInputBox[LIW_ACCOUNT].GetXPos() + 6) / g_fScreenRate_x), int((m_asprInputBox[LIW_ACCOUNT].GetYPos() + 6) / g_fScreenRate_y));
-		m_pPassInputBox->SetPosition(int((m_asprInputBox[LIW_PASSWORD].GetXPos() + 6) / g_fScreenRate_x), int((m_asprInputBox[LIW_PASSWORD].GetYPos() + 6) / g_fScreenRate_y));
-	}
+	m_pIDInputBox->SetPosition(int((m_asprInputBox[LIW_ACCOUNT].GetXPos() + 6) / g_fScreenRate_x), int((m_asprInputBox[LIW_ACCOUNT].GetYPos() + 6) / g_fScreenRate_y));
+	m_pPassInputBox->SetPosition(int((m_asprInputBox[LIW_PASSWORD].GetXPos() + 6) / g_fScreenRate_x), int((m_asprInputBox[LIW_PASSWORD].GetYPos() + 6) / g_fScreenRate_y));
 
 	m_aBtn[LIW_OK].SetPosition(nXCoord + 150, nYCoord + 178);
 	m_aBtn[LIW_CANCEL].SetPosition(nXCoord + 211, nYCoord + 178);
@@ -683,7 +763,7 @@ void CLoginWin::SaveAccount(std::string NameId, std::string PassID)
 			}
 		}
 
-		// Si no se encontró, agregamos la nueva cuenta
+		// Si no se encontrï¿½, agregamos la nueva cuenta
 		if (!accountFound)
 		{
 			if (stAccountMacro.size() < MAX_ACCOUNT_REG)

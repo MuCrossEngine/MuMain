@@ -1362,7 +1362,9 @@ bool NewRenderCharacterScene(HDC hDC)
 		EndSprite();
 
 		BeginBitmap();
+		#ifndef __ANDROID__
 		RenderInterfaceEdge();
+		#endif
 		RenderInfomation();
 		EndBitmap();
 		EndOpengl();

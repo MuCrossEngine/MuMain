@@ -9,7 +9,13 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.provider.Settings;
 import android.util.Log;
+import android.text.Editable;
+import android.text.InputType;
+import android.text.TextWatcher;
+import android.view.KeyEvent;
 import android.view.WindowManager;
+import android.widget.EditText;
+import android.widget.FrameLayout;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.Locale;
@@ -30,6 +36,11 @@ public class MainActivity extends NativeActivity {
     private static final String TAG = "MUAssetsJava";
 
     private volatile int lastHttpStatusCode = 0;
+    private EditText imeBridgeEditText;
+    private boolean suppressImeCallback = false;
+
+    private native void nativeOnCommitText(String text);
+    private native void nativeOnBackspace(int count);
 
     static {
         System.setProperty("http.keepAlive", "false");
@@ -43,6 +54,66 @@ public class MainActivity extends NativeActivity {
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
         super.onCreate(savedInstanceState);
+        setupImeBridge();
+    }
+
+    private void setupImeBridge() {
+        FrameLayout contentRoot = findViewById(android.R.id.content);
+        if (contentRoot == null) {
+            return;
+        }
+
+        imeBridgeEditText = new EditText(this);
+        imeBridgeEditText.setSingleLine(true);
+        imeBridgeEditText.setInputType(InputType.TYPE_CLASS_TEXT
+            | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+            | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD);
+        imeBridgeEditText.setImeOptions(imeBridgeEditText.getImeOptions() | 0x10000000); // IME_FLAG_NO_EXTRACT_UI
+        imeBridgeEditText.setAlpha(0.0f);
+        imeBridgeEditText.setCursorVisible(false);
+
+        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(1, 1);
+        imeBridgeEditText.setLayoutParams(params);
+
+        imeBridgeEditText.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                if (suppressImeCallback) {
+                    return;
+                }
+
+                if (before > 0 && count == 0) {
+                    nativeOnBackspace(before);
+                    return;
+                }
+
+                if (count > 0 && s != null) {
+                    int end = Math.min(start + count, s.length());
+                    if (start >= 0 && start < end) {
+                        CharSequence committed = s.subSequence(start, end);
+                        nativeOnCommitText(committed.toString());
+                    }
+                }
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {
+            }
+        });
+
+        imeBridgeEditText.setOnKeyListener((view, keyCode, event) -> {
+            if (event.getAction() == KeyEvent.ACTION_DOWN && keyCode == KeyEvent.KEYCODE_DEL) {
+                nativeOnBackspace(1);
+                return true;
+            }
+            return false;
+        });
+
+        contentRoot.addView(imeBridgeEditText);
     }
 
     // Called from C++ to get external files dir path
@@ -121,13 +192,27 @@ public class MainActivity extends NativeActivity {
 
     // Called from C++ to show soft keyboard
     public void showSoftKeyboard() {
-        android.view.inputmethod.InputMethodManager imm =
-            (android.view.inputmethod.InputMethodManager)
-            getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
-        if (imm != null) {
-            imm.showSoftInput(getWindow().getDecorView(),
-                android.view.inputmethod.InputMethodManager.SHOW_FORCED);
-        }
+        runOnUiThread(() -> {
+            android.view.inputmethod.InputMethodManager imm =
+                (android.view.inputmethod.InputMethodManager)
+                getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
+            if (imm == null) {
+                return;
+            }
+
+            if (imeBridgeEditText != null) {
+                suppressImeCallback = true;
+                imeBridgeEditText.setText("");
+                imeBridgeEditText.setSelection(0);
+                suppressImeCallback = false;
+                imeBridgeEditText.requestFocus();
+                imm.showSoftInput(imeBridgeEditText,
+                    android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT);
+            } else {
+                imm.showSoftInput(getWindow().getDecorView(),
+                    android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT);
+            }
+        });
     }
 
     // Called from C++ to get a deterministic device HWID in the same 8-8-8-8 format as PC.
@@ -170,12 +255,21 @@ public class MainActivity extends NativeActivity {
 
     // Called from C++ to hide soft keyboard
     public void hideSoftKeyboard() {
-        android.view.inputmethod.InputMethodManager imm =
-            (android.view.inputmethod.InputMethodManager)
-            getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
-        if (imm != null) {
-            imm.hideSoftInputFromWindow(getWindow().getDecorView().getWindowToken(), 0);
-        }
+        runOnUiThread(() -> {
+            android.view.inputmethod.InputMethodManager imm =
+                (android.view.inputmethod.InputMethodManager)
+                getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
+            if (imm == null) {
+                return;
+            }
+
+            if (imeBridgeEditText != null) {
+                imm.hideSoftInputFromWindow(imeBridgeEditText.getWindowToken(), 0);
+                imeBridgeEditText.clearFocus();
+            } else {
+                imm.hideSoftInputFromWindow(getWindow().getDecorView().getWindowToken(), 0);
+            }
+        });
     }
 
     // Called from C++ to extract a downloaded zip package into targetDir.

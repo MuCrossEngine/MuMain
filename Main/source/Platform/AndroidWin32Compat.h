@@ -1375,6 +1375,39 @@ inline LRESULT SendMessage(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
     }
     case WM_GETTEXTLENGTH:
         return static_cast<LRESULT>(state->text.size());
+    case WM_CHAR:
+    {
+        if (state->className != L"edit")
+        {
+            return 0;
+        }
+
+        const wchar_t ch = static_cast<wchar_t>(wParam);
+        if (ch == VK_BACK)
+        {
+            if (!state->text.empty())
+            {
+                state->text.pop_back();
+            }
+            return 1;
+        }
+
+        if (ch == VK_TAB || ch == VK_RETURN)
+        {
+            return 1;
+        }
+
+        if (ch >= 32)
+        {
+            if (state->textLimit == 0 || state->text.size() < state->textLimit)
+            {
+                state->text.push_back(ch);
+            }
+            return 1;
+        }
+
+        return 0;
+    }
     case WM_SETFONT:
         return 0;
     case EM_SETLIMITTEXT:

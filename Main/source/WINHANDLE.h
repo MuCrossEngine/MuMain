@@ -39,13 +39,13 @@ public:
     void SetFontSize(mu_uint32)   {}
     HINSTANCE GetInstance()       { return nullptr; }
 	mu_float GetScreenX() {
-		if (WindowWidth > 0)
-			return static_cast<mu_float>(WindowWidth);
+		if (WindowWidth > 0 && g_fScreenRate_x > 0.0f)
+			return static_cast<mu_float>(WindowWidth) / g_fScreenRate_x;
 		return static_cast<mu_float>(WindowSizeX);
 	}
 	mu_float GetScreenY() {
-		if (WindowHeight > 0)
-			return static_cast<mu_float>(WindowHeight);
+		if (WindowHeight > 0 && g_fScreenRate_y > 0.0f)
+			return static_cast<mu_float>(WindowHeight) / g_fScreenRate_y;
 		return static_cast<mu_float>(WindowSizeY);
 	}
     ResolutionConfig* LoadCurrentConfig() { return nullptr; }

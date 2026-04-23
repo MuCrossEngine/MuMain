@@ -16,6 +16,8 @@
 #include <cstdio>
 #include <vector>
 #include <filesystem>
+#include <deque>
+#include <mutex>
 
 #define LOG_TAG "MUAndroid"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO,  LOG_TAG, __VA_ARGS__)
@@ -76,6 +78,9 @@ static bool                g_initialized = false;
 static bool                g_focused     = false;
 static std::atomic<bool>   g_running{true};
 static bool                g_renderBackendInitialized = false;
+static std::mutex          g_pendingImeMutex;
+static std::deque<wchar_t> g_pendingImeChars;
+static int                 g_pendingImeBackspaceCount = 0;
 
 // Windows initializes this singleton in WinMain(); Android must do it here.
 static CGMCharacter        g_androidCharacterManager;
@@ -461,6 +466,83 @@ void AndroidRequestImmediateSwap()
     }
 }
 
+extern "C" JNIEXPORT void JNICALL
+Java_com_mucrossengine_client_MainActivity_nativeOnCommitText(JNIEnv* env, jobject, jstring text)
+{
+    if (!env || !text)
+    {
+        return;
+    }
+
+    const jchar* chars = env->GetStringChars(text, nullptr);
+    const jsize length = env->GetStringLength(text);
+    if (!chars || length <= 0)
+    {
+        if (chars)
+        {
+            env->ReleaseStringChars(text, chars);
+        }
+        return;
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(g_pendingImeMutex);
+        for (jsize i = 0; i < length; ++i)
+        {
+            g_pendingImeChars.push_back(static_cast<wchar_t>(chars[i]));
+        }
+    }
+
+    env->ReleaseStringChars(text, chars);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_mucrossengine_client_MainActivity_nativeOnBackspace(JNIEnv*, jobject, jint count)
+{
+    if (count <= 0)
+    {
+        return;
+    }
+
+    std::lock_guard<std::mutex> lock(g_pendingImeMutex);
+    g_pendingImeBackspaceCount += static_cast<int>(count);
+}
+
+static void FlushPendingImeToFocusedEdit()
+{
+    HWND focused = GetFocus();
+    if (!(focused && AndroidCompatIsEditControl(focused)))
+    {
+        return;
+    }
+
+    int backspaceCount = 0;
+    std::deque<wchar_t> chars;
+    {
+        std::lock_guard<std::mutex> lock(g_pendingImeMutex);
+        backspaceCount = g_pendingImeBackspaceCount;
+        g_pendingImeBackspaceCount = 0;
+        chars.swap(g_pendingImeChars);
+    }
+
+    while (backspaceCount-- > 0)
+    {
+        SendMessageW(focused, WM_CHAR, VK_BACK, 0);
+    }
+
+    for (wchar_t ch : chars)
+    {
+        if (ch == L'\r' || ch == L'\n')
+        {
+            SendMessageW(focused, WM_CHAR, VK_RETURN, 0);
+        }
+        else
+        {
+            SendMessageW(focused, WM_CHAR, static_cast<WPARAM>(ch), 0);
+        }
+    }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Initialization — mirrors WinMain() init sequence
 // ─────────────────────────────────────────────────────────────────────────────
@@ -595,6 +677,8 @@ static void RenderFrame()
 {
     if (!g_eglWindow || !g_focused) return;
 
+    FlushPendingImeToFocusedEdit();
+
     // Process network packets (replaces WSAAsyncSelect / WM_SOCKET)
     PollSocketIO();
     ProtocolCompiler();
@@ -717,18 +801,6 @@ static int32_t OnInputEvent(android_app* app, AInputEvent* event)
     {
         const int32_t keyCode = AKeyEvent_getKeyCode(event);
         const int32_t action = AKeyEvent_getAction(event);
-        if (keyCode == AKEYCODE_BACK)
-        {
-            if (action == AKEY_EVENT_ACTION_UP)
-            {
-                g_running = false;
-                if (app && app->activity)
-                {
-                    ANativeActivity_finish(app->activity);
-                }
-            }
-            return 1;
-        }
 
         HWND focused = GetFocus();
         if (focused && AndroidCompatIsEditControl(focused) && action == AKEY_EVENT_ACTION_DOWN)
@@ -775,6 +847,30 @@ static int32_t OnInputEvent(android_app* app, AInputEvent* event)
                 SendMessageW(focused, WM_CHAR, ch, 0);
                 return 1;
             }
+        }
+
+        if (keyCode == AKEYCODE_BACK)
+        {
+            if (action == AKEY_EVENT_ACTION_UP)
+            {
+                if (focused && AndroidCompatIsEditControl(focused))
+                {
+                    AndroidHideSoftKeyboard();
+                    if (gwinhandle)
+                    {
+                        SetFocus(gwinhandle->GethWnd());
+                    }
+                }
+                else
+                {
+                    g_running = false;
+                    if (app && app->activity)
+                    {
+                        ANativeActivity_finish(app->activity);
+                    }
+                }
+            }
+            return 1;
         }
     }
 
