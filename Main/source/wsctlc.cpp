@@ -5,6 +5,10 @@
 #include "wsctlc_addon.h"
 #include "CGMProtect.h"
 #include "NewUISystem.h"
+#ifdef __ANDROID__
+#include <android/log.h>
+#define MU_SOCKET_LOG(...) __android_log_print(ANDROID_LOG_INFO, "MUAndroidSocket", __VA_ARGS__)
+#endif
 
 CWsctlc::CWsctlc()
 {
@@ -15,6 +19,8 @@ CWsctlc::CWsctlc()
 	m_nSendBufLen = 0;
 	m_RecvBuf[0] = '\0';
 	m_nRecvBufLen = 0;
+	m_RemoteIp[0] = '\0';
+	m_RemotePort = 0;
 
 	m_pPacketQueue = new CPacketQueue;
 	m_LogPrint = 0;
@@ -202,6 +208,8 @@ int CWsctlc::Create(HWND hWnd, BOOL bGame)
 #endif
 
 	m_hWnd = hWnd;
+	m_RemoteIp[0] = '\0';
+	m_RemotePort = 0;
 	return TRUE;
 }
 
@@ -243,6 +251,12 @@ BOOL CWsctlc::Close()
 
 	m_nSendBufLen = 0;
 	m_nRecvBufLen = 0;
+
+#ifdef __ANDROID__
+	MU_SOCKET_LOG("Close: game=%d remote=%s:%u", m_bGame, m_RemoteIp[0] ? m_RemoteIp : "?", m_RemotePort);
+#endif
+	m_RemoteIp[0] = '\0';
+	m_RemotePort = 0;
 
 	// Clear Packet Queue
 	while (!m_pPacketQueue->IsEmpty())
@@ -371,6 +385,13 @@ int CWsctlc::Connect(char* ip_addr, unsigned short port, DWORD WinMsgNum)
 		//cLogProc.Add("Client WSAAsyncSelect error %d", WSAGetLastError());
 		return FALSE;
 	}
+
+	strncpy(m_RemoteIp, ip_addr, sizeof(m_RemoteIp) - 1);
+	m_RemoteIp[sizeof(m_RemoteIp) - 1] = '\0';
+	m_RemotePort = port;
+#ifdef __ANDROID__
+	MU_SOCKET_LOG("Connect: game=%d remote=%s:%u", m_bGame, m_RemoteIp, m_RemotePort);
+#endif
 	return 1;
 }
 
@@ -487,6 +508,9 @@ int CWsctlc::nRecv()
 
 	if (nResult == 0)
 	{
+	#ifdef __ANDROID__
+		MU_SOCKET_LOG("nRecv: remote closed connection game=%d remote=%s:%u", m_bGame, m_RemoteIp[0] ? m_RemoteIp : "?", m_RemotePort);
+	#endif
 		return 1;
 	}
 	if (nResult == SOCKET_ERROR)
@@ -496,6 +520,9 @@ int CWsctlc::nRecv()
 			return 1;
 		}
 		else {
+#ifdef __ANDROID__
+			MU_SOCKET_LOG("nRecv: socket error=%d game=%d remote=%s:%u", WSAGetLastError(), m_bGame, m_RemoteIp[0] ? m_RemoteIp : "?", m_RemotePort);
+#endif
 #ifdef _DEBUG
 			LogPrint("recv() %d", WSAGetLastError());
 #endif

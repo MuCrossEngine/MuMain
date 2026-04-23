@@ -52,6 +52,8 @@ private :
 	int		m_nSendBufLen;
 	BYTE	m_RecvBuf[MAX_RECVBUF];
 	int		m_nRecvBufLen;
+	char	m_RemoteIp[64];
+	unsigned short	m_RemotePort;
 	int		m_LogPrint;
 	FILE*	m_logfp;
 	CPacketQueue*	m_pPacketQueue;

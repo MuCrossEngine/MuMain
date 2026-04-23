@@ -432,11 +432,11 @@ BOOL SEASON3B::CNewUIReconnect::ReconnectCreateConnection(char* address, WORD po
 {
 	if (gmProtect->ReconnectTime > 0)
 	{
-		if (PORT_RANGE(port) != 0)
+		if (PORT_RANGE(port) != 0 && GameServerAddress != address)
 		{
 			if (strcmp(ReconnectMapServerAddress, address) != 0 || ReconnectMapServerPort != port)
 			{
-				snprintf(GameServerAddress, sizeof(GameServerAddress), "%s", address);
+				wsprintf(GameServerAddress, "%s", address);
 
 				GameServerPort = port;
 

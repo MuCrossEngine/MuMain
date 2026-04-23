@@ -314,13 +314,6 @@ void ReceiveServerList(BYTE* ReceiveBuffer)
 	}
 
 	CUIMng& rUIMng = CUIMng::Instance();
-	if (SceneFlag != LOG_IN_SCENE || !InitLogIn)
-	{
-		g_ErrorReport.Write("ReceiveServerList deferred: login UI not initialized yet.\r\n");
-		g_ConsoleDebug->Write(MCD_RECEIVE, "0xF4 [ReceiveServerList deferred]");
-		return;
-	}
-
 	if (!rUIMng.m_CreditWin.IsShow())
 	{
 		rUIMng.ShowWin(&rUIMng.m_ServerSelWin);
@@ -339,88 +332,12 @@ void ReceiveServerConnect(BYTE* ReceiveBuffer)
 	memset(MyAddressIp, 0, 16);
 	memcpy(MyAddressIp, (char*)Data->IP, 15);
 
-#ifdef __ANDROID__
-	auto IsPrivateIPv4 = [](const char* ip) -> bool
-	{
-		if (ip == NULL || ip[0] == '\0')
-		{
-			return false;
-		}
-
-		unsigned int a = 0, b = 0, c = 0, d = 0;
-		if (sscanf(ip, "%u.%u.%u.%u", &a, &b, &c, &d) != 4)
-		{
-			return false;
-		}
-
-		if (a == 10 || a == 127)
-		{
-			return true;
-		}
-
-		if (a == 172 && b >= 16 && b <= 31)
-		{
-			return true;
-		}
-
-		if (a == 192 && b == 168)
-		{
-			return true;
-		}
-
-		return false;
-	};
-
-	char fallbackIp[16] = { 0, };
-	bool hasFallbackIp = false;
-	if (IsPrivateIPv4(MyAddressIp))
-	{
-		if (szServerIpAddress != NULL && szServerIpAddress[0] != '\0' && !IsPrivateIPv4(szServerIpAddress))
-		{
-			strncpy(fallbackIp, szServerIpAddress, sizeof(fallbackIp) - 1);
-		}
-		else
-		{
-			strncpy(fallbackIp, "10.0.2.2", sizeof(fallbackIp) - 1);
-		}
-
-		hasFallbackIp = (strcmp(fallbackIp, MyAddressIp) != 0);
-	}
-#endif
-
 	g_ErrorReport.Write("[ReceiveServerConnect]");
 	SocketClient.Close();
 
-	bool bReconnectOk = g_pReconnectUI->ReconnectCreateConnection(MyAddressIp, Data->Port);
-
-#ifdef __ANDROID__
-	if (!bReconnectOk && hasFallbackIp)
-	{
-		bReconnectOk = g_pReconnectUI->ReconnectCreateConnection(fallbackIp, Data->Port);
-		if (bReconnectOk)
-		{
-			strncpy(MyAddressIp, fallbackIp, sizeof(MyAddressIp) - 1);
-		}
-	}
-
-#endif
-
-	if (bReconnectOk)
+	if (g_pReconnectUI->ReconnectCreateConnection(MyAddressIp, Data->Port))
 	{
 		g_bGameServerConnected = TRUE;
-
-#ifdef __ANDROID__
-		CUIMng& rUIMng = CUIMng::Instance();
-		if (!rUIMng.m_CreditWin.IsShow())
-		{
-			CurrentProtocolState = RECEIVE_JOIN_SERVER_SUCCESS;
-			rUIMng.ShowWin(&rUIMng.m_LoginWin);
-			if (rUIMng.m_LoginWin.GetIDInputBox())
-			{
-				rUIMng.m_LoginWin.GetIDInputBox()->GiveFocus(TRUE);
-			}
-		}
-#endif
 	}
 
 	char Text[100];
@@ -14003,6 +13920,9 @@ void settings_invasion_manager(BYTE* ReceiveBuffer)
 	}
 }
 #include "Protocol.h"
+#ifdef __ANDROID__
+#include <android/log.h>
+#endif
 BOOL TranslateProtocol(int HeadCode, BYTE* ReceiveBuffer, int Size, BOOL bEncrypted)
 {
 	//===Hook Protocol Custom
@@ -14026,6 +13946,9 @@ BOOL TranslateProtocol(int HeadCode, BYTE* ReceiveBuffer, int Size, BOOL bEncryp
 			break;
 		case 0x01: //receive log in
 			g_pReconnectUI->ReconnectOnConnectAccount(Data->Value);
+		#ifdef __ANDROID__
+			__android_log_print(ANDROID_LOG_INFO, "MUAndroidLogin", "RecvLogin: result=0x%02X", Data->Value);
+		#endif
 			//AddDebugText(ReceiveBuffer,Size);
 			switch (Data->Value)
 			{

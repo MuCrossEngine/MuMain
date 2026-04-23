@@ -68,63 +68,41 @@ void CUIMng::CreateTitleSceneUI()
 	CInput& rInput = CInput::Instance();
 	float fScaleX = (float)rInput.GetScreenWidth() / 800.0f;
 	float fScaleY = (float)rInput.GetScreenHeight() / 600.0f;
-	float fOffsetX800 = 0.0f;
-	float fOffsetY800 = 0.0f;
 
 	m_asprTitle = new CSprite[UIM_TS_MAX];
 
 	float _fScaleXTemp = (float)rInput.GetScreenWidth() / 1280.0f;
 	float _fScaleYTemp = (float)rInput.GetScreenHeight() / 1024.0f;
-	float fOffsetX1280 = 0.0f;
-	float fOffsetY1280 = 0.0f;
-
-#ifdef __ANDROID__
-	const float sw = static_cast<float>(rInput.GetScreenWidth());
-	const float sh = static_cast<float>(rInput.GetScreenHeight());
-	const float kBoost = 1.20f;
-
-	const float cover800 = (((sw / 800.0f) > (sh / 600.0f)) ? (sw / 800.0f) : (sh / 600.0f)) * kBoost;
-	fScaleX = cover800;
-	fScaleY = cover800;
-	fOffsetX800 = ((sw / cover800) - 800.0f) * 0.5f;
-	fOffsetY800 = ((sh / cover800) - 600.0f) * 0.5f;
-
-	const float cover1280 = (((sw / 1280.0f) > (sh / 1024.0f)) ? (sw / 1280.0f) : (sh / 1024.0f)) * kBoost;
-	_fScaleXTemp = cover1280;
-	_fScaleYTemp = cover1280;
-	fOffsetX1280 = ((sw / cover1280) - 1280.0f) * 0.5f;
-	fOffsetY1280 = ((sh / cover1280) - 1024.0f) * 0.5f;
-#endif
 
 	m_asprTitle[UIM_TS_BACK0].Create(400, 69, BITMAP_TITLE, 0, NULL, 0, 0, false, SPR_SIZING_DATUMS_LT, fScaleX, fScaleY);
-	m_asprTitle[UIM_TS_BACK0].SetPosition(0 + fOffsetX800, 0 + fOffsetY800);
+	m_asprTitle[UIM_TS_BACK0].SetPosition(0, 0);
 
 	m_asprTitle[UIM_TS_BACK1].Create(400, 69, BITMAP_TITLE + 1, 0, NULL, 0, 0, false, SPR_SIZING_DATUMS_LT, fScaleX, fScaleY);
-	m_asprTitle[UIM_TS_BACK1].SetPosition(400 + fOffsetX800, 0 + fOffsetY800);
+	m_asprTitle[UIM_TS_BACK1].SetPosition(400, 0);
 
 	m_asprTitle[UIM_TS_BACK2].Create(400, 100, BITMAP_TITLE + 6, 0, NULL, 0, 0, false, SPR_SIZING_DATUMS_LT, fScaleX, fScaleY);
-	m_asprTitle[UIM_TS_BACK2].SetPosition(0 + fOffsetX800, 500 + fOffsetY800);
+	m_asprTitle[UIM_TS_BACK2].SetPosition(0, 500);
 
 	m_asprTitle[UIM_TS_BACK3].Create(400, 100, BITMAP_TITLE + 7, 0, NULL, 0, 0, false, SPR_SIZING_DATUMS_LT, fScaleX, fScaleY);
-	m_asprTitle[UIM_TS_BACK3].SetPosition(400 + fOffsetX800, 500 + fOffsetY800);
+	m_asprTitle[UIM_TS_BACK3].SetPosition(400, 500);
 
 	m_asprTitle[UIM_TS_BACK4].Create(512, 512, BITMAP_TITLE + 8, 0, NULL, 0, 0, false, SPR_SIZING_DATUMS_LT, _fScaleXTemp, _fScaleYTemp);
-	m_asprTitle[UIM_TS_BACK4].SetPosition(0 + fOffsetX1280, 119 + fOffsetY1280);
+	m_asprTitle[UIM_TS_BACK4].SetPosition(0, 119);
 
 	m_asprTitle[UIM_TS_BACK5].Create(512, 512, BITMAP_TITLE + 9, 0, NULL, 0, 0, false, SPR_SIZING_DATUMS_LT, _fScaleXTemp, _fScaleYTemp);
-	m_asprTitle[UIM_TS_BACK5].SetPosition(512 + fOffsetX1280, 119 + fOffsetY1280);
+	m_asprTitle[UIM_TS_BACK5].SetPosition(512, 119);
 
 	m_asprTitle[UIM_TS_BACK6].Create(256, 512, BITMAP_TITLE + 10, 0, NULL, 0, 0, false, SPR_SIZING_DATUMS_LT, _fScaleXTemp, _fScaleYTemp);
-	m_asprTitle[UIM_TS_BACK6].SetPosition(1024 + fOffsetX1280, 119 + fOffsetY1280);
+	m_asprTitle[UIM_TS_BACK6].SetPosition(1024, 119);
 
 	m_asprTitle[UIM_TS_BACK7].Create(512, 223, BITMAP_TITLE + 11, 0, NULL, 0, 0, false, SPR_SIZING_DATUMS_LT, _fScaleXTemp, _fScaleYTemp);
-	m_asprTitle[UIM_TS_BACK7].SetPosition(0 + fOffsetX1280, 512 + 119 + fOffsetY1280);
+	m_asprTitle[UIM_TS_BACK7].SetPosition(0, 512 + 119);
 
 	m_asprTitle[UIM_TS_BACK8].Create(512, 223, BITMAP_TITLE + 12, 0, NULL, 0, 0, false, SPR_SIZING_DATUMS_LT, _fScaleXTemp, _fScaleYTemp);
-	m_asprTitle[UIM_TS_BACK8].SetPosition(512 + fOffsetX1280, 512 + 119 + fOffsetY1280);
+	m_asprTitle[UIM_TS_BACK8].SetPosition(512, 512 + 119);
 
 	m_asprTitle[UIM_TS_BACK9].Create(256, 223, BITMAP_TITLE + 13, 0, NULL, 0, 0, false, SPR_SIZING_DATUMS_LT, _fScaleXTemp, _fScaleYTemp);
-	m_asprTitle[UIM_TS_BACK9].SetPosition(1024 + fOffsetX1280, 512 + 119 + fOffsetY1280);
+	m_asprTitle[UIM_TS_BACK9].SetPosition(1024, 512 + 119);
 
 
 	m_asprTitle[UIM_TS_MU].Create(216, 138, BITMAP_TITLE + 2, 0, NULL, 0, 0, false, SPR_SIZING_DATUMS_LT, _fScaleYTemp, _fScaleYTemp);

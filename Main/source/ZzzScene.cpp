@@ -386,44 +386,6 @@ void MovieScene(HDC hDC)
 
 bool InitWebzenScene = false;
 
-#ifdef __ANDROID__
-static bool s_bAndroidLoginCoreDataLoaded = false;
-
-static void OpenAndroidLoginCoreData()
-{
-	if (s_bAndroidLoginCoreDataLoaded)
-	{
-		return;
-	}
-
-	::LoadBitmap("Interface\\message_ok_b_all.tga", BITMAP_BUTTON);
-	::LoadBitmap("Interface\\loding_cancel_b_all.tga", BITMAP_BUTTON + 1);
-	::LoadBitmap("Interface\\message_close_b_all.tga", BITMAP_BUTTON + 2);
-	::LoadBitmap("Interface\\message_back.tga", BITMAP_MESSAGE_WIN);
-	::LoadBitmap("Interface\\delete_secret_number.tga", BITMAP_MSG_WIN_INPUT);
-	::LoadBitmap("Interface\\op1_stone.jpg", BITMAP_SYS_WIN, GL_NEAREST, GL_REPEAT);
-	::LoadBitmap("Interface\\op1_back1.tga", BITMAP_SYS_WIN + 1);
-	::LoadBitmap("Interface\\op1_back2.tga", BITMAP_SYS_WIN + 2);
-	::LoadBitmap("Interface\\op1_back3.jpg", BITMAP_SYS_WIN + 3, GL_NEAREST, GL_REPEAT);
-	::LoadBitmap("Interface\\op1_back4.jpg", BITMAP_SYS_WIN + 4, GL_NEAREST, GL_REPEAT);
-	::LoadBitmap("Interface\\op1_b_all.tga", BITMAP_TEXT_BTN);
-	::LoadBitmap("Interface\\op2_back1.tga", BITMAP_OPTION_WIN);
-	::LoadBitmap("Interface\\op2_ch.tga", BITMAP_CHECK_BTN);
-	::LoadBitmap("Interface\\op2_volume3.tga", BITMAP_SLIDER);
-	::LoadBitmap("Interface\\op2_volume2.jpg", BITMAP_SLIDER + 1, GL_NEAREST, GL_REPEAT);
-	::LoadBitmap("Interface\\op2_volume1.tga", BITMAP_SLIDER + 2);
-
-	OpenTextData();
-
-	if (g_pNewUISystem)
-	{
-		g_pNewUISystem->LoadMainSceneInterface();
-	}
-
-	s_bAndroidLoginCoreDataLoaded = true;
-}
-#endif
-
 void CreateWebzenScene()
 {
 	CUIMng& rUIMng = CUIMng::Instance();
@@ -472,15 +434,7 @@ void CreateWebzenScene()
 	if (CreateSocket(szServerIpAddress, g_ServerPort))
 	{
 		SendRequestServerHWID();
-#ifdef __ANDROID__
-		SendRequestServerList();
-#endif
-#ifdef __ANDROID__
-		// Android path bypasses legacy launcher update handshake.
-		GMConnectHex->SetUpdateVersion(false);
-#else
 		SendRequestServerUpdate(GMConnectHex->GetClientVersion());
-#endif
 	}
 	else
 	{
@@ -505,14 +459,9 @@ void WebzenScene(HDC hDC)
 		LoadBitmap("Interface\\lo_lo.jpg", BITMAP_TITLE + 5, GL_LINEAR, GL_REPEAT);
 
 		EnableAlphaTest();
-
-#ifdef __ANDROID__
-		OpenAndroidLoginCoreData();
-#else
 		OpenBasicData(hDC);
 
 		g_pNewUISystem->LoadMainSceneInterface();
-#endif
 
 		CUIMng::Instance().RenderTitleSceneUI(hDC, 11, 12);
 
@@ -544,14 +493,9 @@ void WebzenScene(HDC hDC)
 	CUIMng& rUIMng = CUIMng::Instance();
 
 	EnableAlphaTest();
-
-#ifdef __ANDROID__
-	OpenAndroidLoginCoreData();
-#else
 	OpenBasicData(hDC);
 
 	g_pNewUISystem->LoadMainSceneInterface();
-#endif
 
 	CUIMng::Instance().RenderTitleSceneUI(hDC, 11, 12);
 
@@ -1558,13 +1502,6 @@ void CreateLogInScene()
 {
 	EnableMainRender = true;
 
-#ifdef __ANDROID__
-	if (gmProtect->SceneLogin != 1)
-	{
-		gmProtect->SceneLogin = 1;
-	}
-#endif
-
 	if (gmProtect->SceneLogin == 1)
 	{
 		vec3_t Angle, Position;
@@ -1645,26 +1582,11 @@ void CreateLogInScene()
 
 	CUIMng::Instance().CreateLoginScene();
 
-#ifdef __ANDROID__
-	// Keep login controls visible from scene start on Android.
-	// Without this, the app can stay on background-only view until
-	// a server-list packet is received.
-	{
-		CUIMng& rUIMng = CUIMng::Instance();
-		rUIMng.ShowWin(&rUIMng.m_LoginMainWin);
-		rUIMng.ShowWin(&rUIMng.m_ServerSelWin);
-		rUIMng.m_ServerSelWin.UpdateDisplay();
-	}
-#endif
-
 	CurrentProtocolState = REQUEST_JOIN_SERVER;
 
 	if (g_pReconnectUI->ReconnectCreateConnection(szServerIpAddress, g_ServerPort))
 	{
 		SendRequestServerHWID();
-#ifdef __ANDROID__
-		SendRequestServerList();
-#endif
 	}
 
 	EnableSocket = true;
@@ -1746,25 +1668,6 @@ void NewMoveLogInScene()
 			MoveCamera();
 		}
 	}
-
-#ifdef __ANDROID__
-	{
-		static DWORD s_dwLastServerListReq = 0;
-
-		if (!CUIMng::Instance().m_CreditWin.IsShow() &&
-			CurrentProtocolState == REQUEST_JOIN_SERVER &&
-			g_ServerListManager->GetServerGroupSize() <= 0)
-		{
-			const DWORD dwNow = GetTickCount();
-			if (s_dwLastServerListReq == 0 || dwNow - s_dwLastServerListReq >= 2000)
-			{
-				SendRequestServerList();
-				s_dwLastServerListReq = dwNow;
-			}
-		}
-	}
-#endif
-
 	if (CInput::Instance().IsKeyDown(VK_ESCAPE))
 	{
 		CUIMng* rUIMng = &CUIMng::Instance();

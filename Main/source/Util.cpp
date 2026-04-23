@@ -7,6 +7,11 @@
 #include <codecvt>
 
 #include <iostream>
+#ifdef __ANDROID__
+#include <android/log.h>
+#define MU_LOG_TAG "MUAndroidLogin"
+#define MU_LOGI(...) __android_log_print(ANDROID_LOG_INFO, MU_LOG_TAG, __VA_ARGS__)
+#endif
 #ifndef __ANDROID__
 #pragma comment(lib,"Rpcrt4.lib")
 #endif
@@ -306,11 +311,12 @@ void create_hwid_system(char* ComputerHardwareId)
 		return;
 	}
 
-	strcpy(ComputerHardwareId, "ANDROID-00000000-00000000-00000000");
+	strcpy(ComputerHardwareId, "00000000-00000000-00000000-00000000");
 
 	ANativeActivity* activity = AndroidCompatNativeActivity();
 	if (activity == NULL || activity->vm == NULL || activity->clazz == NULL)
 	{
+		MU_LOGI("create_hwid_system: NativeActivity unavailable, fallback HWID=%s", ComputerHardwareId);
 		return;
 	}
 
@@ -320,6 +326,7 @@ void create_hwid_system(char* ComputerHardwareId)
 	{
 		if (activity->vm->AttachCurrentThread(&env, NULL) != JNI_OK || env == NULL)
 		{
+			MU_LOGI("create_hwid_system: AttachCurrentThread failed, fallback HWID=%s", ComputerHardwareId);
 			return;
 		}
 		attached = true;
@@ -339,6 +346,7 @@ void create_hwid_system(char* ComputerHardwareId)
 				{
 					strncpy(ComputerHardwareId, hardwareId, 35);
 					ComputerHardwareId[35] = '\0';
+					MU_LOGI("create_hwid_system: Java HWID=%s", ComputerHardwareId);
 				}
 				if (hardwareId != NULL)
 				{
@@ -349,9 +357,18 @@ void create_hwid_system(char* ComputerHardwareId)
 			else if (env->ExceptionCheck())
 			{
 				env->ExceptionClear();
+				MU_LOGI("create_hwid_system: Java exception, fallback HWID=%s", ComputerHardwareId);
 			}
 		}
+		else
+		{
+			MU_LOGI("create_hwid_system: getAndroidHardwareId method not found, fallback HWID=%s", ComputerHardwareId);
+		}
 		env->DeleteLocalRef(cls);
+	}
+	else
+	{
+		MU_LOGI("create_hwid_system: GetObjectClass failed, fallback HWID=%s", ComputerHardwareId);
 	}
 
 	if (attached)

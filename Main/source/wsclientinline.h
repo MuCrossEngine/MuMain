@@ -20,6 +20,10 @@
 #include "NewUISystem.h" 
 #include "ProtocolSend.h" 
 #include "Utilities/Log/DebugAngel.h"
+#ifdef __ANDROID__
+#include <android/log.h>
+#define MU_LOGIN_LOG(...) __android_log_print(ANDROID_LOG_INFO, "MUAndroidLogin", __VA_ARGS__)
+#endif
 
 #define PACKET_MOVE					0xD4
 #define PACKET_POSITION				0x15
@@ -247,11 +251,14 @@ inline void SendRequestLogIn(const char* p_lpszID, const char* p_lpszPassword)
 
 	strncpy(lpszID, p_lpszID, MAX_ID_SIZE);
 	strncpy(lpszPass, p_lpszPassword, MAX_PASSWORD_SIZE);
-	BuxConvert((BYTE*)lpszID, MAX_ID_SIZE);
-	BuxConvert((BYTE*)lpszPass, MAX_PASSWORD_SIZE);
-
 	char ComputerHardwareId[36] = { 0, };
 	create_hwid_system(ComputerHardwareId);
+#ifdef __ANDROID__
+	MU_LOGIN_LOG("SendRequestLogIn: id='%s' passLen=%d hwid='%s'", p_lpszID, (int)strlen(p_lpszPassword), ComputerHardwareId);
+#endif
+
+	BuxConvert((BYTE*)lpszID, MAX_ID_SIZE);
+	BuxConvert((BYTE*)lpszPass, MAX_PASSWORD_SIZE);
 	BuxConvert((BYTE*)ComputerHardwareId, 36);
 
 
