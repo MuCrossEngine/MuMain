@@ -66,26 +66,25 @@ include_directories(
 # lua 5.4  — TODO: add source to Main/dependencies/lua-5.4-src/
 # turbojpeg— TODO: add source to Main/dependencies/libjpeg-turbo-src/
 
-# CryptoPP excluded — no source files available in dependencies
-# if(NOT EXISTS "${CRYPTOPP_SRC_DIR}/cryptlib.cpp")
-#     message(FATAL_ERROR "Crypto++ source not found at ${CRYPTOPP_SRC_DIR}")
-# endif()
-#
-# file(GLOB CRYPTOPP_ALL_CPP CONFIGURE_DEPENDS "${CRYPTOPP_SRC_DIR}/*.cpp")
-# list(FILTER CRYPTOPP_ALL_CPP EXCLUDE REGEX ".*/(adhoc|bench1|bench2|bench3|datatest|dlltest|fipsalgt|fipstest|regtest[1-4]|test|validat[0-9]+|simple|pch)\\.cpp$")
-#
-# add_library(cryptopp_android STATIC
-#     ${CRYPTOPP_ALL_CPP}
-#     ${NDK_CPUFEATURES_DIR}/cpu-features.c
-# )
-#
-# set_target_properties(cryptopp_android PROPERTIES
-#     POSITION_INDEPENDENT_CODE ON
-# )
-#
-# target_compile_definitions(cryptopp_android PRIVATE
-#     CRYPTOPP_DISABLE_ASM
-# )
+if(NOT EXISTS "${CRYPTOPP_SRC_DIR}/cryptlib.cpp")
+    message(FATAL_ERROR "Crypto++ source not found at ${CRYPTOPP_SRC_DIR}")
+endif()
+
+file(GLOB CRYPTOPP_ALL_CPP CONFIGURE_DEPENDS "${CRYPTOPP_SRC_DIR}/*.cpp")
+list(FILTER CRYPTOPP_ALL_CPP EXCLUDE REGEX ".*/(adhoc|bench1|bench2|bench3|datatest|dlltest|fipsalgt|fipstest|regtest[1-4]|test|validat[0-9]+|simple|pch)\\.cpp$")
+
+add_library(cryptopp_android STATIC
+    ${CRYPTOPP_ALL_CPP}
+    ${NDK_CPUFEATURES_DIR}/cpu-features.c
+)
+
+set_target_properties(cryptopp_android PROPERTIES
+    POSITION_INDEPENDENT_CODE ON
+)
+
+target_compile_definitions(cryptopp_android PRIVATE
+    CRYPTOPP_DISABLE_ASM
+)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Android NDK libraries
