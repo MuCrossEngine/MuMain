@@ -11,7 +11,7 @@ set(SOURCE_DIR  "${CMAKE_CURRENT_SOURCE_DIR}/../../../../../source")
 set(DEP_DIR     "${CMAKE_CURRENT_SOURCE_DIR}/../../../../../dependencies")
 set(UTIL_DIR    "${CMAKE_CURRENT_SOURCE_DIR}/../../../../../../Util")
 set(PLATFORM_DIR "${SOURCE_DIR}/Platform")
-set(CRYPTOPP_SRC_DIR "${DEP_DIR}/cryptopp-src")
+set(CRYPTOPP_SRC_DIR "${DEP_DIR}/include/cryptopp820")
 set(NATIVE_APP_GLUE_DIR "${ANDROID_NDK}/sources/android/native_app_glue")
 set(NDK_CPUFEATURES_DIR "${ANDROID_NDK}/sources/android/cpufeatures")
 

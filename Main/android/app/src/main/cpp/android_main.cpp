@@ -890,14 +890,15 @@ void android_main(android_app* app)
     // Main loop — equivalent to the PeekMessage loop in WINHANDLE.cpp
     while (g_running)
     {
-        int events;
-        android_poll_source* source;
-
-        // Poll for events (timeout=0 when rendering, -1 when paused)
         int timeout = (g_focused && g_initialized) ? 0 : -1;
-        if (ALooper_pollAll(timeout, nullptr, &events, (void**)&source) >= 0)
+        int fd = -1;
+        int events = 0;
+        void* pollSource = nullptr;
+        
+        int result = ALooper_pollOnce(timeout, &fd, &events, &pollSource);
+        if (result > 0 && pollSource)
         {
-            if (source) source->process(app, source);
+            ((android_poll_source*)pollSource)->process(app, (android_poll_source*)pollSource);
         }
 
         if (app->destroyRequested)
