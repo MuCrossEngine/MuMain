@@ -1,6 +1,28 @@
 #include "stdafx.h"
 #include "CGMProtect.h"
 
+#ifdef __ANDROID__
+#include <android/log.h>
+static void LogMem(const char* tag)
+{
+    FILE* f = fopen("/proc/self/status", "r");
+    if (!f) return;
+    char line[128];
+    long vmrss = 0, vmswap = 0;
+    while (fgets(line, sizeof(line), f))
+    {
+        if (strncmp(line, "VmRSS:", 6) == 0)  sscanf(line + 6, "%ld", &vmrss);
+        if (strncmp(line, "VmSwap:", 7) == 0) sscanf(line + 7, "%ld", &vmswap);
+    }
+    fclose(f);
+    __android_log_print(ANDROID_LOG_INFO, "MUMem",
+        "%s: RSS=%ldMB Swap=%ldMB Total=%ldMB",
+        tag, vmrss/1024, vmswap/1024, (vmrss+vmswap)/1024);
+}
+#else
+static void LogMem(const char*) {}
+#endif
+
 #include "UIControls.h"
 #include "ZzzOpenglUtil.h"
 #include "ZzzBMD.h"
@@ -56,6 +78,7 @@ extern SEASON3A::CMixRecipeMgr g_MixRecipeMgr;
 
 void OpenPlayers()
 {
+	LogMem("OpenPlayers:start");
 	gmClientModels->AccessModel(MODEL_PLAYER, "Data\\Player\\", "Player");
 
 	if (gmClientModels->GetPlayerModel()->NumMeshs > 0)
@@ -427,6 +450,7 @@ void OpenPlayers()
 
 void OpenPlayerTextures()
 {
+	LogMem("OpenPlayerTextures:start");
 	//-- Skin basic evo1
 	LoadBitmap("Player\\skin_barbarian_01.jpg", BITMAP_SKIN, GL_NEAREST, GL_CLAMP_TO_EDGE, true, false);
 	LoadBitmap("Player\\skin_wizard_01.jpg", BITMAP_SKIN + 1, GL_NEAREST, GL_CLAMP_TO_EDGE, true, false);
@@ -814,6 +838,7 @@ void OpenPlayerTextures()
 
 void OpenItems()
 {
+	LogMem("OpenItems:start");
 	//////////////////////////////////////////////////////////////////////////
 	//  MODEL_SWORD
 	//////////////////////////////////////////////////////////////////////////
@@ -1473,6 +1498,7 @@ void OpenItems()
 
 void OpenItemTextures()
 {
+	LogMem("OpenItemTextures:start");
 	for (int i = 0; i < 4; ++i)
 	{
 		if (i >= 3)
@@ -5356,6 +5382,7 @@ static bool LoadLogoBitmapWithFallback(const char* szPrimary, GLuint uiTextureIn
 
 void OpenLogoSceneData()
 {
+	LogMem("OpenLogoSceneData:start");
 	if (gmProtect->SceneLogin == 1)
 	{
 	#ifdef __ANDROID__
@@ -5406,21 +5433,34 @@ void OpenLogoSceneData()
 #ifdef MOVIE_DIRECTSHOW
 	::LoadBitmap("Interface\\movie_b_all.tga", BITMAP_LOG_IN + 15);
 #endif	// MOVIE_DIRECTSHOW
+	LogMem("OpenLogoSceneData:end");
 }
 
 void ReleaseLogoSceneData()
 {
+	LogMem("ReleaseLogoSceneData:start");
 	for (int i = BITMAP_LOG_IN; i <= BITMAP_LOG_IN_END; ++i)
 		::DeleteBitmap(i);
 	for (int i = BITMAP_TEMP; i < BITMAP_TEMP + 30; i++)
 		DeleteBitmap(i);
 
+	// Release the 3D login scene models so they don't compete with
+	// the character scene models for memory (avoids OOM on Android).
+	if (gmProtect->SceneLogin == 1)
+	{
+		gmClientModels->GetModel(MODEL_SHIP)->Release();
+		for (int i = 0; i < 4; i++)
+			gmClientModels->GetModel(MODEL_LOGO + i)->Release();
+	}
+
 	gMapManager->DeleteObjects();
 	ClearCharacters();
+	LogMem("ReleaseLogoSceneData:end");
 }
 
 void OpenCharacterSceneData()
 {
+	LogMem("OpenCharacterSceneData:start");
 	if (gmProtect->SceneCharacter == 1)
 	{
 		LoadBitmap("Logo\\Interface01.tga", BITMAP_LOG_IN + 8, GL_NEAREST, GL_REPEAT);
@@ -5477,6 +5517,7 @@ void OpenCharacterSceneData()
 		gmClientModels->GetModel(MODEL_FACE + i)->Actions[1].PlaySpeed = 0.3f;
 	}
 	gmClientModels->GetModel(MODEL_FACE + CLASS_SUMMONER)->Actions[0].PlaySpeed = 0.25f;
+	LogMem("OpenCharacterSceneData:end");
 }
 
 void ReleaseCharacterSceneData()
@@ -5497,6 +5538,7 @@ void ReleaseCharacterSceneData()
 
 void OpenBasicData(HDC hDC)
 {
+	LogMem("OpenBasicData:start");
 	CUIMng& rUIMng = CUIMng::Instance();
 
 	rUIMng.RenderTitleSceneUI(hDC, 0, 12);
@@ -6023,9 +6065,11 @@ void OpenBasicData(HDC hDC)
 
 
 	g_ErrorReport.Write("> First Load Files OK.\r\n");
+	LogMem("OpenBasicData:first-textures-done");
 
 	OpenPlayers();
 	rUIMng.RenderTitleSceneUI(hDC, 2, 12);
+	LogMem("OpenBasicData:OpenPlayers-done");
 
 	OpenPlayerTextures();
 	rUIMng.RenderTitleSceneUI(hDC, 3, 12);
@@ -6185,6 +6229,7 @@ void OpenBasicData(HDC hDC)
 	LoadWaveFile(SOUND_RING_EVENT_END, "Data\\Sound\\iEventEnd.wav", 1);
 
 	rUIMng.RenderTitleSceneUI(hDC, 11, 12);
+	LogMem("OpenBasicData:end");
 }
 
 #if MAIN_UPDATE > 303

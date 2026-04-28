@@ -219,7 +219,7 @@ Atualizar os checkboxes conforme cada item for concluído.
 - [x] Boot: `OpenBasicData()` carrega dados sem crash (WEBZEN_SCENE) e avanca para `LOG_IN_SCENE`
 - [ ] Login: render e conexao inicial validados; faltam validacoes finais de input/texto e fluxo completo de UI (LOG_IN_SCENE)
 - [ ] Server select: lista de servidores aparece, seleção funciona
-- [ ] Character select: lista renderiza com modelos 3D
+- [ ] Character select: crash de tela preta após login corrigido (2026-04-28): `CreateCharacterScene()` agora força `SceneCharacter=1` no Android para evitar `LoadWorld(74)+RenderTerrain` que crashava no backend GLES3 (`ZzzLodTerrain` não adaptado); aguarda validação final de render/UI em runtime
 - [ ] Character creation: modelos de criação renderizam
 - [ ] Main scene: terreno, personagem, UI in-game (MAIN_SCENE)
 - [x] Crash hardening inicial em `MainScene`: removidos aborts imediatos por formatação insegura de strings (`FORTIFY`) no Android

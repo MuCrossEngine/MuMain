@@ -813,9 +813,16 @@ void CGlobalBitmap::CreateMipmappedTexture(GLuint* TextureNumber, GLuint Compone
 
 	glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
 
+#ifdef __ANDROID__
+	// On GLES3, GL_TEXTURE_MAX_LEVEL is a per-texture param, not a global state.
+	// glGetIntegerv(GL_TEXTURE_MAX_LEVEL) generates GL_INVALID_ENUM on GLES3.
+	// Skip mipmaps on Android; use simple filter fallback below.
+	GLint maxMipLevels = 0;
+#else
 	GLint maxMipLevels = 0;
 
 	glGetIntegerv(GL_TEXTURE_MAX_LEVEL, &maxMipLevels);
+#endif
 
 	if (maxMipLevels != 0 && !GMProtect->IsWindows11())
 	{

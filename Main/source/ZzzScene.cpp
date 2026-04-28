@@ -72,6 +72,7 @@
 #include "ConnectVersionHex.h"
 #ifdef __ANDROID__
 #include "Platform/GameAssetPath.h"
+#include <android/log.h>
 #endif
 
 extern CUITextInputBox* g_pSingleTextInputBox;
@@ -418,7 +419,24 @@ static bool AndroidCanUseOriginalLoginScene(BYTE sceneLogin)
 
 	case 4:
 		return AndroidAssetExists("Data\\World94\\Encterrain94.map")
-			&& AndroidAssetExists("Data\\Object94\\Object01.bmd");
+			&& AndroidAssetExists("Data\\World94\\Encterrain94.att")
+			&& AndroidAssetExists("Data\\World94\\EncTerrain94.obj")
+			&& AndroidAssetExists("Data\\Object94\\Object01.bmd")
+			&& AndroidAssetExists("Data\\Object94\\Object02.bmd")
+			&& AndroidAssetExists("Data\\Object94\\Object03.bmd")
+			&& AndroidAssetExists("Data\\Object94\\Object05.bmd")
+			&& AndroidAssetExists("Data\\Object94\\Object07.bmd")
+			&& AndroidAssetExists("Data\\Object94\\Object08.bmd")
+			&& AndroidAssetExists("Data\\Object94\\Object10.bmd")
+			&& AndroidAssetExists("Data\\Object94\\Object11.bmd")
+			&& AndroidAssetExists("Data\\Object94\\Object12.bmd")
+			&& AndroidAssetExists("Data\\Object94\\Object13.bmd")
+			&& AndroidAssetExists("Data\\Object94\\Object18.bmd")
+			&& AndroidAssetExists("Data\\Object94\\Object19.bmd")
+			&& AndroidAssetExists("Data\\Object94\\Object20.bmd")
+			&& AndroidAssetExists("Data\\Object94\\Object29.bmd")
+			&& AndroidAssetExists("Data\\Object94\\Object55.bmd")
+			&& AndroidAssetExists("Data\\Object94\\Object56.bmd");
 
 	case 0:
 	default:
@@ -433,6 +451,18 @@ static void OpenAndroidLoginCoreData()
 	{
 		return;
 	}
+
+	// Cursor textures — used every frame for mouse pointer rendering
+	::LoadBitmap("Interface\\Cursor.tga",            BITMAP_CURSOR,     GL_LINEAR, GL_CLAMP_TO_EDGE);
+	::LoadBitmap("Interface\\CursorPush.tga",        BITMAP_CURSOR + 1, GL_LINEAR, GL_CLAMP_TO_EDGE);
+	::LoadBitmap("Interface\\CursorAttack.tga",      BITMAP_CURSOR + 2, GL_LINEAR, GL_CLAMP_TO_EDGE);
+	::LoadBitmap("Interface\\CursorGet.tga",         BITMAP_CURSOR + 3, GL_LINEAR, GL_CLAMP_TO_EDGE);
+	::LoadBitmap("Interface\\CursorTalk.tga",        BITMAP_CURSOR + 4, GL_LINEAR, GL_CLAMP_TO_EDGE);
+	::LoadBitmap("Interface\\CursorRepair.tga",      BITMAP_CURSOR + 5, GL_LINEAR, GL_CLAMP_TO_EDGE);
+	::LoadBitmap("Interface\\CursorLeanAgainst.tga", BITMAP_CURSOR + 6, GL_LINEAR, GL_CLAMP_TO_EDGE);
+	::LoadBitmap("Interface\\CursorSitDown.tga",     BITMAP_CURSOR + 7, GL_LINEAR, GL_CLAMP_TO_EDGE);
+	::LoadBitmap("Interface\\CursorDontMove.tga",    BITMAP_CURSOR + 8, GL_LINEAR, GL_CLAMP_TO_EDGE);
+	::LoadBitmap("Interface\\CursorAttack2.tga",     BITMAP_CURSOR2,    GL_LINEAR, GL_CLAMP_TO_EDGE);
 
 	::LoadBitmap("Interface\\message_ok_b_all.tga", BITMAP_BUTTON);
 	::LoadBitmap("Interface\\loding_cancel_b_all.tga", BITMAP_BUTTON + 1);
@@ -1130,7 +1160,17 @@ void RenderInterfaceEdge()
 
 void CreateCharacterScene()
 {
+#ifdef __ANDROID__
+	// Log as absolute first line so we can detect if we reach here at all.
+	__android_log_print(ANDROID_LOG_INFO, "MUScene", "CreateCharacterScene: entry SceneCharacter=%d", (int)gmProtect->SceneCharacter);
+	// Belt-and-suspenders: SceneCharacter was already set in NewMoveLogInScene, but force again here.
+	gmProtect->SceneCharacter = 1;
+#endif
+
 	g_pNewUIMng->ResetActiveUIObj();
+#ifdef __ANDROID__
+	__android_log_print(ANDROID_LOG_INFO, "MUScene", "CreateCharacterScene: ResetActiveUIObj done");
+#endif
 
 	EnableMainRender = true;
 	MouseOnWindow = false;
@@ -1151,11 +1191,20 @@ void CreateCharacterScene()
 		CurrentCameraAngle[1] = -800.0;
 		CurrentCameraAngle[2] = 300.0;
 
+#ifdef __ANDROID__
+		__android_log_print(ANDROID_LOG_INFO, "MUScene", "CreateCharacterScene: calling OpenCharacterSceneData");
+#endif
 		OpenCharacterSceneData();
+#ifdef __ANDROID__
+		__android_log_print(ANDROID_LOG_INFO, "MUScene", "CreateCharacterScene: OpenCharacterSceneData done");
+#endif
 
 		Vector(0.0, 0.0, 0.0, Angle);
 		Vector(0.0, 0.0, 0.0, Position);
 		CreateObject(MODEL_CARD, Position, Angle, 1.1f);
+#ifdef __ANDROID__
+		__android_log_print(ANDROID_LOG_INFO, "MUScene", "CreateCharacterScene: CreateObject MODEL_CARD done");
+#endif
 	}
 	else
 	{
@@ -1186,7 +1235,13 @@ void CreateCharacterScene()
 	CharacterView.Object.Kind = 0;
 
 	SelectedHero = -1;
+#ifdef __ANDROID__
+	__android_log_print(ANDROID_LOG_INFO, "MUScene", "CreateCharacterScene: calling CUIMng::CreateCharacterScene");
+#endif
 	CUIMng::Instance().CreateCharacterScene();
+#ifdef __ANDROID__
+	__android_log_print(ANDROID_LOG_INFO, "MUScene", "CreateCharacterScene: CUIMng done");
+#endif
 
 	ClearInventory();
 	CharacterAttribute->SkillNumber = 0;
@@ -1599,13 +1654,6 @@ void CreateLogInScene()
 
 	if (gmProtect->SceneLogin == 1)
 	{
-	#ifdef __ANDROID__
-		World = -1;
-		OpenLogoSceneData();
-		CurrentCameraCount = -1;
-		Vector(0.0, 0.0, 0.0, CameraAngle);
-		Vector(0.0, 0.0, 0.0, CameraPosition);
-	#else
 		vec3_t Angle, Position;
 
 		World = -1;
@@ -1620,24 +1668,32 @@ void CreateLogInScene()
 		Vector(-700.0, 700.0, 0.0, Position);
 
 		CreateObject(MODEL_SHIP, Position, Angle, 1.0);
+#ifndef __ANDROID__
 		CreateObject(MODEL_WAVEBYSHIP, Position, Angle, 1.0);
+#endif
 
 		Vector(400.0, 400.0, 0.0, Position);
 		CreateObject(MODEL_SHIP, Position, Angle, 1.0);
+#ifndef __ANDROID__
 		CreateObject(MODEL_WAVEBYSHIP, Position, Angle, 1.0);
+#endif
 
 		Vector(-200.0, -400.0, 0.0, Position);
 		CreateObject(MODEL_SHIP, Position, Angle, 1.0);
+#ifndef __ANDROID__
 		CreateObject(MODEL_WAVEBYSHIP, Position, Angle, 1.0);
+#endif
 
 		Vector(0.0, 0.0, 0.0, Angle);
+#ifndef __ANDROID__
 		Vector(-110.0, 1600.0, 50.0, Position);
 		CreateObject(MODEL_LOGOSUN, Position, Angle, 1.0);
 
 		Vector(0.0, -600.0, 500.0, Position);
 		CreateObject(MODEL_MUGAME, Position, Angle, 1.0);
+#endif
 
-
+#ifndef __ANDROID__
 		CHARACTER* pCharacter;
 		Vector(0.0, 0.0, 180.0, Angle);
 
@@ -1654,10 +1710,10 @@ void CreateLogInScene()
 		{
 			gGoboidManager->CreateBug(MODEL_HELPER, Position, &pCharacter->Object);
 		}
+#endif
 		CurrentCameraCount = -1;
 		Vector(0.0, 0.0, 0.0, CameraAngle);
 		Vector(0.0, 0.0, 0.0, CameraPosition);
-	#endif
 	}
 	else
 	{
@@ -1786,10 +1842,30 @@ void NewMoveLogInScene()
 	{
 		g_ErrorReport.Write("> Request Character list\r\n");
 		CCameraMove::GetInstancePtr()->SetTourMode(FALSE);
+#ifdef __ANDROID__
+		// Force SceneCharacter=1 NOW so that ReceiveCharacterList() uses the
+		// card-mode positions ((Index*100, Index*50-50)) rather than World74
+		// world-space coordinates.  SceneFlag is still LOG_IN_SCENE here.
+		gmProtect->SceneCharacter = 1;
+		__android_log_print(ANDROID_LOG_INFO, "MUScene",
+			"NewMoveLogInScene: LOGIN_SUCCESS -> CHARACTER_SCENE, SceneCharacter forced=1");
+#endif
 		SceneFlag = CHARACTER_SCENE;
+#ifdef __ANDROID__
+		__android_log_print(ANDROID_LOG_INFO, "MUScene", "LoginSuccess: SceneFlag=CHARACTER_SCENE");
+#endif
 		SendRequestCharactersList(g_pMultiLanguage->GetLanguage());
+#ifdef __ANDROID__
+		__android_log_print(ANDROID_LOG_INFO, "MUScene", "LoginSuccess: SendRequestCharactersList done");
+#endif
 		ReleaseLogoSceneData();
+#ifdef __ANDROID__
+		__android_log_print(ANDROID_LOG_INFO, "MUScene", "LoginSuccess: ReleaseLogoSceneData done");
+#endif
 		ClearCharacters();
+#ifdef __ANDROID__
+		__android_log_print(ANDROID_LOG_INFO, "MUScene", "LoginSuccess: ClearCharacters done");
+#endif
 	}
 	g_ConsoleDebug->UpdateMainScene();
 }
@@ -1818,15 +1894,6 @@ bool NewRenderLogInScene(HDC hDC)
 		RenderParticles();
 		EndSprite();
 		BeginBitmap();
-	#ifdef __ANDROID__
-		{
-			const float fWidth = 320.0f;
-			const float fHeight = 325.0f;
-			RenderNoBitmap(BITMAP_LOG_IN + 9, 0.0f, 25.0f, fWidth, fHeight, 0.0f, 0.0f, 511.75f / 512.f, 512.f / 512.f);
-			RenderNoBitmap(BITMAP_LOG_IN + 10, fWidth, 25.0f, fWidth, fHeight, 0.0f, 0.0f, 511.75f / 512.f, 512.f / 512.f);
-		}
-	#endif
-
 		//g_fMULogoAlpha += 0.02f;
 		//if (g_fMULogoAlpha > 10.0f)
 		//	g_fMULogoAlpha = 10.0f;

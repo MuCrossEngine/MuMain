@@ -75,6 +75,12 @@ void  RasterPos2i(int x, int y);
 // (these pass through to GLES3 unchanged, but need uniforms uploaded first)
 void  FlushUniforms();   // upload current matrix/state uniforms before a draw call
 
+// ── State query helpers (for glGetFloatv / glGetIntegerv emulation) ───────────
+// GL_CURRENT_COLOR: returns the current per-vertex color set by glColor*
+void  GetCurrentColor(float* rgba4);      // out: 4 floats (r,g,b,a)
+// GL_MODELVIEW_MATRIX: returns the top of the modelview stack as column-major 4x4
+void  GetModelViewMatrix(float* m16);     // out: 16 floats
+
 } // namespace GLESFF
 
 #endif // __ANDROID__

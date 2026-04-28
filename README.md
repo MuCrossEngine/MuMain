@@ -95,6 +95,14 @@ Para reproduzir o build local usado nesta etapa:
 
 ## Changelog
 
+### 2026-04-28
+
+- Corrigido crash de tela preta ao fazer login e tentar entrar na tela de seleção de personagem (`CHARACTER_SCENE`):
+  - Causa raiz: `CreateCharacterScene()` não tinha fallback Android equivalente ao de `CreateLogInScene()`; sem `Configs.xtm` no Android `SceneCharacter` era 0 (default), acionando `LoadWorld(74) + RenderTerrain()` em `ZzzLodTerrain.cpp` (não adaptado para GLES3).
+  - Fix: adicionado `#ifdef __ANDROID__` em `CreateCharacterScene()` que força `gmProtect->SceneCharacter = 1`, usando o path de cartão (sem terrain/world), idêntico ao padrão já usado no login (`CreateLogInScene`).
+  - Arquivo alterado: `Main/source/ZzzScene.cpp`.
+  - Build `assembleDebug` + `adb install` validados; validação de runtime da tela de seleção de personagem pendente.
+
 ### 2026-04-22
 
 - Fluxo Android validado em runtime no emulador, com evidência de marcos de login/rede:

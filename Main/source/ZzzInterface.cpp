@@ -7703,7 +7703,7 @@ void SelectObjects()
 		CKind_1 = KIND_MONSTER | KIND_EDIT;
 		CKind_2 = KIND_PLAYER;
 
-		if (Hero->GetBaseClass() == CLASS_ELF || Hero->GetBaseClass() == CLASS_WIZARD)
+		if (Hero && (Hero->GetBaseClass() == CLASS_ELF || Hero->GetBaseClass() == CLASS_WIZARD))
 		{
 			int Skill = CharacterAttribute->Skill[Hero->CurrentSkill];
 

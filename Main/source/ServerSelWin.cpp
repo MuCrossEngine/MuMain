@@ -3,6 +3,13 @@
 //*****************************************************************************
 
 #include "stdafx.h"
+#ifdef __ANDROID__
+#  include <android/log.h>
+#  define SSW_LOG(...) __android_log_print(ANDROID_LOG_INFO, "MUServerSel", __VA_ARGS__)
+#else
+#  define SSW_LOG(...) do {} while(0)
+#endif
+
 #include "ServerSelWin.h"
 #include "Input.h"
 #include "UIMng.h"
@@ -406,6 +413,40 @@ bool CServerSelWin::CursorInWin(int nArea)
 void CServerSelWin::UpdateWhileActive(double dDeltaTick)
 {
 	int i;
+
+#ifdef __ANDROID__
+	// Log button hit-test state once every 120 frames to avoid logspam
+	static int s_dbgFrame = 0;
+	if (++s_dbgFrame >= 120)
+	{
+		s_dbgFrame = 0;
+		CInput& rIn = CInput::Instance();
+		SSW_LOG("ServerSelWin: cursor=(%ld,%ld) LBtnDn=%d LBtnUp=%d show=%d",
+			rIn.GetCursorX(), rIn.GetCursorY(),
+			(int)rIn.IsLBtnDn(), (int)rIn.IsLBtnUp(),
+			(int)CWin::m_bShow);
+		for (int j = 0; j < SSW_SERVER_G_MAX; ++j)
+		{
+			if (m_aServerGroupBtn[j].IsShow())
+				SSW_LOG("  ServerGroupBtn[%d]: x=%d y=%d inObj=%d",
+					j,
+					m_aServerGroupBtn[j].GetXPos(),
+					m_aServerGroupBtn[j].GetYPos(),
+					(int)m_aServerGroupBtn[j].CursorInObject());
+		}
+		for (int j = 0; j < m_icntServer; ++j)
+		{
+			if (m_aServerBtn[j].IsShow())
+				SSW_LOG("  ServerBtn[%d]: x=%d y=%d w=%d h=%d inObj=%d",
+					j,
+					m_aServerBtn[j].GetXPos(),
+					m_aServerBtn[j].GetYPos(),
+					m_aServerBtn[j].GetWidth(),
+					m_aServerBtn[j].GetHeight(),
+					(int)m_aServerBtn[j].CursorInObject());
+		}
+	}
+#endif
 
 	for( i=0 ; i<SSW_SERVER_G_MAX ; i++ )
 	{

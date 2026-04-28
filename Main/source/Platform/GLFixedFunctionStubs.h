@@ -668,6 +668,43 @@ inline void glFinish()
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// State queries — intercept fixed-function tokens that are invalid in GLES3
+// ─────────────────────────────────────────────────────────────────────────────
+inline void glGetFloatv(GLenum pname, GLfloat* params)
+{
+    switch (pname)
+    {
+    case GL_CURRENT_COLOR:
+        // Return the current immediate-mode color from the render backend.
+        GLESFF::GetCurrentColor(params);
+        return;
+    case GL_MODELVIEW_MATRIX:
+        GLESFF::GetModelViewMatrix(params);
+        return;
+    default:
+        break;
+    }
+    using Fn = void (*)(GLenum, GLfloat*);
+    static Fn fn = GLFixedNative::Proc<Fn>("glGetFloatv");
+    if (fn) fn(pname, params);
+}
+inline void glGetIntegerv(GLenum pname, GLint* params)
+{
+    switch (pname)
+    {
+    case GL_TEXTURE_MAX_LEVEL:
+        // Per-texture parameter, not a global state in GLES3.
+        if (params) *params = 0;
+        return;
+    default:
+        break;
+    }
+    using Fn = void (*)(GLenum, GLint*);
+    static Fn fn = GLFixedNative::Proc<Fn>("glGetIntegerv");
+    if (fn) fn(pname, params);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Direct draw calls — upload uniforms first
 // ─────────────────────────────────────────────────────────────────────────────
 inline void glDrawArrays(GLenum mode, GLint first, GLsizei count)

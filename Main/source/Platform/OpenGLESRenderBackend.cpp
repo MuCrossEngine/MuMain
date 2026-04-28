@@ -11,6 +11,7 @@
 #include <GLES3/gl3.h>
 #include <EGL/egl.h>
 #include <android/log.h>
+#include <dlfcn.h>
 #ifdef min
 #  undef min
 #endif
@@ -81,47 +82,54 @@ static std::stack<glm::mat4> s_modelviewStack;
 static std::stack<glm::mat4> s_projectionStack;
 static std::stack<glm::mat4> s_textureStack;
 static int s_matrixMode = 0; // 0=MV, 1=Proj, 2=Tex
-static void (*s_driverBindTexture)(GLenum, GLuint) = nullptr;
-static void (*s_driverDrawArrays)(GLenum, GLint, GLsizei) = nullptr;
+// Use dlsym to get native GLES3 function pointers.
+// eglGetProcAddress returns NULL for core functions on many Android
+// implementations; dlsym("libGLESv2.so") bypasses our GLFixedFunctionStubs
+// inline overrides and gives us the real driver entry points.
+static void (*s_nativeBindTexture)(GLenum, GLuint)           = nullptr;
+static void (*s_nativeDrawArrays)(GLenum, GLint, GLsizei)    = nullptr;
+
+static void ResolveNativeGLProcs()
+{
+    if (s_nativeBindTexture && s_nativeDrawArrays) return;
+
+    // Try libGLESv3.so first, then libGLESv2.so (GLES3 functions live in GLES2 lib on Android)
+    static void* s_glesLib = nullptr;
+    if (!s_glesLib)
+    {
+        s_glesLib = dlopen("libGLESv3.so", RTLD_NOW | RTLD_LOCAL);
+        if (!s_glesLib)
+            s_glesLib = dlopen("libGLESv2.so", RTLD_NOW | RTLD_LOCAL);
+    }
+
+    if (s_glesLib)
+    {
+        if (!s_nativeBindTexture)
+            s_nativeBindTexture  = reinterpret_cast<void(*)(GLenum,GLuint)>(dlsym(s_glesLib, "glBindTexture"));
+        if (!s_nativeDrawArrays)
+            s_nativeDrawArrays   = reinterpret_cast<void(*)(GLenum,GLint,GLsizei)>(dlsym(s_glesLib, "glDrawArrays"));
+    }
+
+    // eglGetProcAddress fallback (works for extensions on all Android versions)
+    if (!s_nativeBindTexture)
+        s_nativeBindTexture = reinterpret_cast<void(*)(GLenum,GLuint)>(eglGetProcAddress("glBindTexture"));
+    if (!s_nativeDrawArrays)
+        s_nativeDrawArrays = reinterpret_cast<void(*)(GLenum,GLint,GLsizei)>(eglGetProcAddress("glDrawArrays"));
+
+    LOGI("ResolveNativeGLProcs: bindTexture=%p drawArrays=%p",
+         (void*)s_nativeBindTexture, (void*)s_nativeDrawArrays);
+}
 
 static inline void DriverBindTexture(GLenum target, GLuint tex)
 {
-    if (s_driverBindTexture)
-    {
-        s_driverBindTexture(target, tex);
-        return;
-    }
-
-    using BindTextureProc = void (*)(GLenum, GLuint);
-    s_driverBindTexture = reinterpret_cast<BindTextureProc>(eglGetProcAddress("glBindTexture"));
-    if (s_driverBindTexture)
-    {
-        s_driverBindTexture(target, tex);
-    }
-    else
-    {
-        LOGE("Failed to resolve driver glBindTexture");
-    }
+    if (s_nativeBindTexture)
+        s_nativeBindTexture(target, tex);
 }
 
 static inline void DriverDrawArrays(GLenum mode, GLint first, GLsizei count)
 {
-    if (s_driverDrawArrays)
-    {
-        s_driverDrawArrays(mode, first, count);
-        return;
-    }
-
-    using DrawArraysProc = void (*)(GLenum, GLint, GLsizei);
-    s_driverDrawArrays = reinterpret_cast<DrawArraysProc>(eglGetProcAddress("glDrawArrays"));
-    if (s_driverDrawArrays)
-    {
-        s_driverDrawArrays(mode, first, count);
-    }
-    else
-    {
-        LOGE("Failed to resolve driver glDrawArrays");
-    }
+    if (s_nativeDrawArrays)
+        s_nativeDrawArrays(mode, first, count);
 }
 
 static std::stack<glm::mat4>& ActiveStack()
@@ -293,11 +301,12 @@ namespace GLESFF {
 bool Init(int screenW, int screenH)
 {
     s_screenW = screenW; s_screenH = screenH;
-    s_driverBindTexture = reinterpret_cast<void (*)(GLenum, GLuint)>(eglGetProcAddress("glBindTexture"));
-    if (!s_driverBindTexture)
-    {
-        LOGE("Init: could not resolve driver glBindTexture");
-    }
+
+    // Resolve native GL function pointers via dlsym (bypasses our GLFixedFunctionStubs inline overrides).
+    ResolveNativeGLProcs();
+
+    // Clear any pending GL errors before setup
+    while (glGetError() != GL_NO_ERROR) {}
 
     // Init matrix stacks with identity
     while (!s_modelviewStack.empty())  s_modelviewStack.pop();
@@ -326,6 +335,13 @@ bool Init(int screenW, int screenH)
     // Create streaming VAO/VBO
     glGenVertexArrays(1, &s_vao);
     glGenBuffers(1, &s_vbo);
+
+    if (!s_vao || !s_vbo)
+    {
+        LOGE("Init: failed to create VAO/VBO (vao=%u vbo=%u)", s_vao, s_vbo);
+        return false;
+    }
+    LOGI("Init: VAO=%u VBO=%u", s_vao, s_vbo);
 
     glBindVertexArray(s_vao);
     glBindBuffer(GL_ARRAY_BUFFER, s_vbo);
@@ -593,6 +609,13 @@ void ImmEnd()
 
     DriverDrawArrays(s_immMode, 0, (GLsizei)count);
 
+    GLenum err = glGetError();
+    if (err != GL_NO_ERROR)
+    {
+        LOGE("ImmEnd: glGetError=0x%04x mode=0x%04x count=%zu prog=%u",
+             (unsigned)err, (unsigned)s_immMode, count, s_program);
+    }
+
     glBindVertexArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 
@@ -608,6 +631,22 @@ void BindTexture(GLenum /*target*/, GLuint tex)
 void TexEnvf(GLenum /*target*/, GLenum /*pname*/, float /*param*/) { /* stored in RS if needed */ }
 
 void RasterPos2i(int /*x*/, int /*y*/) { /* no-op — 2-D positioning handled by caller's matrices */ }
+
+void GetCurrentColor(float* rgba4)
+{
+    rgba4[0] = s_curColor[0];
+    rgba4[1] = s_curColor[1];
+    rgba4[2] = s_curColor[2];
+    rgba4[3] = s_curColor[3];
+}
+
+void GetModelViewMatrix(float* m16)
+{
+    const glm::mat4& mv = s_modelviewStack.top();
+    // glm stores column-major which matches OpenGL convention
+    for (int i = 0; i < 16; ++i)
+        m16[i] = glm::value_ptr(mv)[i];
+}
 
 } // namespace GLESFF
 

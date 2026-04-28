@@ -11,6 +11,9 @@
 #include "Zzzinfomation.h"
 #include "NewUISystem.h"
 #include "CShaderGL.h"
+#ifdef __ANDROID__
+#include <android/log.h>
+#endif
 
 
 float Distance;
@@ -295,10 +298,22 @@ void BindTexture(int tex)
 		{
 			BITMAP_t* b = &Bitmaps[tex];
 #ifdef SHADER_VERSION_TEST
-			glActiveTexture(GL_TEXTURE0);  // Activamos la unidad de textura despu�s
+			glActiveTexture(GL_TEXTURE0);  // Activamos la unidad de textura después
 #endif // SHADER_VERSION_TEST
 
 			glBindTexture(GL_TEXTURE_2D, b->TextureNumber);
+#ifdef __ANDROID__
+			if (b->TextureNumber == 0)
+			{
+				static int s_nullTexWarnCount = 0;
+				if (s_nullTexWarnCount < 20)
+				{
+					++s_nullTexWarnCount;
+					__android_log_print(ANDROID_LOG_WARN, "MURender",
+						"BindTexture: tex=%d has TextureNumber=0 (not loaded?)", tex);
+				}
+			}
+#endif
 		}
 		else
 		{

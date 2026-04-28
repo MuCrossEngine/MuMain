@@ -126,6 +126,7 @@ namespace GameMouseInput
             s_touchDownTime  = now;
             s_longPressFired = false;
             SetMousePos(x, y);
+            __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "TouchDown x=%.0f y=%.0f", x, y);
             FireLButtonDown();
             break;
 

@@ -622,13 +622,20 @@ CHARACTER_ENABLE g_CharCardEnable;
 
 void ReceiveCharacterList(BYTE* ReceiveBuffer)
 {
+#ifdef __ANDROID__
+	__android_log_print(ANDROID_LOG_INFO, "MUAndroidFlow",
+		"ReceiveCharacterList: entry SceneFlag=%d SceneCharacter=%d state=%d",
+		(int)SceneFlag, (int)gmProtect->SceneCharacter, (int)CurrentProtocolState);
+#endif
 	LPPHEADER_DEFAULT_CHARACTER_LIST Data = (LPPHEADER_DEFAULT_CHARACTER_LIST)ReceiveBuffer;
 
 	InitGuildWar();
 
 	SetCreateMaxClass(Data->ClassCode);
 
-	if (SceneFlag == LOG_IN_SCENE)
+	// On Android the scene has already transitioned to CHARACTER_SCENE by the
+	// time the server response arrives, so accept both states.
+	if (SceneFlag == LOG_IN_SCENE || SceneFlag == CHARACTER_SCENE)
 	{
 		if (gmProtect->SceneCharacter == 1)
 		{
@@ -655,6 +662,11 @@ void ReceiveCharacterList(BYTE* ReceiveBuffer)
 	int Offset = sizeof(PHEADER_DEFAULT_CHARACTER_LIST);
 
 	int character_first = -1;
+
+#ifdef __ANDROID__
+	__android_log_print(ANDROID_LOG_INFO, "MUAndroidFlow",
+		"ReceiveCharacterList: MaxClass=%d ClassCode=%d", (int)Data->MaxClass, (int)Data->ClassCode);
+#endif
 
 	for (int i = 0; i < Data->MaxClass; i++)
 	{
@@ -749,6 +761,20 @@ void ReceiveCharacterList(BYTE* ReceiveBuffer)
 
 		CHARACTER* c = CreateHero(Data2->Index, iClass, 0, fPos[0], fPos[1], fAngle);
 
+		if (c == nullptr)
+		{
+#ifdef __ANDROID__
+			__android_log_print(ANDROID_LOG_ERROR, "MUAndroidFlow",
+				"ReceiveCharacterList: CreateHero returned null for index=%d class=%d", Data2->Index, iClass);
+#endif
+			Offset += sizeof(PRECEIVE_CHARACTER_LIST);
+			continue;
+		}
+#ifdef __ANDROID__
+		__android_log_print(ANDROID_LOG_INFO, "MUAndroidFlow",
+			"ReceiveCharacterList: CreateHero ok idx=%d class=%d id=%s", Data2->Index, iClass, Data2->ID);
+#endif
+
 		c->Level = Data2->Level;
 
 		c->m_Reset = Data2->Reset;
@@ -769,9 +795,16 @@ void ReceiveCharacterList(BYTE* ReceiveBuffer)
 
 	CurrentProtocolState = RECEIVE_CHARACTERS_LIST;
 
-	g_pStorageExpansion->SetExpansionStorage(Data->ExtWarehouse);
+#ifdef __ANDROID__
+	__android_log_print(ANDROID_LOG_INFO, "MUAndroidFlow",
+		"ReceiveCharacterList: OK state=RECEIVE_CHARACTERS_LIST");
+#endif
 
-	g_pReconnectUI->ReconnectOnCharacterList();
+	if (g_pStorageExpansion)
+		g_pStorageExpansion->SetExpansionStorage(Data->ExtWarehouse);
+
+	if (g_pReconnectUI)
+		g_pReconnectUI->ReconnectOnCharacterList();
 }
 
 void ReceiveCharacterCard_New(BYTE* ReceiveBuffer)
