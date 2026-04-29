@@ -14,7 +14,7 @@
     <application
         android:allowBackup="false"
         android:usesCleartextTraffic="true"
-        android:icon="@android:drawable/sym_def_app_icon"
+        android:icon="@mipmap/ic_launcher"
         android:label="MU Cross Engine"
         android:hasCode="true"
         android:theme="@android:style/Theme.NoTitleBar.Fullscreen">
