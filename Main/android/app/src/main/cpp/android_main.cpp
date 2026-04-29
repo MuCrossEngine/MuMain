@@ -48,6 +48,7 @@
 #include "ZzzObject.h"
 #include "ZzzCharacter.h"
 #include "UIManager.h"
+#include "UIMapName.h"
 #include "UIMng.h"
 #include "Input.h"
 #include "Time/Timer.h"
@@ -68,6 +69,9 @@ extern int SceneFlag;
 extern void Scene(HDC hDC);
 extern float g_fScreenRate_x;
 extern float g_fScreenRate_y;
+extern void CheckHack(void);
+// Defined in LegacyGlobalsAndroid.cpp (CUIMapName has no header extern)
+extern CUIMapName* g_pUIMapName;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // App state
@@ -81,6 +85,7 @@ static bool                g_renderBackendInitialized = false;
 static std::mutex          g_pendingImeMutex;
 static std::deque<wchar_t> g_pendingImeChars;
 static int                 g_pendingImeBackspaceCount = 0;
+static DWORD               g_lastHackTick = 0;
 
 // Windows initializes this singleton in WinMain(); Android must do it here.
 static CGMCharacter        g_androidCharacterManager;
@@ -136,6 +141,18 @@ static void InitLegacyCoreState()
     {
         Hero = gmCharacters->GetCharacter(0);
     }
+
+    // Allocate globals that WinMain normally creates but are needed on Android.
+    // These are declared in LegacyGlobalsAndroid.cpp as nullptr.
+    // NOTE: g_pUIManager and CAIController are created later in MoveMainScene's
+    // Android block (after all data is loaded) to avoid premature file I/O.
+    if (g_pUIMapName == nullptr)
+    {
+        g_pUIMapName = new CUIMapName;
+    }
+
+    // WinMain calls g_pNewUISystem->Create() after CInput; do it here for Android.
+    g_pNewUISystem->Create();
 
     g_legacyCoreInitialized = true;
 }
@@ -678,6 +695,19 @@ static void RenderFrame()
     if (!g_eglWindow || !g_focused) return;
 
     FlushPendingImeToFocusedEdit();
+
+    // Win32 uses HACK_TIMER (20s) -> CheckHack() via WM_TIMER.
+    // Android has no real SetTimer/WM_TIMER dispatch, so run a lightweight
+    // periodic pump here to keep GameServer checksum-time validation alive
+    // during long MAIN_SCENE loading steps.
+    {
+        const DWORD now = GetTickCount();
+        if (g_lastHackTick == 0 || (DWORD)(now - g_lastHackTick) >= 2000)
+        {
+            CheckHack();
+            g_lastHackTick = now;
+        }
+    }
 
     // Process network packets (replaces WSAAsyncSelect / WM_SOCKET)
     PollSocketIO();

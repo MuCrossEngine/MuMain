@@ -88,7 +88,6 @@ bool CBitmapCache::Create()
 	memset(m_QuickCache[QUICK_CACHE_PLAYER].ppBitmap, 0, dwRange * sizeof(BITMAP_t*));
 
 	m_pNullBitmap = new BITMAP_t;
-	memset(m_pNullBitmap, 0, sizeof(BITMAP_t));
 	m_ManageTimer.SetTimer(1500);
 
 	return true;
@@ -644,7 +643,6 @@ bool CGlobalBitmap::OpenJpeg(GLuint uiBitmapIndex, const std::string& filename, 
 	int textureHeight = leftoverSize(jpegheight);
 
 	BITMAP_t* pNewBitmap = new BITMAP_t;
-	memset(pNewBitmap, 0, sizeof(BITMAP_t));
 
 	pNewBitmap->BitmapIndex = uiBitmapIndex;
 	pNewBitmap->Width = (float)textureWidth;
@@ -745,7 +743,6 @@ bool CGlobalBitmap::OpenTga(GLuint uiBitmapIndex, const std::string& filename, G
 	int textureHeight = leftoverSize(tgaheight);
 
 	BITMAP_t* pNewBitmap = new BITMAP_t;
-	memset(pNewBitmap, 0, sizeof(BITMAP_t));
 
 	pNewBitmap->BitmapIndex = uiBitmapIndex;
 	pNewBitmap->Width = (float)textureWidth;

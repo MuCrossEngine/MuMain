@@ -23,14 +23,12 @@ namespace SEASON3B
 {
 	typedef void (*UI_2DEFFECT_CALLBACK)(LPVOID pClass, DWORD dwParamA, DWORD dwParamB);
 
-#pragma pack(push, 1)
 	typedef struct tagUI_2DEFFECT_INFO
 	{
 		UI_2DEFFECT_CALLBACK	pCallbackFunc;
 		LPVOID					pClass;
 		DWORD					dwParamA, dwParamB;
 	} UI_2DEFFECT_INFO;
-#pragma pack(pop)
 
 	class CNewUIManager;
 

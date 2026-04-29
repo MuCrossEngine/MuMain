@@ -170,7 +170,6 @@ typedef struct _MINI_MAP
 	char Name[100];
 }MINI_MAP;
 
-#pragma pack(push, 1)
 typedef struct tagITEM
 {
 /*+00*/		short	Type;
@@ -257,7 +256,6 @@ public:
 		return false;
 	}
 } ITEM;
-#pragma pack(pop)
 
 typedef struct
 {

@@ -30,7 +30,6 @@
 #  define GL_POLYGON 0x0009
 #endif
 
-#include <stack>
 #include <vector>
 #include <string>
 #include <cstdio>
@@ -76,11 +75,12 @@ struct UniformLoc
 static UniformLoc s_u;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Matrix stacks
+// Matrix stacks — plain std::vector avoids std::deque multi-chunk complexity
+// and MTE tag mismatch crashes (Android 15 SIGSEGV in deque::push_back).
 // ─────────────────────────────────────────────────────────────────────────────
-static std::stack<glm::mat4> s_modelviewStack;
-static std::stack<glm::mat4> s_projectionStack;
-static std::stack<glm::mat4> s_textureStack;
+static std::vector<glm::mat4> s_modelviewStack;
+static std::vector<glm::mat4> s_projectionStack;
+static std::vector<glm::mat4> s_textureStack;
 static int s_matrixMode = 0; // 0=MV, 1=Proj, 2=Tex
 // Use dlsym to get native GLES3 function pointers.
 // eglGetProcAddress returns NULL for core functions on many Android
@@ -132,7 +132,7 @@ static inline void DriverDrawArrays(GLenum mode, GLint first, GLsizei count)
         s_nativeDrawArrays(mode, first, count);
 }
 
-static std::stack<glm::mat4>& ActiveStack()
+static std::vector<glm::mat4>& ActiveStack()
 {
     switch (s_matrixMode)
     {
@@ -288,7 +288,7 @@ void RS_ApplyToDriver()
 void RS_SetLightPosition(const float* pos4)
 {
     // Transform light position to eye space using current MV
-    const glm::mat4& mv = s_modelviewStack.top();
+    const glm::mat4& mv = s_modelviewStack.back();
     glm::vec4 ep = mv * glm::vec4(pos4[0], pos4[1], pos4[2], pos4[3]);
     g_rs.lightPosition = ep;
 }
@@ -308,13 +308,16 @@ bool Init(int screenW, int screenH)
     // Clear any pending GL errors before setup
     while (glGetError() != GL_NO_ERROR) {}
 
-    // Init matrix stacks with identity
-    while (!s_modelviewStack.empty())  s_modelviewStack.pop();
-    while (!s_projectionStack.empty()) s_projectionStack.pop();
-    while (!s_textureStack.empty())    s_textureStack.pop();
-    s_modelviewStack.push(glm::mat4(1));
-    s_projectionStack.push(glm::mat4(1));
-    s_textureStack.push(glm::mat4(1));
+    // Init matrix stacks with identity (pre-reserve to avoid realloc during rendering)
+    s_modelviewStack.clear();
+    s_projectionStack.clear();
+    s_textureStack.clear();
+    s_modelviewStack.reserve(128);
+    s_projectionStack.reserve(16);
+    s_textureStack.reserve(16);
+    s_modelviewStack.push_back(glm::mat4(1));
+    s_projectionStack.push_back(glm::mat4(1));
+    s_textureStack.push_back(glm::mat4(1));
 
     // Load shaders
     std::string vsrc = ReadShaderFile("shaders/fixed_vert.glsl");
@@ -396,65 +399,65 @@ void EndFrame()
 // ── Matrix stack ─────────────────────────────────────────────────────────────
 
 void MatrixMode(int mode)    { s_matrixMode = mode; }
-void PushMatrix()            { auto& st = ActiveStack(); st.push(st.top()); }
-void PopMatrix()             { auto& st = ActiveStack(); if (st.size() > 1) st.pop(); }
-void LoadIdentity()          { ActiveStack().top() = glm::mat4(1); }
+void PushMatrix()            { auto& st = ActiveStack(); st.push_back(st.back()); }
+void PopMatrix()             { auto& st = ActiveStack(); if (st.size() > 1) st.pop_back(); }
+void LoadIdentity()          { ActiveStack().back() = glm::mat4(1); }
 
 void LoadMatrixf(const float* m)
 {
-    ActiveStack().top() = glm::make_mat4(m);
+    ActiveStack().back() = glm::make_mat4(m);
 }
 
 void MultMatrixf(const float* m)
 {
-    ActiveStack().top() *= glm::make_mat4(m);
+    ActiveStack().back() *= glm::make_mat4(m);
 }
 
 void Rotatef(float angle, float x, float y, float z)
 {
-    ActiveStack().top() = glm::rotate(ActiveStack().top(),
+    ActiveStack().back() = glm::rotate(ActiveStack().back(),
                                        glm::radians(angle), glm::vec3(x,y,z));
 }
 
 void Translatef(float x, float y, float z)
 {
-    ActiveStack().top() = glm::translate(ActiveStack().top(), glm::vec3(x,y,z));
+    ActiveStack().back() = glm::translate(ActiveStack().back(), glm::vec3(x,y,z));
 }
 
 void Scalef(float x, float y, float z)
 {
-    ActiveStack().top() = glm::scale(ActiveStack().top(), glm::vec3(x,y,z));
+    ActiveStack().back() = glm::scale(ActiveStack().back(), glm::vec3(x,y,z));
 }
 
 void Ortho(double l, double r, double b, double t, double n, double f)
 {
-    ActiveStack().top() *= glm::ortho((float)l,(float)r,(float)b,(float)t,(float)n,(float)f);
+    ActiveStack().back() *= glm::ortho((float)l,(float)r,(float)b,(float)t,(float)n,(float)f);
 }
 
 void Frustum(double l, double r, double b, double t, double n, double f)
 {
-    ActiveStack().top() *= glm::frustum((float)l,(float)r,(float)b,(float)t,(float)n,(float)f);
+    ActiveStack().back() *= glm::frustum((float)l,(float)r,(float)b,(float)t,(float)n,(float)f);
 }
 
 void PerspectiveFov(float fovY, float aspect, float zNear, float zFar)
 {
-    s_projectionStack.top() = glm::perspective(glm::radians(fovY), aspect, zNear, zFar);
+    s_projectionStack.back() = glm::perspective(glm::radians(fovY), aspect, zNear, zFar);
 }
 
 void LookAt(float ex,float ey,float ez,float cx,float cy,float cz,float ux,float uy,float uz)
 {
-    s_modelviewStack.top() *= glm::lookAt(glm::vec3(ex,ey,ez),
+    s_modelviewStack.back() *= glm::lookAt(glm::vec3(ex,ey,ez),
                                            glm::vec3(cx,cy,cz),
                                            glm::vec3(ux,uy,uz));
 }
 
-const glm::mat4& GetModelView()  { return s_modelviewStack.top(); }
-const glm::mat4& GetProjection() { return s_projectionStack.top(); }
-glm::mat4 GetMVP()               { return s_projectionStack.top() * s_modelviewStack.top(); }
+const glm::mat4& GetModelView()  { return s_modelviewStack.back(); }
+const glm::mat4& GetProjection() { return s_projectionStack.back(); }
+glm::mat4 GetMVP()               { return s_projectionStack.back() * s_modelviewStack.back(); }
 
 glm::mat3 GetNormalMatrix()
 {
-    return glm::mat3(glm::transpose(glm::inverse(s_modelviewStack.top())));
+    return glm::mat3(glm::transpose(glm::inverse(s_modelviewStack.back())));
 }
 
 // ── Uniforms upload ───────────────────────────────────────────────────────────
@@ -642,7 +645,7 @@ void GetCurrentColor(float* rgba4)
 
 void GetModelViewMatrix(float* m16)
 {
-    const glm::mat4& mv = s_modelviewStack.top();
+    const glm::mat4& mv = s_modelviewStack.back();
     // glm stores column-major which matches OpenGL convention
     for (int i = 0; i < 16; ++i)
         m16[i] = glm::value_ptr(mv)[i];

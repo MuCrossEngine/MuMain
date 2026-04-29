@@ -47,45 +47,84 @@ namespace GameAssetPath
 
 #ifdef __ANDROID__
     // Case-insensitive fopen for ext4 (Android filesystem is case-sensitive).
-    // Walks each path component and does a case-insensitive match.
+    // Walks every path component from the base directory case-insensitively,
+    // so paths like "Data/World1/EncTerrain1.map" find "Data/world1/encterrain1.map".
     static FILE* fopen_ci(const std::string& fullPath, const char* mode)
     {
         // Try exact path first (fast path)
         FILE* f = fopen(fullPath.c_str(), mode);
         if (f) return f;
 
-        // Split into directory + filename
-        size_t slash = fullPath.rfind('/');
-        if (slash == std::string::npos) return nullptr;
-
-        std::string dir  = fullPath.substr(0, slash);
-        std::string file = fullPath.substr(slash + 1);
-
-        // Case-insensitive search in the directory
-        DIR* d = opendir(dir.c_str());
-        if (!d)
+        // Must be under the base path to do the component walk.
+        if (s_basePath.empty() || fullPath.size() <= s_basePath.size() ||
+            fullPath.substr(0, s_basePath.size()) != s_basePath)
         {
-            // Try case-insensitive on the directory itself (recursive would be heavy)
+            LOGW("fopen_ci: not found: %s", fullPath.c_str());
             return nullptr;
         }
 
-        std::string match;
-        struct dirent* entry;
-        while ((entry = readdir(d)) != nullptr)
+        // rel = path relative to base, e.g. "Data/World1/EncTerrain1.map"
+        std::string rel = fullPath.substr(s_basePath.size());
+
+        // current accumulates the resolved absolute path component by component.
+        // s_basePath already ends with '/', so strip the trailing slash for joining.
+        std::string current = s_basePath;
+        if (!current.empty() && current.back() == '/')
+            current.pop_back();
+
+        while (!rel.empty())
         {
-            if (strcasecmp(entry->d_name, file.c_str()) == 0)
+            size_t slash = rel.find('/');
+            std::string component;
+            if (slash == std::string::npos)
             {
-                match = dir + '/' + entry->d_name;
-                break;
+                component = rel;
+                rel.clear();
             }
+            else
+            {
+                component = rel.substr(0, slash);
+                rel = rel.substr(slash + 1);
+            }
+            if (component.empty()) continue;
+
+            // Try exact match first (no opendir needed)
+            std::string exact = current + '/' + component;
+            struct stat st;
+            if (stat(exact.c_str(), &st) == 0)
+            {
+                current = exact;
+                continue;
+            }
+
+            // Case-insensitive scan of the current directory
+            DIR* d = opendir(current.c_str());
+            if (!d)
+            {
+                LOGW("fopen_ci: can't open dir: %s", current.c_str());
+                return nullptr;
+            }
+            std::string match;
+            struct dirent* entry;
+            while ((entry = readdir(d)) != nullptr)
+            {
+                if (strcasecmp(entry->d_name, component.c_str()) == 0)
+                {
+                    match = current + '/' + entry->d_name;
+                    break;
+                }
+            }
+            closedir(d);
+
+            if (match.empty())
+            {
+                LOGW("fopen_ci: component not found: '%s' in '%s'", component.c_str(), current.c_str());
+                return nullptr;
+            }
+            current = match;
         }
-        closedir(d);
 
-        if (!match.empty())
-            return fopen(match.c_str(), mode);
-
-        LOGW("fopen_ci: not found: %s", fullPath.c_str());
-        return nullptr;
+        return fopen(current.c_str(), mode);
     }
 
     FILE* OpenFile(const char* relativePath, const char* mode)

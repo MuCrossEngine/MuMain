@@ -265,8 +265,10 @@ bool PetProcess::LoadData()
 			memcpy(_action, pSeek, sizeof(int) * _array);
 			pSeek += sizeof(int) * _array;
 
-			memcpy(_speed, pSeek, sizeof(_speed) * _array);
-			pSeek += sizeof(_speed) * _array;
+			// Fix: was sizeof(_speed) which is sizeof(float*) = 8 on 64-bit,
+			// but the buffer and the data are sizeof(float) = 4 per element.
+			memcpy(_speed, pSeek, sizeof(float) * _array);
+			pSeek += sizeof(float) * _array;
 
 			PetInfoPtr petInfo = PetInfo::Make();
 			petInfo->SetBlendMesh(_blendMesh);

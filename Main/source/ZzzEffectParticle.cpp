@@ -642,7 +642,7 @@ int CreateParticle(int Type, vec3_t Position, vec3_t Angle, vec3_t Light, int Su
 					inter = (Light[0] - inter) / 15.0f;
 					Vector(0.f, inter, 0.f, o->Velocity);
 
-					//  »ö.
+					//  ï¿½ï¿½.
 					Luminosity = (float)sinf(WorldTime * 0.002f) * 0.3f + 0.7f;
 					Vector(Luminosity, Luminosity * 0.5f, Luminosity * 0.5f, o->Light);
 				}
@@ -1024,7 +1024,7 @@ int CreateParticle(int Type, vec3_t Position, vec3_t Angle, vec3_t Light, int Su
 					o->Position[2] -= (20.f);
 					o->Gravity = (float)(rand() % 10 + 5) * 0.1f;
 				}
-				else if (o->SubType == 6)	// ¡Ý
+				else if (o->SubType == 6)	// ï¿½ï¿½
 				{
 					o->LifeTime = 25;
 					o->Scale = (float)(rand() % 8 + 50) * 0.01f * Scale;
@@ -1069,7 +1069,7 @@ int CreateParticle(int Type, vec3_t Position, vec3_t Angle, vec3_t Light, int Su
 					o->Velocity[2] = -((1.2f) + ((float)(rand() % 20 - 10) * 0.025f));
 					o->Gravity = 2.f + ((float)(rand() % 20 - 10) * 0.05f);
 				}
-				else if (o->SubType == 10)	// BITMAP_FIRE_CURSEDLICH o->SubType == 1°ú ºñ½Á.
+				else if (o->SubType == 10)	// BITMAP_FIRE_CURSEDLICH o->SubType == 1ï¿½ï¿½ ï¿½ï¿½ï¿½.
 				{
 					o->Position[0] += ((rand() % 10 - 5) * 0.2f);
 					o->Position[1] += ((rand() % 10 - 5) * 0.2f);
@@ -2717,7 +2717,7 @@ int CreateParticle(int Type, vec3_t Position, vec3_t Angle, vec3_t Light, int Su
 					VectorCopy(vSpeed, o->Velocity);
 
 					o->Alpha = 1.0f;
-					//o->Scale = (float)(rand()%20)/20.0f+1.0f;	//(1~2 20´Ü°è)
+					//o->Scale = (float)(rand()%20)/20.0f+1.0f;	//(1~2 20ï¿½Ü°ï¿½)
 					o->LifeTime = rand() % 30 + 20;
 					o->Angle[2] = (float)(rand() % 360);
 					o->Rotation = (float)(rand() % 360);
@@ -7096,7 +7096,7 @@ void MoveParticles()
 						CreateBomb(vPos, true);
 					}
 				}
-				else if ((o->SubType == 2 || o->SubType == 3) && o->Target != NULL)
+				else if ((o->SubType == 2 || o->SubType == 3) && o->Target != NULL && o->Target->Live)
 				{
 					o->Frame = (16 - o->LifeTime._runvalue) / 4;
 

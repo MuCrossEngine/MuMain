@@ -1,6 +1,27 @@
 ﻿#include "stdafx.h"
 #include "UIManager.h"
 #include "GuildCache.h"
+
+#ifdef __ANDROID__
+#include <android/log.h>
+static void LogMemWS(const char* tag)
+{
+    FILE* f = fopen("/proc/self/status", "r");
+    if (!f) return;
+    char line[128];
+    long vmrss = 0, vmswap = 0;
+    while (fgets(line, sizeof(line), f))
+    {
+        if (strncmp(line, "VmRSS:", 6) == 0)  sscanf(line + 6, "%ld", &vmrss);
+        if (strncmp(line, "VmSwap:", 7) == 0) sscanf(line + 7, "%ld", &vmswap);
+    }
+    fclose(f);
+    __android_log_print(ANDROID_LOG_INFO, "MUMem",
+        "%s: RSS=%ldMB Swap=%ldMB", tag, vmrss/1024, vmswap/1024);
+}
+#else
+static void LogMemWS(const char*) {}
+#endif
 #include "ZzzBMD.h"
 #include "ZzzInfomation.h"
 #include "ZzzObject.h"
@@ -773,6 +794,10 @@ void ReceiveCharacterList(BYTE* ReceiveBuffer)
 #ifdef __ANDROID__
 		__android_log_print(ANDROID_LOG_INFO, "MUAndroidFlow",
 			"ReceiveCharacterList: CreateHero ok idx=%d class=%d id=%s", Data2->Index, iClass, Data2->ID);
+		__android_log_print(ANDROID_LOG_INFO, "MUAndroidFlow",
+			"ReceiveCharacterList: equip w0=%08X w1=%08X wing=%08X helper=%08X muun0=%08X muun1=%08X",
+			Data2->Equipment[0], Data2->Equipment[1], Data2->Equipment[7],
+			Data2->Equipment[8], Data2->Equipment[9], Data2->Equipment[10]);
 #endif
 
 		c->Level = Data2->Level;
@@ -787,11 +812,19 @@ void ReceiveCharacterList(BYTE* ReceiveBuffer)
 		c->ID[MAX_ID_SIZE] = NULL;
 
 		ChangeCharacterExt(Data2->Index, Data2->Equipment);
+#ifdef __ANDROID__
+		LogMemWS("ReceiveCharacterList:afterChangeCharExt");
+#endif
 
 		c->GuildStatus = Data2->byGuildStatus;
 
 		Offset += sizeof(PRECEIVE_CHARACTER_LIST);
 	}
+#ifdef __ANDROID__
+	LogMemWS("ReceiveCharacterList:beforeSetState");
+	mallopt(M_PURGE, 0);  // Return freed heap pages to OS before joining world
+	LogMemWS("ReceiveCharacterList:afterMalloptPurge");
+#endif
 
 	CurrentProtocolState = RECEIVE_CHARACTERS_LIST;
 
@@ -12669,6 +12702,9 @@ void ReceiveCheckSumRequest(BYTE* ReceiveBuffer)
 {
 	LPPHEADER_DEFAULT_WORD Data = (LPPHEADER_DEFAULT_WORD)ReceiveBuffer;
 	DWORD dwCheckSum = GetCheckSum(Data->Value);
+	#ifdef __ANDROID__
+	MU_FLOW_LOG("ReceiveCheckSumRequest: key=0x%04X checksum=0x%08X", (unsigned int)Data->Value, (unsigned int)dwCheckSum);
+	#endif
 	SendCheckSum(dwCheckSum);
 
 	g_ConsoleDebug->Write(MCD_RECEIVE, "0x03 [ReceiveCheckSumRequest]");

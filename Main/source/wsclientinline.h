@@ -23,6 +23,7 @@
 #ifdef __ANDROID__
 #include <android/log.h>
 #define MU_LOGIN_LOG(...) __android_log_print(ANDROID_LOG_INFO, "MUAndroidLogin", __VA_ARGS__)
+#define MU_NET_LOG(...) __android_log_print(ANDROID_LOG_INFO, "MUAndroidNet", __VA_ARGS__)
 #endif
 
 #define PACKET_MOVE					0xD4
@@ -91,6 +92,9 @@ __forceinline bool FindText2(char* Text, char* Token, bool First = false)
 
 __forceinline int SendPacket(char* buf, int len, BOOL bEncrypt = FALSE, BOOL bForceC4 = FALSE)
 {
+#ifdef __ANDROID__
+	const bool isCheckPacket = (len >= 3 && (BYTE)buf[0] == 0xC1 && (BYTE)buf[2] == 0x0E);
+#endif
 #ifdef SAVE_PACKET
 	LPPHEADER_DEFAULT_SUBCODE pData = (LPPHEADER_DEFAULT_SUBCODE)buf;
 	std::string timeString;
@@ -100,7 +104,14 @@ __forceinline int SendPacket(char* buf, int len, BOOL bEncrypt = FALSE, BOOL bFo
 
 	if (!bEncrypt)
 	{
-		return (g_pSocketClient->sSend(buf, len));
+		int sent = g_pSocketClient->sSend(buf, len);
+	#ifdef __ANDROID__
+		if (isCheckPacket)
+		{
+			MU_NET_LOG("SendPacket[0x0E]: plain len=%d sent=%d", len, sent);
+		}
+	#endif
+		return sent;
 	}
 
 	BYTE byBuffer[MAX_SPE_BUFFERSIZE_];
@@ -127,7 +138,14 @@ __forceinline int SendPacket(char* buf, int len, BOOL bEncrypt = FALSE, BOOL bFo
 		g_SimpleModulusCS.Encrypt(bc.byBuffer, byBuffer + iSkip, len - iSkip);
 		assert(iSize < 256);
 
-		return (g_pSocketClient->sSend((char*)&bc, iLength));
+		int sent = g_pSocketClient->sSend((char*)&bc, iLength);
+	#ifdef __ANDROID__
+		if (isCheckPacket)
+		{
+			MU_NET_LOG("SendPacket[0x0E]: enc=C3 outLen=%d sent=%d", iLength, sent);
+		}
+	#endif
+		return sent;
 	}
 	else
 	{
@@ -140,7 +158,14 @@ __forceinline int SendPacket(char* buf, int len, BOOL bEncrypt = FALSE, BOOL bFo
 		g_SimpleModulusCS.Encrypt(wc.byBuffer, byBuffer + iSkip, len - iSkip);
 
 		assert(iSize <= MAX_SPE_BUFFERSIZE_);
-		return (g_pSocketClient->sSend((char*)&wc, iLength));
+		int sent = g_pSocketClient->sSend((char*)&wc, iLength);
+	#ifdef __ANDROID__
+		if (isCheckPacket)
+		{
+			MU_NET_LOG("SendPacket[0x0E]: enc=C4 outLen=%d sent=%d", iLength, sent);
+		}
+	#endif
+		return sent;
 	}
 }
 
@@ -206,6 +231,9 @@ __forceinline void SendCheck(void)
 {
 	if (!g_bGameServerConnected)
 	{
+	#ifdef __ANDROID__
+		MU_NET_LOG("SendCheck: skipped (g_bGameServerConnected=0)");
+	#endif
 		return;
 	}
 	g_ConsoleDebug->Write(MCD_SEND, "SendCheck");
@@ -213,9 +241,14 @@ __forceinline void SendCheck(void)
 	CStreamPacketEngine spe;
 	spe.Init(0xC1, 0x0E);
 	DWORD dwTick = GetTickCount();
+	DWORD attackSpeed = CharacterAttribute ? (DWORD)(CharacterAttribute->AttackSpeed) : 0;
+	DWORD magicSpeed = CharacterAttribute ? (DWORD)(CharacterAttribute->MagicSpeed) : 0;
 	spe.AddNullData(1);
 	spe << dwTick;
-	spe << (DWORD)(CharacterAttribute->AttackSpeed) << (DWORD)(CharacterAttribute->MagicSpeed);
+	spe << attackSpeed << magicSpeed;
+	#ifdef __ANDROID__
+		MU_NET_LOG("SendCheck: tick=%u atk=%u mag=%u first=%d", (unsigned int)dwTick, (unsigned int)attackSpeed, (unsigned int)magicSpeed, First ? 1 : 0);
+	#endif
 	spe.Send(TRUE);
 
 	if (!First)

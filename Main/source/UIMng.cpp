@@ -144,6 +144,12 @@ void CUIMng::ReleaseTitleSceneUI()
 
 void CUIMng::RenderTitleSceneUI(HDC hDC, DWORD dwNow, DWORD dwTotal)
 {
+#ifdef __ANDROID__
+	// Title scene sprites are released by ReleaseTitleSceneUI() before login
+	// completes, so rendering them on Android would crash. This function is
+	// only a Windows loading-progress-bar — skip it on Android entirely.
+	return;
+#endif
 	::BeginOpengl();
 	::glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	::BeginBitmap();

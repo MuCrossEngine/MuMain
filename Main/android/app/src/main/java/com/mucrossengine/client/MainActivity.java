@@ -253,21 +253,21 @@ public class MainActivity extends NativeActivity {
             | (data[offset + 3] & 0xFF);
     }
 
-    // Called from C++ to hide soft keyboard
+    // Called from C++ to hide soft keyboard.
+    // We only clear focus — no hideSoftInputFromWindow / WindowInsetsController.hide()
+    // because both create an ImeTracker token whose IBinder gets GC'd during the
+    // animation on Android 15, causing a SIGSEGV in binder:*_n / onProgress.
+    // Clearing focus is sufficient: the IME closes by itself when nothing is focused.
     public void hideSoftKeyboard() {
         runOnUiThread(() -> {
-            android.view.inputmethod.InputMethodManager imm =
-                (android.view.inputmethod.InputMethodManager)
-                getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
-            if (imm == null) {
-                return;
-            }
-
-            if (imeBridgeEditText != null) {
-                imm.hideSoftInputFromWindow(imeBridgeEditText.getWindowToken(), 0);
-                imeBridgeEditText.clearFocus();
-            } else {
-                imm.hideSoftInputFromWindow(getWindow().getDecorView().getWindowToken(), 0);
+            try {
+                if (imeBridgeEditText != null) {
+                    imeBridgeEditText.clearFocus();
+                }
+                // Remove focus from the whole window so the system IME hides.
+                getWindow().getDecorView().clearFocus();
+            } catch (Exception e) {
+                android.util.Log.w("MUAndroid", "hideSoftKeyboard: " + e.getMessage());
             }
         });
     }

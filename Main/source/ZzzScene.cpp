@@ -2,6 +2,10 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "stdafx.h"
+#ifdef __ANDROID__
+#include <malloc.h>
+#endif
+
 #include "UIManager.h"
 #include "GuildCache.h"
 #include "ZzzOpenglUtil.h"
@@ -73,6 +77,23 @@
 #ifdef __ANDROID__
 #include "Platform/GameAssetPath.h"
 #include <android/log.h>
+#endif
+
+#ifdef __ANDROID__
+static void LogMemScene(const char* tag)
+{
+    FILE* f = fopen("/proc/self/status", "r");
+    if (!f) return;
+    char line[128]; long vmrss = 0, vmswap = 0;
+    while (fgets(line, sizeof(line), f)) {
+        if (strncmp(line, "VmRSS:", 6) == 0) sscanf(line+6, "%ld", &vmrss);
+        if (strncmp(line, "VmSwap:", 7) == 0) sscanf(line+7, "%ld", &vmswap);
+    }
+    fclose(f);
+    __android_log_print(ANDROID_LOG_INFO, "MUMem", "%s: RSS=%ldMB Swap=%ldMB", tag, vmrss/1024, vmswap/1024);
+}
+#else
+static void LogMemScene(const char*) {}
 #endif
 
 extern CUITextInputBox* g_pSingleTextInputBox;
@@ -483,10 +504,15 @@ static void OpenAndroidLoginCoreData()
 
 	OpenTextData();
 
+	// LoadMainSceneInterface loads all in-game HUD textures (~100MB).
+	// On Android, defer this until just before entering the game world
+	// to keep the login-phase RSS low enough to survive LMK pressure.
+#ifndef __ANDROID__
 	if (g_pNewUISystem)
 	{
 		g_pNewUISystem->LoadMainSceneInterface();
 	}
+#endif
 
 	s_bAndroidLoginCoreDataLoaded = true;
 }
@@ -608,7 +634,9 @@ void WebzenScene(HDC hDC)
 
 	EnableAlphaTest();
 	#ifdef __ANDROID__
+	LogMemScene("WebzenScene:before-OpenAndroidLoginCoreData");
 	OpenAndroidLoginCoreData();
+	LogMemScene("WebzenScene:after-OpenAndroidLoginCoreData");
 	#else
 	OpenBasicData(hDC);
 
@@ -1293,7 +1321,13 @@ void NewMoveCharacterScene()
 		if (!InitCharacterScene)
 		{
 			InitCharacterScene = true;
+#ifdef __ANDROID__
+			LogMemScene("NewMoveCharacterScene:beforeCreate");
+#endif
 			CreateCharacterScene();
+#ifdef __ANDROID__
+			LogMemScene("NewMoveCharacterScene:afterCreate");
+#endif
 		}
 
 		if (gmProtect->SceneCharacter == 1)
@@ -1853,14 +1887,33 @@ void NewMoveLogInScene()
 		SceneFlag = CHARACTER_SCENE;
 #ifdef __ANDROID__
 		__android_log_print(ANDROID_LOG_INFO, "MUScene", "LoginSuccess: SceneFlag=CHARACTER_SCENE");
+		// On Android, WebzenScene() calls OpenAndroidLoginCoreData() instead of
+		// OpenBasicData(), leaving all BMD models (player/item/skill) with
+		// NumBones=0. ChangeCharacterExt/CalculateAll dereference model data, so
+		// we must load it before the server's character-list packet arrives.
+		{
+			static bool s_bBasicDataLoaded = false;
+			if (!s_bBasicDataLoaded) {
+				s_bBasicDataLoaded = true;
+				// Release login scene textures FIRST to free memory before loading game data
+				ReleaseLogoSceneData();
+				LogMemScene("before-OpenBasicData");
+				OpenBasicData(NULL);
+				LogMemScene("after-OpenBasicData");
+				// Release free heap pages back to OS immediately after loading
+				mallopt(M_PURGE, 0);
+				LogMemScene("after-mallopt-purge");
+			}
+		}
 #endif
 		SendRequestCharactersList(g_pMultiLanguage->GetLanguage());
 #ifdef __ANDROID__
 		__android_log_print(ANDROID_LOG_INFO, "MUScene", "LoginSuccess: SendRequestCharactersList done");
 #endif
+#ifndef __ANDROID__
 		ReleaseLogoSceneData();
-#ifdef __ANDROID__
-		__android_log_print(ANDROID_LOG_INFO, "MUScene", "LoginSuccess: ReleaseLogoSceneData done");
+#else
+		__android_log_print(ANDROID_LOG_INFO, "MUScene", "LoginSuccess: ReleaseLogoSceneData already done (before OpenBasicData)");
 #endif
 		ClearCharacters();
 #ifdef __ANDROID__
@@ -2508,11 +2561,53 @@ void MoveMainScene()
 {
 	if (!InitMainScene)
 	{
-		g_pMainFrame->ResetSkillHotKey();
-
 		CHARACTER* pCharacter = gmCharacters->GetCharacter(SelectedHero);
 
 		InitMainScene = true;
+
+#ifdef __ANDROID__
+		// Load remaining data deferred from OpenBasicData.
+		// OpenPlayers/OpenPlayerTextures already loaded during character-select transition.
+		// IMPORTANT: LoadMainSceneInterface must happen BEFORE ResetSkillHotKey.
+		{
+			extern void OpenItems();
+			extern void OpenItemTextures();
+			extern void OpenSkills();
+			extern void OpenImages();
+			LogMemScene("MoveMainScene:before-deferred-OpenItems");
+			OpenItems();
+			LogMemScene("MoveMainScene:after-deferred-OpenItems");
+			mallopt(M_PURGE, 0);
+			LogMemScene("MoveMainScene:before-deferred-OpenItemTextures");
+			OpenItemTextures();
+			LogMemScene("MoveMainScene:after-deferred-OpenItemTextures");
+			mallopt(M_PURGE, 0);
+			LogMemScene("MoveMainScene:before-deferred-OpenSkills");
+			OpenSkills();
+			LogMemScene("MoveMainScene:after-deferred-OpenSkills");
+			mallopt(M_PURGE, 0);
+			LogMemScene("MoveMainScene:before-deferred-OpenImages");
+			OpenImages();
+			LogMemScene("MoveMainScene:after-deferred-OpenImages");
+			mallopt(M_PURGE, 0);
+		}
+		if (g_pNewUISystem)
+		{
+			// Create singletons that WinMain normally sets up — deferred here so
+			// all data paths are valid and no premature file I/O occurs.
+			if (g_pUIManager == nullptr)
+				g_pUIManager = new CUIManager;
+			if (CAIController::GetSingletonPtr() == nullptr)
+			{
+				static CAIController s_aiCtrl(Hero);
+			}
+			LogMemScene("MoveMainScene:before-deferred-LoadMainSceneInterface");
+			g_pNewUISystem->LoadMainSceneInterface();
+			LogMemScene("MoveMainScene:after-deferred-LoadMainSceneInterface");
+		}
+#endif
+
+		g_pMainFrame->ResetSkillHotKey();
 
 		if (pCharacter)
 		{

@@ -589,7 +589,10 @@ target_compile_options(mucrossengine PRIVATE
     -Wno-unused-variable
     -Wno-tautological-compare
     -Wno-reorder
+    -fno-omit-frame-pointer
 )
+
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Link

@@ -309,6 +309,22 @@ bool OpenJpegBuffer(char* filename, float* BufferFloat)
 
 bool LoadBitmap(const char* szFileName, GLuint uiTextureIndex, GLuint uiFilter, GLuint uiWrapMode, bool bCheck, bool bFullPath)
 {
+	#ifdef __ANDROID__
+	// MAIN_SCENE loading can block for many seconds in a single frame.
+	// Pump anti-hack heartbeat while loading textures to avoid CheckSumTime timeout.
+	if (g_bGameServerConnected)
+	{
+		extern void CheckHack(void);
+		static DWORD s_lastCheckTick = 0;
+		DWORD now = GetTickCount();
+		if (s_lastCheckTick == 0 || (DWORD)(now - s_lastCheckTick) >= 1000)
+		{
+			CheckHack();
+			s_lastCheckTick = now;
+		}
+	}
+	#endif
+
 	char szFullPath[256] = { 0, };
 
 	if (bFullPath == true)

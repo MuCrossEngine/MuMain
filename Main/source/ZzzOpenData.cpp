@@ -5543,6 +5543,7 @@ void OpenBasicData(HDC hDC)
 
 	rUIMng.RenderTitleSceneUI(hDC, 0, 12);
 
+#ifndef __ANDROID__
 	LoadBitmap("Interface\\Cursor.tga", BITMAP_CURSOR, GL_LINEAR, GL_CLAMP_TO_EDGE);
 	LoadBitmap("Interface\\CursorPush.tga", BITMAP_CURSOR + 1, GL_LINEAR, GL_CLAMP_TO_EDGE);
 	LoadBitmap("Interface\\CursorAttack.tga", BITMAP_CURSOR + 2, GL_LINEAR, GL_CLAMP_TO_EDGE);
@@ -6065,12 +6066,21 @@ void OpenBasicData(HDC hDC)
 
 
 	g_ErrorReport.Write("> First Load Files OK.\r\n");
+#else
+	LogMem("OpenBasicData:first-textures-skipped");
+#endif // !__ANDROID__
 	LogMem("OpenBasicData:first-textures-done");
 
+#ifndef __ANDROID__
 	OpenPlayers();
 	rUIMng.RenderTitleSceneUI(hDC, 2, 12);
+#else
+	// On Android, load player models for character selection scene
+	OpenPlayers();
+#endif
 	LogMem("OpenBasicData:OpenPlayers-done");
 
+#ifndef __ANDROID__
 	OpenPlayerTextures();
 	rUIMng.RenderTitleSceneUI(hDC, 3, 12);
 
@@ -6079,10 +6089,24 @@ void OpenBasicData(HDC hDC)
 
 	OpenItemTextures();
 	rUIMng.RenderTitleSceneUI(hDC, 5, 12);
+#else
+	// On Android, load player textures for character selection scene
+	OpenPlayerTextures();
+	LogMem("OpenBasicData:OpenPlayerTextures-done");
+	// Items/ItemTextures still deferred to MoveMainScene
+	LogMem("OpenBasicData:Items+ItemTextures-deferred");
+#endif
 
+	LogMem("OpenBasicData:before-LoadingProgressive");
+#ifndef __ANDROID__
 	GMProtect->LoadingProgressive();
+	LogMem("OpenBasicData:LoadingProgressive-done");
+#else
+	LogMem("OpenBasicData:LoadingProgressive-skipped");
+#endif
 	rUIMng.RenderTitleSceneUI(hDC, 6, 12);
 
+#ifndef __ANDROID__
 	OpenSkills();
 	rUIMng.RenderTitleSceneUI(hDC, 7, 12);
 
@@ -6091,9 +6115,14 @@ void OpenBasicData(HDC hDC)
 
 	OpenSounds();
 	rUIMng.RenderTitleSceneUI(hDC, 9, 12);
+#else
+	// Skip OpenSkills/Images/Sounds on Android — not needed for character-selection scene
+	LogMem("OpenBasicData:OpenSkills+Images+Sounds-skipped");
+#endif
 
 	g_ServerListManager->LoadServerListScript();
 
+#ifndef __ANDROID__
 #if MAIN_UPDATE > 303
 #ifdef CHINESE_LANGUAGE
 	g_MixRecipeMgr.OpenRecipeFile("Data\\Local\\Mix.bmd");
@@ -6204,6 +6233,26 @@ void OpenBasicData(HDC hDC)
 
 	OpenMonsterSkillScript("Data\\Local\\MonsterSkill.bmd");
 #endif // MAIN_UPDATE > 303
+#else
+	// Android: load only the minimum data needed for character selection
+	{
+		char Text[100];
+		sprintf(Text, "Data\\Local\\%s\\Item.bmd", g_strSelectedML.c_str());
+		GMItemMng->OpenFile(Text);
+		LogMem("OpenBasicData:android-Item.bmd-loaded");
+
+		OpenTextData();
+		LogMem("OpenBasicData:android-TextData-loaded");
+
+		g_csItemOption.OpenItemSetScript(false);
+
+		OpenGateScript("Data\\Gate.bmd");
+
+		OpenFilterFile("Data\\Local\\Filter.bmd");
+		OpenNameFilterFile("Data\\Local\\FilterName.bmd");
+		LogMem("OpenBasicData:android-minimal-scripts-loaded");
+	}
+#endif // !__ANDROID__
 
 #ifdef SHUTDOWN_SCALEFORM_INFO
 	gfxinit->LoadMovie();
@@ -6211,6 +6260,7 @@ void OpenBasicData(HDC hDC)
 
 	rUIMng.RenderTitleSceneUI(hDC, 10, 12);
 
+#ifndef __ANDROID__
 	LoadWaveFile(SOUND_TITLE01, "Data\\Sound\\iTitle.wav", 1);
 	LoadWaveFile(SOUND_MENU01, "Data\\Sound\\iButtonMove.wav", 2);
 	LoadWaveFile(SOUND_CLICK01, "Data\\Sound\\iButtonClick.wav", 1);
@@ -6227,6 +6277,7 @@ void OpenBasicData(HDC hDC)
 	LoadWaveFile(SOUND_RING_EVENT_READY, "Data\\Sound\\iEvent3min.wav", 1);
 	LoadWaveFile(SOUND_RING_EVENT_START, "Data\\Sound\\iEventStart.wav", 1);
 	LoadWaveFile(SOUND_RING_EVENT_END, "Data\\Sound\\iEventEnd.wav", 1);
+#endif // !__ANDROID__
 
 	rUIMng.RenderTitleSceneUI(hDC, 11, 12);
 	LogMem("OpenBasicData:end");

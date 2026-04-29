@@ -46,6 +46,12 @@ namespace GameMouseInput
     // Pinch tracking
     static float s_lastPinchDist   = 0.f;
 
+    // Deferred release: for quick taps, DOWN and UP both fire before Scene()
+    // runs. We defer KEY_RELEASE until Update() (which runs AFTER Scene()) so
+    // CInput::Update() inside Scene() always sees KEY_PRESS for at least one frame.
+    static bool  s_pendingLButtonRelease = false;
+    static bool  s_pendingRButtonRelease = false;
+
     static float PinchDistance(AInputEvent* event)
     {
         if (AMotionEvent_getPointerCount(event) < 2) return 0.f;
@@ -82,9 +88,11 @@ namespace GameMouseInput
 
     static void FireLButtonUp()
     {
-        MouseLButton     = false;
+        // Do NOT clear MouseLButton here — DOWN+UP may arrive before Scene() runs.
+        // Defer the clear to Update() (after Scene()) so the click is visible for
+        // exactly one frame.
         MouseLButtonPop  = true;
-        SetVKey(VK_LBUTTON, SEASON3B::CNewKeyInput::KEY_RELEASE);
+        s_pendingLButtonRelease = true;
     }
 
     static void FireRButtonDown()
@@ -97,9 +105,9 @@ namespace GameMouseInput
 
     static void FireRButtonUp()
     {
-        MouseRButton     = false;
+        // Same deferral for RButton.
         MouseRButtonPop  = true;
-        SetVKey(VK_RBUTTON, SEASON3B::CNewKeyInput::KEY_RELEASE);
+        s_pendingRButtonRelease = true;
     }
 
     int ProcessEvent(AInputEvent* event)
@@ -205,12 +213,25 @@ namespace GameMouseInput
         // Advance virtual key states after scene/input update has consumed this frame.
         if (g_pNewKeyInput)
         {
-            if (g_pNewKeyInput->IsPress(VK_LBUTTON) && MouseLButton)
+            // Apply deferred releases (tap DOWN+UP arrived before Scene() ran this frame)
+            if (s_pendingLButtonRelease)
+            {
+                s_pendingLButtonRelease = false;
+                MouseLButton = false;   // NOW clear — Scene() has already run
+                g_pNewKeyInput->SetKeyState(VK_LBUTTON, SEASON3B::CNewKeyInput::KEY_RELEASE);
+            }
+            else if (g_pNewKeyInput->IsPress(VK_LBUTTON) && MouseLButton)
                 g_pNewKeyInput->SetKeyState(VK_LBUTTON, SEASON3B::CNewKeyInput::KEY_REPEAT);
             else if (g_pNewKeyInput->IsRelease(VK_LBUTTON) && !MouseLButton)
                 g_pNewKeyInput->SetKeyState(VK_LBUTTON, SEASON3B::CNewKeyInput::KEY_NONE);
 
-            if (g_pNewKeyInput->IsPress(VK_RBUTTON) && MouseRButton)
+            if (s_pendingRButtonRelease)
+            {
+                s_pendingRButtonRelease = false;
+                MouseRButton = false;   // NOW clear — Scene() has already run
+                g_pNewKeyInput->SetKeyState(VK_RBUTTON, SEASON3B::CNewKeyInput::KEY_RELEASE);
+            }
+            else if (g_pNewKeyInput->IsPress(VK_RBUTTON) && MouseRButton)
                 g_pNewKeyInput->SetKeyState(VK_RBUTTON, SEASON3B::CNewKeyInput::KEY_REPEAT);
             else if (g_pNewKeyInput->IsRelease(VK_RBUTTON) && !MouseRButton)
                 g_pNewKeyInput->SetKeyState(VK_RBUTTON, SEASON3B::CNewKeyInput::KEY_NONE);

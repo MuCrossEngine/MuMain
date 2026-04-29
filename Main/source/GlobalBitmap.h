@@ -13,25 +13,26 @@
 
 #define MAX_BITMAP_FILE_NAME 256
 
-#pragma pack(push, 1)
+// NOTE: Do NOT use #pragma pack here. BITMAP_t contains std::vector<BYTE> Buffer
+// whose internal pointers require 8-byte alignment on arm64. Packing to 1-byte
+// alignment causes misaligned pointer stores which is UB and corrupts the heap.
 typedef struct
 {
-	GLuint	BitmapIndex;
-	char	FileName[MAX_BITMAP_FILE_NAME];
-	float	Width;
-	float	Height;
-	unsigned int output_width;
-	unsigned int output_height;
-	BYTE	Components;
-	GLuint	TextureNumber;
-	BYTE	Ref;
+	GLuint	BitmapIndex    = 0;
+	char	FileName[MAX_BITMAP_FILE_NAME] = {};
+	float	Width          = 0.0f;
+	float	Height         = 0.0f;
+	unsigned int output_width  = 0;
+	unsigned int output_height = 0;
+	BYTE	Components     = 0;
+	GLuint	TextureNumber  = 0;
+	BYTE	Ref            = 0;
 	std::vector<BYTE> Buffer;
 	//BYTE*   Buffer;
 private:
 	friend class CBitmapCache;
-	DWORD	dwCallCount;
+	DWORD	dwCallCount = 0;
 } BITMAP_t;
-#pragma pack(pop)
 
 class CBitmapCache
 {
