@@ -214,8 +214,9 @@ static void SyncLegacyScreenMetrics(int width, int height)
         return;
     }
 
-    WindowWidth = static_cast<unsigned int>(width);
-    WindowHeight = static_cast<unsigned int>(height);
+    // Force logical resolution to 1280x720 (16:9 HD)
+    WindowWidth = 1280;
+    WindowHeight = 720;
 
     int screenType = 0;
     if (gmProtect != nullptr)
@@ -739,8 +740,10 @@ static void OnAppCmd(android_app* app, int32_t cmd)
             }
             LegacyClientRuntime::SetWindow(app->window);
 
-            const int width = ANativeWindow_getWidth(app->window);
-            const int height = ANativeWindow_getHeight(app->window);
+            // Force 1280x720 render resolution
+            ANativeWindow_setBuffersGeometry(app->window, 1280, 720, 0);
+            const int width = 1280;
+            const int height = 720;
 
             if (!g_initialized)
             {
@@ -800,13 +803,11 @@ static void OnAppCmd(android_app* app, int32_t cmd)
     case APP_CMD_CONFIG_CHANGED:
         if (app->window && g_renderBackendInitialized)
         {
-            const int width = ANativeWindow_getWidth(app->window);
-            const int height = ANativeWindow_getHeight(app->window);
-            if (width > 0 && height > 0)
-            {
-                RenderBackend::SetScreenSize(width, height);
-                SyncLegacyScreenMetrics(width, height);
-            }
+            const int width = 1280;
+            const int height = 720;
+            ANativeWindow_setBuffersGeometry(app->window, width, height, 0);
+            RenderBackend::SetScreenSize(width, height);
+            SyncLegacyScreenMetrics(width, height);
         }
         break;
 

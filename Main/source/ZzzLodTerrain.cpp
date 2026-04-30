@@ -2341,7 +2341,8 @@ void CreateFrustrum2D(vec3_t Position)
 	Width = 1.0;
 #endif // MAIN_UPDATE > 303
 
-	CAMERA_INFO* CurrentCam = CameraFactorPtr->CurrentCam();
+	CGMCameraWorld* pCamWorld = g_pNewUISystem->GetUI_NewUICamWebzen();
+	CAMERA_INFO* CurrentCam = pCamWorld ? pCamWorld->CurrentCam() : nullptr;
 
 	int iWorld = gMapManager->currentMap;
 

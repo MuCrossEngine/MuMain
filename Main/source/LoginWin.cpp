@@ -4,9 +4,6 @@
 
 #include "stdafx.h"
 #include "LoginWin.h"
-#ifdef __ANDROID__
-#include "Platform/GameAssetPath.h"
-#endif
 #include "Input.h"
 #include "UIMng.h"
 #include "ZzzBMD.h"
@@ -430,32 +427,6 @@ void CLoginWin::RenderControls()
 {
 	if (this->FirstLoad == TRUE)
 	{
-#ifdef __ANDROID__
-		// Auto-login from Data/autoLogin.txt if present (for automated testing)
-		// Format: first line = username, second line = password
-		{
-			FILE* f = GameAssetPath::OpenFile("Data/autoLogin.txt", "r");
-			if (f) {
-				char szAutoID[MAX_ID_SIZE + 1] = {0};
-				char szAutoPass[MAX_PASSWORD_SIZE + 1] = {0};
-				if (fgets(szAutoID, sizeof(szAutoID), f)) {
-					for (int i = 0; szAutoID[i]; i++) { if (szAutoID[i] == '\n' || szAutoID[i] == '\r') { szAutoID[i] = 0; break; } }
-				}
-				if (fgets(szAutoPass, sizeof(szAutoPass), f)) {
-					for (int i = 0; szAutoPass[i]; i++) { if (szAutoPass[i] == '\n' || szAutoPass[i] == '\r') { szAutoPass[i] = 0; break; } }
-				}
-				fclose(f);
-				if (szAutoID[0] && szAutoPass[0]) {
-					m_pIDInputBox->SetText(szAutoID);
-					m_pPassInputBox->SetText(szAutoPass);
-					MU_FLOW_LOG("AutoLogin: filling credentials id=%s", szAutoID);
-					this->FirstLoad = 0;
-					RequestLogin(false);
-					return;
-				}
-			}
-		}
-#endif
 		if (m_ID[MAX_ACCOUNT_REG][0] != '\0')
 		{
 			this->GetPassInputBox()->GiveFocus();

@@ -39,10 +39,6 @@ using namespace SEASON3A;
 
 CServerSelWin::CServerSelWin()
 {
-#ifdef __ANDROID__
-	m_bAutoGroupDone  = false;
-	m_bAutoServerDone = false;
-#endif
 }
 
 CServerSelWin::~CServerSelWin()
@@ -415,42 +411,6 @@ bool CServerSelWin::CursorInWin(int nArea)
 
 void CServerSelWin::UpdateWhileShow(double dDeltaTick)
 {
-#ifdef __ANDROID__
-	// Auto-select server group when there is exactly one group and none is selected yet.
-	if (!m_bAutoGroupDone && m_icntServerGroup == 1 && m_iSelectServerBtnIndex == -1 && m_aServerGroupBtn[0].IsShow())
-	{
-		m_bAutoGroupDone = true;
-		m_aServerGroupBtn[0].SetCheck(true);
-		m_iSelectServerBtnIndex = 0;
-		MU_FLOW_LOG("AutoSelect: server group 0");
-		SendRequestServerList();
-	}
-
-	// Auto-select the server when there is exactly one server in the selected group.
-	if (!m_bAutoServerDone && m_pSelectServerGroup != NULL && m_icntServer == 1 && m_aServerBtn[0].IsShow())
-	{
-		CServerInfo* pAutoServer = m_pSelectServerGroup->GetServerInfo(0);
-		if (pAutoServer && pAutoServer->m_iPercent < 100)
-		{
-			m_bAutoServerDone = true;
-			MU_FLOW_LOG("AutoSelect: server 0 connectIndex=%d", pAutoServer->m_iConnectIndex);
-			CUIMng::Instance().HideWin(this);
-			SendRequestServerAddress(pAutoServer->m_iConnectIndex);
-
-			int iCensorshipIndex = CGameCensorship::STATE_12;
-			if (m_pSelectServerGroup->m_bPvPServer)
-				iCensorshipIndex = CGameCensorship::STATE_18;
-			else if (0x01 & pAutoServer->m_byNonPvP)
-				iCensorshipIndex = CGameCensorship::STATE_15;
-
-			bool bTestServer = (m_pSelectServerGroup->m_iSequence == 0);
-			if (gmProtect->ServerNameDefault)
-				g_ServerListManager->SetSelectServerInfo(m_pSelectServerGroup->m_szName, pAutoServer->m_iIndex, iCensorshipIndex, pAutoServer->m_byNonPvP, bTestServer);
-			else
-				g_ServerListManager->SetSelectServerInfo(pAutoServer->m_bName, pAutoServer->m_iIndex, iCensorshipIndex, pAutoServer->m_byNonPvP, bTestServer);
-		}
-	}
-#endif
 }
 
 void CServerSelWin::UpdateWhileActive(double dDeltaTick)

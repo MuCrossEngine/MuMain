@@ -1,8 +1,10 @@
 #include "stdafx.h"
 #include "CGMProtect.h"
+#include "Platform/GameAssetPath.h"
 
 #ifdef __ANDROID__
 #include <android/log.h>
+#include <cctype>
 static void LogMem(const char* tag)
 {
     FILE* f = fopen("/proc/self/status", "r");
@@ -21,6 +23,56 @@ static void LogMem(const char* tag)
 }
 #else
 static void LogMem(const char*) {}
+#endif
+
+#ifdef __ANDROID__
+extern std::string g_strSelectedML;
+
+static bool AndroidFileExists(const char* path)
+{
+	FILE* fp = MU_FOPEN(path, "rb");
+	if (fp)
+	{
+		fclose(fp);
+		return true;
+	}
+	return false;
+}
+
+static void BuildLocalizedLocalPath(char* outPath, size_t outSize, const char* fileName)
+{
+	if (outPath == nullptr || outSize == 0 || fileName == nullptr)
+	{
+		return;
+	}
+
+	snprintf(outPath, outSize, "Data\\Local\\%s\\%s", g_strSelectedML.c_str(), fileName);
+	if (AndroidFileExists(outPath))
+	{
+		return;
+	}
+
+	std::string normalized = g_strSelectedML;
+	if (!normalized.empty())
+	{
+		normalized[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(normalized[0])));
+		for (size_t i = 1; i < normalized.size(); ++i)
+		{
+			normalized[i] = static_cast<char>(std::tolower(static_cast<unsigned char>(normalized[i])));
+		}
+	}
+
+	if (!normalized.empty())
+	{
+		snprintf(outPath, outSize, "Data\\Local\\%s\\%s", normalized.c_str(), fileName);
+		if (AndroidFileExists(outPath))
+		{
+			return;
+		}
+	}
+
+	snprintf(outPath, outSize, "Data\\Local\\Eng\\%s", fileName);
+}
 #endif
 
 #include "UIControls.h"
@@ -6237,7 +6289,7 @@ void OpenBasicData(HDC hDC)
 	// Android: load only the minimum data needed for character selection
 	{
 		char Text[100];
-		sprintf(Text, "Data\\Local\\%s\\Item.bmd", g_strSelectedML.c_str());
+		BuildLocalizedLocalPath(Text, sizeof(Text), "Item.bmd");
 		GMItemMng->OpenFile(Text);
 		LogMem("OpenBasicData:android-Item.bmd-loaded");
 
@@ -6291,7 +6343,11 @@ void OpenTextData()
 #ifdef CHINESE_LANGUAGE
 	sprintf(Text, "Data\\Local\\Text.bmd");
 #else
+#ifdef __ANDROID__
+	BuildLocalizedLocalPath(Text, sizeof(Text), "Text.bmd");
+#else
 	sprintf(Text, "Data\\Local\\%s\\Text.bmd", g_strSelectedML.c_str());
+#endif
 #endif // CHINESE_LANGUAGE
 
 	GlobalText.Load(Text, CGlobalText::LD_USA_CANADA_TEXTS | CGlobalText::LD_FOREIGN_TEXTS);
@@ -6299,7 +6355,11 @@ void OpenTextData()
 #ifdef CHINESE_LANGUAGE
 	sprintf(Text, "Data\\Local\\GlobalText.bmd");
 #else
+#ifdef __ANDROID__
+	BuildLocalizedLocalPath(Text, sizeof(Text), "GlobalText.bmd");
+#else
 	sprintf(Text, "Data\\Local\\%s\\GlobalText.bmd", g_strSelectedML.c_str());
+#endif
 #endif // CHINESE_LANGUAGE
 	TextGlobal.Load(Text, CGlobalText::LD_USA_CANADA_TEXTS | CGlobalText::LD_FOREIGN_TEXTS);
 

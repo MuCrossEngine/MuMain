@@ -36,6 +36,33 @@
 #include "w_MapProcess.h"
 #include "./Utilities/Log/ErrorReport.h"
 
+#ifdef __ANDROID__
+static bool RetryTerrainCaseForAndroid(char* fileName, size_t fileNameSize)
+{
+	char* token = strstr(fileName, "EncTerrain");
+	if (token == nullptr)
+	{
+		return false;
+	}
+
+	char retryName[64] = { 0, };
+	strncpy(retryName, fileName, sizeof(retryName) - 1);
+
+	char* retryToken = strstr(retryName, "EncTerrain");
+	if (retryToken == nullptr)
+	{
+		return false;
+	}
+
+	memcpy(retryToken, "Encterrain", 10);
+	retryName[sizeof(retryName) - 1] = '\0';
+
+	strncpy(fileName, retryName, fileNameSize - 1);
+	fileName[fileNameSize - 1] = '\0';
+	return true;
+}
+#endif
+
 CMapManager::CMapManager() // OK
 {
 	this->currentMap = -1;
@@ -1378,6 +1405,23 @@ void CMapManager::LoadWorld(int Map)
 	sprintf(FileName, "Data\\%s\\EncTerrain%d.map", WorldName, iMapWorld);
 
 	int iResult = OpenTerrainMapping(FileName);
+#ifdef __ANDROID__
+	if (iResult == -1)
+	{
+		char retryName[64] = { 0, };
+		strncpy(retryName, FileName, sizeof(retryName) - 1);
+		if (RetryTerrainCaseForAndroid(retryName, sizeof(retryName)))
+		{
+			int retryResult = OpenTerrainMapping(retryName);
+			if (retryResult != -1)
+			{
+				iResult = retryResult;
+				strncpy(FileName, retryName, sizeof(FileName) - 1);
+				FileName[sizeof(FileName) - 1] = '\0';
+			}
+		}
+	}
+#endif
 
 	if (iMapWorld != iResult && -1 == iResult)
 	{
@@ -1444,6 +1488,23 @@ void CMapManager::LoadWorld(int Map)
 		sprintf(FileName, "Data\\%s\\EncTerrain%d.att", WorldName, iMapWorld);
 	}
 	iResult = OpenTerrainAttribute(FileName);
+#ifdef __ANDROID__
+	if (iResult == -1)
+	{
+		char retryName[64] = { 0, };
+		strncpy(retryName, FileName, sizeof(retryName) - 1);
+		if (RetryTerrainCaseForAndroid(retryName, sizeof(retryName)))
+		{
+			int retryResult = OpenTerrainAttribute(retryName);
+			if (retryResult != -1)
+			{
+				iResult = retryResult;
+				strncpy(FileName, retryName, sizeof(FileName) - 1);
+				FileName[sizeof(FileName) - 1] = '\0';
+			}
+		}
+	}
+#endif
 
 	if (-1 == iResult)
 	{
@@ -1459,6 +1520,23 @@ void CMapManager::LoadWorld(int Map)
 	sprintf(FileName, "Data\\%s\\EncTerrain%d.obj", WorldName, iMapWorld);
 
 	iResult = OpenObjectsEnc(FileName);
+#ifdef __ANDROID__
+	if (iResult == -1)
+	{
+		char retryName[64] = { 0, };
+		strncpy(retryName, FileName, sizeof(retryName) - 1);
+		if (RetryTerrainCaseForAndroid(retryName, sizeof(retryName)))
+		{
+			int retryResult = OpenObjectsEnc(retryName);
+			if (retryResult != -1)
+			{
+				iResult = retryResult;
+				strncpy(FileName, retryName, sizeof(FileName) - 1);
+				FileName[sizeof(FileName) - 1] = '\0';
+			}
+		}
+	}
+#endif
 
 	if (-1 == iResult)
 	{

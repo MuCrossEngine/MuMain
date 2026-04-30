@@ -45,11 +45,6 @@ protected:
 	
 	int				m_iSelectServerBtnIndex;
 	CServerGroup*	m_pSelectServerGroup;
-
-#ifdef __ANDROID__
-	bool		m_bAutoGroupDone;
-	bool		m_bAutoServerDone;
-#endif
 	
 	unicode::t_char		m_szDescription[SSW_DESC_LINE_MAX][SSW_DESC_ROW_MAX];
 
@@ -74,4 +69,3 @@ protected:
 	void UpdateWhileActive(double dDeltaTick);
 	void RenderControls();
 };
-

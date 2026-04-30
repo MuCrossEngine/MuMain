@@ -156,7 +156,7 @@ bool OpenJpegBuffer(char* filename, float* BufferFloat)
 	strcat(FileName, NewFileName);
 	strcat(FileName, "OZJ");
 
-	FILE* infile = fopen(FileName, "rb");
+	FILE* infile = MU_FOPEN(FileName, "rb");
 	if (infile == NULL)
 	{
 		char Text[256];

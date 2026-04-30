@@ -31,6 +31,8 @@ extern int   MouseWheel;
 
 // Screen dimensions (set by LegacyClientRuntime)
 extern int WindowSizeX, WindowSizeY;
+// Logical render dimensions used by legacy UI/input hit-tests.
+extern unsigned int WindowWidth, WindowHeight;
 
 namespace GameMouseInput
 {
@@ -63,10 +65,25 @@ namespace GameMouseInput
 
     static void SetMousePos(float x, float y)
     {
-        // Clamp to screen
-        MouseRenderX = (int)x;
-        MouseRenderY = (int)y;
-        // Game coordinates (may differ if game uses a virtual resolution)
+        float mappedX = x;
+        float mappedY = y;
+
+        // Android motion events can arrive in physical surface coordinates
+        // while the game runs in a fixed logical backbuffer (1280x720).
+        if (WindowSizeX > 0 && WindowSizeY > 0 && WindowWidth > 0 && WindowHeight > 0)
+        {
+            mappedX = x * (float)WindowWidth / (float)WindowSizeX;
+            mappedY = y * (float)WindowHeight / (float)WindowSizeY;
+        }
+
+        // Clamp to logical screen used by legacy UI hit-tests.
+        if (mappedX < 0.f) mappedX = 0.f;
+        if (mappedY < 0.f) mappedY = 0.f;
+        if (WindowWidth > 0 && mappedX > (float)WindowWidth - 1.f) mappedX = (float)WindowWidth - 1.f;
+        if (WindowHeight > 0 && mappedY > (float)WindowHeight - 1.f) mappedY = (float)WindowHeight - 1.f;
+
+        MouseRenderX = mappedX;
+        MouseRenderY = mappedY;
         MouseX = MouseRenderX;
         MouseY = MouseRenderY;
     }

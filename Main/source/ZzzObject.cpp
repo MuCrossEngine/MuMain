@@ -50,6 +50,7 @@
 #include "CGMRenderGroupMesh.h"
 #include "CGMJewelOfAction.h"
 #include "CGMPhysicsManager.h"
+#include "Platform/GameAssetPath.h"
 
 extern vec3_t VertexTransform[MAX_MESH][MAX_VERTICES];
 extern vec3_t LightTransform[MAX_MESH][MAX_VERTICES];
@@ -5607,7 +5608,7 @@ void DeleteObjectTile(int x, int y)
 
 int OpenObjects(char* FileName)
 {
-	FILE* fp = fopen(FileName, "rb");
+	FILE* fp = MU_FOPEN(FileName, "rb");
 	if (fp == NULL)
 	{
 		char Text[256];
@@ -5643,14 +5644,12 @@ int OpenObjects(char* FileName)
 		CreateObject(Type, Position, Angle, Scale);
 	}
 	delete[] Data;
-
-	fclose(fp);
 	return iMapNumber;
 }
 
 int OpenObjectsEnc(char* FileName)
 {
-	FILE* fp = fopen(FileName, "rb");
+	FILE* fp = MU_FOPEN(FileName, "rb");
 
 	if (fp == NULL)
 	{

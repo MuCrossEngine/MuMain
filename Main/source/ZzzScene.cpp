@@ -426,6 +426,60 @@ static bool AndroidAssetExists(const char* relativePath)
 	return false;
 }
 
+static bool AndroidCanDecodeEncTerrainObject(const char* relativePath)
+{
+	FILE* fp = MU_FOPEN(relativePath, "rb");
+	if (fp == NULL)
+	{
+		return false;
+	}
+
+	fseek(fp, 0, SEEK_END);
+	long fileSize = ftell(fp);
+	fseek(fp, 0, SEEK_SET);
+	if (fileSize <= 4)
+	{
+		fclose(fp);
+		return false;
+	}
+
+	std::vector<BYTE> encBuffer((size_t)fileSize);
+	if (fread(encBuffer.data(), 1u, (size_t)fileSize, fp) != (size_t)fileSize)
+	{
+		fclose(fp);
+		return false;
+	}
+	fclose(fp);
+
+	std::vector<BYTE> decBuffer((size_t)fileSize, 0);
+	MapFileDecrypt(decBuffer.data(), encBuffer.data(), (int)fileSize);
+
+	BYTE version = decBuffer[0];
+	short count = 0;
+	memcpy(&count, &decBuffer[2], sizeof(short));
+	if (count < 0 || count > 10000)
+	{
+		return false;
+	}
+
+	int bytesPerObject = 2 + (int)sizeof(vec3_t) + (int)sizeof(vec3_t) + 4;
+	if (version == 1)
+	{
+		bytesPerObject += 2;
+	}
+	else if (version == 2)
+	{
+		bytesPerObject += 3;
+	}
+	else if (version == 3)
+	{
+		bytesPerObject += 3 + (int)sizeof(vec3_t);
+	}
+
+	long requiredBytes = 4 + (long)count * (long)bytesPerObject;
+	return requiredBytes <= fileSize;
+}
+
 static bool AndroidCanUseOriginalLoginScene(BYTE sceneLogin)
 {
 	switch (sceneLogin)
@@ -464,6 +518,63 @@ static bool AndroidCanUseOriginalLoginScene(BYTE sceneLogin)
 		return AndroidAssetExists("Data\\World73\\EncTerrain73.map")
 			&& AndroidAssetExists("Data\\Object73\\Object01.bmd");
 	}
+}
+
+static bool AndroidCanUseOriginalCharacterScene(BYTE sceneCharacter)
+{
+	switch (sceneCharacter)
+	{
+	case 1:
+		return true;
+
+	case 2:
+		return AndroidAssetExists("Data\\World54\\EncTerrain54.map")
+			&& AndroidAssetExists("Data\\World54\\EncTerrain54.att")
+			&& AndroidCanDecodeEncTerrainObject("Data\\World54\\EncTerrain54.obj");
+
+	case 3:
+		return AndroidAssetExists("Data\\World78\\EncTerrain78.map")
+			&& AndroidAssetExists("Data\\World78\\EncTerrain78.att")
+			&& AndroidCanDecodeEncTerrainObject("Data\\World78\\EncTerrain78.obj");
+
+	case 4:
+		return AndroidAssetExists("Data\\World94\\Encterrain94.map")
+			&& AndroidAssetExists("Data\\World94\\Encterrain94.att")
+			&& AndroidCanDecodeEncTerrainObject("Data\\World94\\EncTerrain94.obj")
+			&& AndroidAssetExists("Data\\World94\\TerrainLight.OZJ")
+			&& AndroidAssetExists("Data\\World94\\TileRock06.OZJ")
+			&& AndroidAssetExists("Data\\World94\\TileGrass03.OZT");
+
+	case 0:
+	default:
+		return AndroidAssetExists("Data\\World75\\EncTerrain75.map")
+			&& AndroidAssetExists("Data\\World75\\EncTerrain75.att")
+			&& AndroidCanDecodeEncTerrainObject("Data\\World75\\EncTerrain75.obj");
+	}
+}
+
+static BYTE AndroidResolveCharacterScene(BYTE requestedScene)
+{
+	if (AndroidCanUseOriginalCharacterScene(requestedScene))
+	{
+		return requestedScene;
+	}
+
+	const BYTE fallbackOrder[] = { 4, 3, 0, 1 };
+	for (BYTE fallbackScene : fallbackOrder)
+	{
+		if (fallbackScene == requestedScene)
+		{
+			continue;
+		}
+
+		if (AndroidCanUseOriginalCharacterScene(fallbackScene))
+		{
+			return fallbackScene;
+		}
+	}
+
+	return 1;
 }
 
 static void OpenAndroidLoginCoreData()
@@ -1188,21 +1299,22 @@ void RenderInterfaceEdge()
 
 void CreateCharacterScene()
 {
-#ifdef __ANDROID__
-	// Log as absolute first line so we can detect if we reach here at all.
-	__android_log_print(ANDROID_LOG_INFO, "MUScene", "CreateCharacterScene: entry SceneCharacter=%d", (int)gmProtect->SceneCharacter);
-	// Belt-and-suspenders: SceneCharacter was already set in NewMoveLogInScene, but force again here.
-	gmProtect->SceneCharacter = 1;
-#endif
-
 	g_pNewUIMng->ResetActiveUIObj();
-#ifdef __ANDROID__
-	__android_log_print(ANDROID_LOG_INFO, "MUScene", "CreateCharacterScene: ResetActiveUIObj done");
-#endif
 
 	EnableMainRender = true;
 	MouseOnWindow = false;
 	ErrorMessage = NULL;
+#ifdef __ANDROID__
+	BYTE requestedScene = gmProtect->SceneCharacter;
+	BYTE resolvedScene = AndroidResolveCharacterScene(requestedScene);
+	if (resolvedScene != requestedScene)
+	{
+		__android_log_print(ANDROID_LOG_WARN, "MUScene",
+			"CreateCharacterScene: Character scene %d unavailable, fallback to scene %d",
+			(int)requestedScene, (int)resolvedScene);
+		gmProtect->SceneCharacter = resolvedScene;
+	}
+#endif
 
 	if (gmProtect->SceneCharacter == 1)
 	{
@@ -1219,20 +1331,11 @@ void CreateCharacterScene()
 		CurrentCameraAngle[1] = -800.0;
 		CurrentCameraAngle[2] = 300.0;
 
-#ifdef __ANDROID__
-		__android_log_print(ANDROID_LOG_INFO, "MUScene", "CreateCharacterScene: calling OpenCharacterSceneData");
-#endif
 		OpenCharacterSceneData();
-#ifdef __ANDROID__
-		__android_log_print(ANDROID_LOG_INFO, "MUScene", "CreateCharacterScene: OpenCharacterSceneData done");
-#endif
 
 		Vector(0.0, 0.0, 0.0, Angle);
 		Vector(0.0, 0.0, 0.0, Position);
 		CreateObject(MODEL_CARD, Position, Angle, 1.1f);
-#ifdef __ANDROID__
-		__android_log_print(ANDROID_LOG_INFO, "MUScene", "CreateCharacterScene: CreateObject MODEL_CARD done");
-#endif
 	}
 	else
 	{
@@ -1263,13 +1366,7 @@ void CreateCharacterScene()
 	CharacterView.Object.Kind = 0;
 
 	SelectedHero = -1;
-#ifdef __ANDROID__
-	__android_log_print(ANDROID_LOG_INFO, "MUScene", "CreateCharacterScene: calling CUIMng::CreateCharacterScene");
-#endif
 	CUIMng::Instance().CreateCharacterScene();
-#ifdef __ANDROID__
-	__android_log_print(ANDROID_LOG_INFO, "MUScene", "CreateCharacterScene: CUIMng done");
-#endif
 
 	ClearInventory();
 	CharacterAttribute->SkillNumber = 0;
@@ -1346,10 +1443,8 @@ void NewMoveCharacterScene()
 			InitTerrainLight();
 			MoveObjects();
 			gGoboidManager->MoveBugs();
-
 			MoveCharactersClient();
 			MoveCharacterClient(&CharacterView);
-
 			MoveEffects();
 			MoveJoints();
 			MoveParticles();
@@ -1396,7 +1491,13 @@ void NewMoveCharacterScene()
 			SelectedHero = SelectedCharacter;
 			::StartGame();
 		}
-		else if (rInput.IsLBtnDn())
+		else if (
+#ifdef __ANDROID__
+			rInput.IsLBtnDn() || rInput.IsLBtnUp()
+#else
+			rInput.IsLBtnDn()
+#endif
+			)
 		{
 			if (SelectedCharacter < 0 || SelectedCharacter > 4)
 				SelectedHero = -1;
@@ -1877,12 +1978,15 @@ void NewMoveLogInScene()
 		g_ErrorReport.Write("> Request Character list\r\n");
 		CCameraMove::GetInstancePtr()->SetTourMode(FALSE);
 #ifdef __ANDROID__
-		// Force SceneCharacter=1 NOW so that ReceiveCharacterList() uses the
-		// card-mode positions ((Index*100, Index*50-50)) rather than World74
-		// world-space coordinates.  SceneFlag is still LOG_IN_SCENE here.
-		gmProtect->SceneCharacter = 1;
-		__android_log_print(ANDROID_LOG_INFO, "MUScene",
-			"NewMoveLogInScene: LOGIN_SUCCESS -> CHARACTER_SCENE, SceneCharacter forced=1");
+		BYTE requestedScene = gmProtect->SceneCharacter;
+		BYTE resolvedScene = AndroidResolveCharacterScene(requestedScene);
+		if (resolvedScene != requestedScene)
+		{
+			__android_log_print(ANDROID_LOG_WARN, "MUScene",
+				"LoginSuccess: Character scene %d unavailable, fallback to scene %d",
+				(int)requestedScene, (int)resolvedScene);
+			gmProtect->SceneCharacter = resolvedScene;
+		}
 #endif
 		SceneFlag = CHARACTER_SCENE;
 #ifdef __ANDROID__
@@ -2171,7 +2275,8 @@ bool MoveMainCamera()
 {
 	bool bLockCamera = false;
 
-	CAMERA_INFO* CurrentCam = CameraFactorPtr->CurrentCam();
+	CGMCameraWorld* pCamWorld = g_pNewUISystem->GetUI_NewUICamWebzen();
+	CAMERA_INFO* CurrentCam = pCamWorld ? pCamWorld->CurrentCam() : nullptr;
 
 	int iWorld = World;
 
@@ -2184,7 +2289,7 @@ bool MoveMainCamera()
 	}
 	else if (SceneFlag == MAIN_SCENE)
 	{
-		CameraFOV = CurrentCam->zoom;
+		CameraFOV = (CurrentCam ? CurrentCam->zoom : 35.0);
 	}
 	else
 	{
