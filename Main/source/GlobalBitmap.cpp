@@ -12,12 +12,639 @@
 #ifdef max
 #undef max
 #endif
-#include <gli/gli.hpp>
+#include <cstdint>
 
 #include "GlobalBitmap.h"
 #include "Platform/GameAssetPath.h"
 #include "./Utilities/Log/ErrorReport.h"
 #include "./Utilities/Log/muConsoleDebug.h"
+#ifdef __ANDROID__
+#include <android/log.h>
+#endif
+
+namespace
+{
+#ifdef __ANDROID__
+constexpr const char* kTextureLogTag = "MUTexture";
+#endif
+
+std::string BuildPathWithExtension(const std::string& path, const char* extensionWithoutDot)
+{
+	char drive[_MAX_DRIVE] = { 0 };
+	char dir[_MAX_DIR] = { 0 };
+	char fname[_MAX_FNAME] = { 0 };
+
+	_splitpath(path.c_str(), drive, dir, fname, NULL);
+
+	std::string outPath = drive;
+	outPath += dir;
+	outPath += fname;
+	outPath += '.';
+	outPath += extensionWithoutDot;
+	return outPath;
+}
+
+bool ReadBinaryFilePayload(const std::string& path, int headerSkip, std::vector<BYTE>& outData)
+{
+	if (headerSkip < 0)
+	{
+		return false;
+	}
+
+	FILE* file = MU_FOPEN(path.c_str(), "rb");
+	if (!file)
+	{
+		return false;
+	}
+
+	fseek(file, 0, SEEK_END);
+	const long fileSize = ftell(file);
+	if (fileSize <= headerSkip)
+	{
+		fclose(file);
+		return false;
+	}
+
+	const size_t payloadSize = static_cast<size_t>(fileSize - headerSkip);
+	outData.resize(payloadSize);
+
+	fseek(file, headerSkip, SEEK_SET);
+	const size_t readBytes = fread(outData.data(), 1, payloadSize, file);
+	fclose(file);
+
+	if (readBytes != payloadSize)
+	{
+		outData.clear();
+		return false;
+	}
+
+	return true;
+}
+
+bool LoadPackedOrRawEncoded(const std::string& filename,
+	const char* packedExtensionWithoutDot,
+	int packedHeaderSkip,
+	std::vector<BYTE>& outEncoded,
+	std::string& outResolvedPath)
+{
+	if (packedExtensionWithoutDot && packedExtensionWithoutDot[0] != '\0')
+	{
+		const std::string packedPath = BuildPathWithExtension(filename, packedExtensionWithoutDot);
+		if (ReadBinaryFilePayload(packedPath, packedHeaderSkip, outEncoded))
+		{
+			outResolvedPath = packedPath;
+			return true;
+		}
+	}
+
+	if (ReadBinaryFilePayload(filename, 0, outEncoded))
+	{
+		outResolvedPath = filename;
+		return true;
+	}
+
+	return false;
+}
+
+bool LoadPackedOrRawEncodedMulti(const std::string& filename,
+	const char* packedExtensionWithoutDot1,
+	int packedHeaderSkip1,
+	const char* packedExtensionWithoutDot2,
+	int packedHeaderSkip2,
+	std::vector<BYTE>& outEncoded,
+	std::string& outResolvedPath)
+{
+	if (packedExtensionWithoutDot1 && packedExtensionWithoutDot1[0] != '\0')
+	{
+		const std::string packedPath1 = BuildPathWithExtension(filename, packedExtensionWithoutDot1);
+		if (ReadBinaryFilePayload(packedPath1, packedHeaderSkip1, outEncoded))
+		{
+			outResolvedPath = packedPath1;
+			return true;
+		}
+	}
+
+	if (packedExtensionWithoutDot2 && packedExtensionWithoutDot2[0] != '\0')
+	{
+		const std::string packedPath2 = BuildPathWithExtension(filename, packedExtensionWithoutDot2);
+		if (ReadBinaryFilePayload(packedPath2, packedHeaderSkip2, outEncoded))
+		{
+			outResolvedPath = packedPath2;
+			return true;
+		}
+	}
+
+	if (ReadBinaryFilePayload(filename, 0, outEncoded))
+	{
+		outResolvedPath = filename;
+		return true;
+	}
+
+	return false;
+}
+
+constexpr uint32_t MakeFourCC(char a, char b, char c, char d)
+{
+	return static_cast<uint32_t>(a)
+		| (static_cast<uint32_t>(b) << 8u)
+		| (static_cast<uint32_t>(c) << 16u)
+		| (static_cast<uint32_t>(d) << 24u);
+}
+
+#pragma pack(push, 1)
+struct DDSPixelFormat
+{
+	uint32_t size;
+	uint32_t flags;
+	uint32_t fourCC;
+	uint32_t rgbBitCount;
+	uint32_t rBitMask;
+	uint32_t gBitMask;
+	uint32_t bBitMask;
+	uint32_t aBitMask;
+};
+
+struct DDSHeader
+{
+	uint32_t size;
+	uint32_t flags;
+	uint32_t height;
+	uint32_t width;
+	uint32_t pitchOrLinearSize;
+	uint32_t depth;
+	uint32_t mipMapCount;
+	uint32_t reserved1[11];
+	DDSPixelFormat pixelFormat;
+	uint32_t caps;
+	uint32_t caps2;
+	uint32_t caps3;
+	uint32_t caps4;
+	uint32_t reserved2;
+};
+#pragma pack(pop)
+
+struct DXTColorBlock
+{
+	uint16_t color0;
+	uint16_t color1;
+	uint8_t rows[4];
+};
+
+struct DXT3AlphaBlock
+{
+	uint16_t rows[4];
+};
+
+struct DXT5AlphaBlock
+{
+	uint8_t alpha0;
+	uint8_t alpha1;
+	uint8_t bitmap[6];
+};
+
+inline BYTE Expand5To8(uint8_t value5)
+{
+	return static_cast<BYTE>((value5 << 3u) | (value5 >> 2u));
+}
+
+inline BYTE Expand6To8(uint8_t value6)
+{
+	return static_cast<BYTE>((value6 << 2u) | (value6 >> 4u));
+}
+
+void DecodeColor565(uint16_t packed565, BYTE& outR, BYTE& outG, BYTE& outB)
+{
+	outR = Expand5To8(static_cast<uint8_t>((packed565 >> 11u) & 0x1Fu));
+	outG = Expand6To8(static_cast<uint8_t>((packed565 >> 5u) & 0x3Fu));
+	outB = Expand5To8(static_cast<uint8_t>(packed565 & 0x1Fu));
+}
+
+void WriteRGBA(std::vector<BYTE>& rgba, int width, int x, int y, BYTE r, BYTE g, BYTE b, BYTE a)
+{
+	const size_t index = (static_cast<size_t>(y) * static_cast<size_t>(width) + static_cast<size_t>(x)) * 4u;
+	rgba[index + 0] = r;
+	rgba[index + 1] = g;
+	rgba[index + 2] = b;
+	rgba[index + 3] = a;
+}
+
+void DecodeDXTColorPalette(const DXTColorBlock& colorBlock, bool dxt1PunchThrough, BYTE outPalette[4][4])
+{
+	DecodeColor565(colorBlock.color0, outPalette[0][0], outPalette[0][1], outPalette[0][2]);
+	DecodeColor565(colorBlock.color1, outPalette[1][0], outPalette[1][1], outPalette[1][2]);
+	outPalette[0][3] = 255;
+	outPalette[1][3] = 255;
+
+	if (dxt1PunchThrough && colorBlock.color0 <= colorBlock.color1)
+	{
+		outPalette[2][0] = static_cast<BYTE>((outPalette[0][0] + outPalette[1][0]) / 2u);
+		outPalette[2][1] = static_cast<BYTE>((outPalette[0][1] + outPalette[1][1]) / 2u);
+		outPalette[2][2] = static_cast<BYTE>((outPalette[0][2] + outPalette[1][2]) / 2u);
+		outPalette[2][3] = 255;
+
+		outPalette[3][0] = 0;
+		outPalette[3][1] = 0;
+		outPalette[3][2] = 0;
+		outPalette[3][3] = 0;
+	}
+	else
+	{
+		outPalette[2][0] = static_cast<BYTE>((2u * outPalette[0][0] + outPalette[1][0]) / 3u);
+		outPalette[2][1] = static_cast<BYTE>((2u * outPalette[0][1] + outPalette[1][1]) / 3u);
+		outPalette[2][2] = static_cast<BYTE>((2u * outPalette[0][2] + outPalette[1][2]) / 3u);
+		outPalette[2][3] = 255;
+
+		outPalette[3][0] = static_cast<BYTE>((outPalette[0][0] + 2u * outPalette[1][0]) / 3u);
+		outPalette[3][1] = static_cast<BYTE>((outPalette[0][1] + 2u * outPalette[1][1]) / 3u);
+		outPalette[3][2] = static_cast<BYTE>((outPalette[0][2] + 2u * outPalette[1][2]) / 3u);
+		outPalette[3][3] = 255;
+	}
+}
+
+void DecodeDXT1Block(const DXTColorBlock& colorBlock, int blockX, int blockY, int width, int height, std::vector<BYTE>& rgba)
+{
+	BYTE palette[4][4] = {};
+	DecodeDXTColorPalette(colorBlock, true, palette);
+
+	for (int row = 0; row < 4; ++row)
+	{
+		const int dstY = blockY * 4 + row;
+		if (dstY >= height)
+		{
+			continue;
+		}
+
+		for (int col = 0; col < 4; ++col)
+		{
+			const int dstX = blockX * 4 + col;
+			if (dstX >= width)
+			{
+				continue;
+			}
+
+			const uint8_t paletteIndex = static_cast<uint8_t>((colorBlock.rows[row] >> (col * 2)) & 0x3u);
+			WriteRGBA(rgba, width, dstX, dstY,
+				palette[paletteIndex][0],
+				palette[paletteIndex][1],
+				palette[paletteIndex][2],
+				palette[paletteIndex][3]);
+		}
+	}
+}
+
+void DecodeDXT3Block(const DXT3AlphaBlock& alphaBlock, const DXTColorBlock& colorBlock, int blockX, int blockY, int width, int height, std::vector<BYTE>& rgba)
+{
+	BYTE palette[4][4] = {};
+	DecodeDXTColorPalette(colorBlock, false, palette);
+
+	for (int row = 0; row < 4; ++row)
+	{
+		const int dstY = blockY * 4 + row;
+		if (dstY >= height)
+		{
+			continue;
+		}
+
+		for (int col = 0; col < 4; ++col)
+		{
+			const int dstX = blockX * 4 + col;
+			if (dstX >= width)
+			{
+				continue;
+			}
+
+			const uint8_t paletteIndex = static_cast<uint8_t>((colorBlock.rows[row] >> (col * 2)) & 0x3u);
+			const uint8_t alpha4 = static_cast<uint8_t>((alphaBlock.rows[row] >> (col * 4)) & 0xFu);
+			const uint8_t alpha8 = static_cast<uint8_t>(alpha4 * 17u);
+
+			WriteRGBA(rgba, width, dstX, dstY,
+				palette[paletteIndex][0],
+				palette[paletteIndex][1],
+				palette[paletteIndex][2],
+				alpha8);
+		}
+	}
+}
+
+void BuildDXT5AlphaPalette(const DXT5AlphaBlock& alphaBlock, BYTE outAlpha[8])
+{
+	outAlpha[0] = alphaBlock.alpha0;
+	outAlpha[1] = alphaBlock.alpha1;
+
+	if (outAlpha[0] > outAlpha[1])
+	{
+		outAlpha[2] = static_cast<BYTE>((6u * outAlpha[0] + 1u * outAlpha[1]) / 7u);
+		outAlpha[3] = static_cast<BYTE>((5u * outAlpha[0] + 2u * outAlpha[1]) / 7u);
+		outAlpha[4] = static_cast<BYTE>((4u * outAlpha[0] + 3u * outAlpha[1]) / 7u);
+		outAlpha[5] = static_cast<BYTE>((3u * outAlpha[0] + 4u * outAlpha[1]) / 7u);
+		outAlpha[6] = static_cast<BYTE>((2u * outAlpha[0] + 5u * outAlpha[1]) / 7u);
+		outAlpha[7] = static_cast<BYTE>((1u * outAlpha[0] + 6u * outAlpha[1]) / 7u);
+	}
+	else
+	{
+		outAlpha[2] = static_cast<BYTE>((4u * outAlpha[0] + 1u * outAlpha[1]) / 5u);
+		outAlpha[3] = static_cast<BYTE>((3u * outAlpha[0] + 2u * outAlpha[1]) / 5u);
+		outAlpha[4] = static_cast<BYTE>((2u * outAlpha[0] + 3u * outAlpha[1]) / 5u);
+		outAlpha[5] = static_cast<BYTE>((1u * outAlpha[0] + 4u * outAlpha[1]) / 5u);
+		outAlpha[6] = 0;
+		outAlpha[7] = 255;
+	}
+}
+
+void DecodeDXT5Block(const DXT5AlphaBlock& alphaBlock, const DXTColorBlock& colorBlock, int blockX, int blockY, int width, int height, std::vector<BYTE>& rgba)
+{
+	BYTE palette[4][4] = {};
+	DecodeDXTColorPalette(colorBlock, false, palette);
+
+	BYTE alphaPalette[8] = {};
+	BuildDXT5AlphaPalette(alphaBlock, alphaPalette);
+
+	uint64_t alphaBitmap = 0;
+	alphaBitmap |= static_cast<uint64_t>(alphaBlock.bitmap[0]);
+	alphaBitmap |= static_cast<uint64_t>(alphaBlock.bitmap[1]) << 8u;
+	alphaBitmap |= static_cast<uint64_t>(alphaBlock.bitmap[2]) << 16u;
+	alphaBitmap |= static_cast<uint64_t>(alphaBlock.bitmap[3]) << 24u;
+	alphaBitmap |= static_cast<uint64_t>(alphaBlock.bitmap[4]) << 32u;
+	alphaBitmap |= static_cast<uint64_t>(alphaBlock.bitmap[5]) << 40u;
+
+	for (int row = 0; row < 4; ++row)
+	{
+		const int dstY = blockY * 4 + row;
+		if (dstY >= height)
+		{
+			continue;
+		}
+
+		for (int col = 0; col < 4; ++col)
+		{
+			const int dstX = blockX * 4 + col;
+			if (dstX >= width)
+			{
+				continue;
+			}
+
+			const uint8_t paletteIndex = static_cast<uint8_t>((colorBlock.rows[row] >> (col * 2)) & 0x3u);
+			const uint8_t alphaIndex = static_cast<uint8_t>((alphaBitmap >> ((row * 4 + col) * 3)) & 0x7u);
+
+			WriteRGBA(rgba, width, dstX, dstY,
+				palette[paletteIndex][0],
+				palette[paletteIndex][1],
+				palette[paletteIndex][2],
+				alphaPalette[alphaIndex]);
+		}
+	}
+}
+
+bool DecodeDDS(const std::vector<BYTE>& encoded,
+	int& outWidth,
+	int& outHeight,
+	int& outSourceComponents,
+	std::vector<BYTE>& outRgbaPixels)
+{
+	outWidth = 0;
+	outHeight = 0;
+	outSourceComponents = 0;
+	outRgbaPixels.clear();
+
+	if (encoded.size() < 4u + sizeof(DDSHeader))
+	{
+		return false;
+	}
+
+	if (!(encoded[0] == 'D' && encoded[1] == 'D' && encoded[2] == 'S' && encoded[3] == ' '))
+	{
+		return false;
+	}
+
+	const auto* header = reinterpret_cast<const DDSHeader*>(encoded.data() + 4u);
+	if (header->size != 124u || header->pixelFormat.size != 32u)
+	{
+		return false;
+	}
+
+	const uint32_t width = header->width;
+	const uint32_t height = header->height;
+	if (width == 0u || height == 0u)
+	{
+		return false;
+	}
+
+	outWidth = static_cast<int>(width);
+	outHeight = static_cast<int>(height);
+	outSourceComponents = 4;
+	outRgbaPixels.assign(static_cast<size_t>(width) * static_cast<size_t>(height) * 4u, 0);
+
+	const size_t dataOffset = 4u + sizeof(DDSHeader);
+	if (dataOffset >= encoded.size())
+	{
+		return false;
+	}
+
+	const BYTE* data = encoded.data() + dataOffset;
+	const size_t dataSize = encoded.size() - dataOffset;
+
+	const uint32_t fourCC = header->pixelFormat.fourCC;
+	const size_t blocksWide = (static_cast<size_t>(width) + 3u) / 4u;
+	const size_t blocksHigh = (static_cast<size_t>(height) + 3u) / 4u;
+
+	if (fourCC == MakeFourCC('D', 'X', 'T', '1'))
+	{
+		const size_t blockSize = 8u;
+		const size_t required = blocksWide * blocksHigh * blockSize;
+		if (required > dataSize)
+		{
+			return false;
+		}
+
+		for (size_t by = 0; by < blocksHigh; ++by)
+		{
+			for (size_t bx = 0; bx < blocksWide; ++bx)
+			{
+				const size_t blockIndex = by * blocksWide + bx;
+				const auto* colorBlock = reinterpret_cast<const DXTColorBlock*>(data + blockIndex * blockSize);
+				DecodeDXT1Block(*colorBlock, static_cast<int>(bx), static_cast<int>(by), outWidth, outHeight, outRgbaPixels);
+			}
+		}
+		return true;
+	}
+
+	if (fourCC == MakeFourCC('D', 'X', 'T', '3'))
+	{
+		const size_t blockSize = 16u;
+		const size_t required = blocksWide * blocksHigh * blockSize;
+		if (required > dataSize)
+		{
+			return false;
+		}
+
+		for (size_t by = 0; by < blocksHigh; ++by)
+		{
+			for (size_t bx = 0; bx < blocksWide; ++bx)
+			{
+				const size_t blockIndex = by * blocksWide + bx;
+				const BYTE* blockPtr = data + blockIndex * blockSize;
+				const auto* alphaBlock = reinterpret_cast<const DXT3AlphaBlock*>(blockPtr);
+				const auto* colorBlock = reinterpret_cast<const DXTColorBlock*>(blockPtr + sizeof(DXT3AlphaBlock));
+				DecodeDXT3Block(*alphaBlock, *colorBlock, static_cast<int>(bx), static_cast<int>(by), outWidth, outHeight, outRgbaPixels);
+			}
+		}
+		return true;
+	}
+
+	if (fourCC == MakeFourCC('D', 'X', 'T', '5'))
+	{
+		const size_t blockSize = 16u;
+		const size_t required = blocksWide * blocksHigh * blockSize;
+		if (required > dataSize)
+		{
+			return false;
+		}
+
+		for (size_t by = 0; by < blocksHigh; ++by)
+		{
+			for (size_t bx = 0; bx < blocksWide; ++bx)
+			{
+				const size_t blockIndex = by * blocksWide + bx;
+				const BYTE* blockPtr = data + blockIndex * blockSize;
+				const auto* alphaBlock = reinterpret_cast<const DXT5AlphaBlock*>(blockPtr);
+				const auto* colorBlock = reinterpret_cast<const DXTColorBlock*>(blockPtr + sizeof(DXT5AlphaBlock));
+				DecodeDXT5Block(*alphaBlock, *colorBlock, static_cast<int>(bx), static_cast<int>(by), outWidth, outHeight, outRgbaPixels);
+			}
+		}
+		return true;
+	}
+
+	// Uncompressed 32-bits RGBA/BGRA.
+	if (header->pixelFormat.rgbBitCount == 32u && dataSize >= static_cast<size_t>(width) * static_cast<size_t>(height) * 4u)
+	{
+		const bool isBGRA =
+			header->pixelFormat.rBitMask == 0x00ff0000u &&
+			header->pixelFormat.gBitMask == 0x0000ff00u &&
+			header->pixelFormat.bBitMask == 0x000000ffu &&
+			header->pixelFormat.aBitMask == 0xff000000u;
+		const bool isRGBA =
+			header->pixelFormat.rBitMask == 0x000000ffu &&
+			header->pixelFormat.gBitMask == 0x0000ff00u &&
+			header->pixelFormat.bBitMask == 0x00ff0000u &&
+			header->pixelFormat.aBitMask == 0xff000000u;
+
+		const size_t pixelCount = static_cast<size_t>(width) * static_cast<size_t>(height);
+		if (isRGBA)
+		{
+			memcpy(outRgbaPixels.data(), data, pixelCount * 4u);
+			return true;
+		}
+		if (isBGRA)
+		{
+			for (size_t i = 0; i < pixelCount; ++i)
+			{
+				outRgbaPixels[i * 4 + 0] = data[i * 4 + 2];
+				outRgbaPixels[i * 4 + 1] = data[i * 4 + 1];
+				outRgbaPixels[i * 4 + 2] = data[i * 4 + 0];
+				outRgbaPixels[i * 4 + 3] = data[i * 4 + 3];
+			}
+			return true;
+		}
+	}
+
+	return false;
+}
+
+bool HasTransparentAlpha(const BYTE* rgbaPixels, size_t pixelCount)
+{
+	for (size_t i = 0; i < pixelCount; ++i)
+	{
+		if (rgbaPixels[i * 4 + 3] < 255)
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+bool HasNonBinaryAlpha(const BYTE* rgbaPixels, size_t pixelCount)
+{
+	for (size_t i = 0; i < pixelCount; ++i)
+	{
+		const BYTE alpha = rgbaPixels[i * 4 + 3];
+		if (alpha != 0 && alpha != 255)
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+void LogTextureAlphaDebug(const char* stage,
+	const std::string& filename,
+	int sourceComponents,
+	int finalComponents,
+	int width,
+	int height,
+	bool hasTransparentAlpha)
+{
+#ifdef __ANDROID__
+	__android_log_print(ANDROID_LOG_INFO, kTextureLogTag,
+		"%s file=%s srcComp=%d finalComp=%d size=%dx%d hasTransparentAlpha=%d",
+		stage,
+		filename.c_str(),
+		sourceComponents,
+		finalComponents,
+		width,
+		height,
+		hasTransparentAlpha ? 1 : 0);
+#else
+	(void)stage;
+	(void)filename;
+	(void)sourceComponents;
+	(void)finalComponents;
+	(void)width;
+	(void)height;
+	(void)hasTransparentAlpha;
+#endif
+}
+
+bool DecodeRGBAWithStbi(const std::vector<BYTE>& encoded,
+	int& outWidth,
+	int& outHeight,
+	int& outSourceComponents,
+	std::vector<BYTE>& outRgbaPixels)
+{
+	outWidth = 0;
+	outHeight = 0;
+	outSourceComponents = 0;
+	outRgbaPixels.clear();
+
+	if (encoded.empty())
+	{
+		return false;
+	}
+
+	(void)stbi_info_from_memory(
+		encoded.data(),
+		static_cast<int>(encoded.size()),
+		&outWidth,
+		&outHeight,
+		&outSourceComponents);
+
+	unsigned char* decoded = stbi_load_from_memory(
+		encoded.data(),
+		static_cast<int>(encoded.size()),
+		&outWidth,
+		&outHeight,
+		&outSourceComponents,
+		4);
+	if (!decoded)
+	{
+		return false;
+	}
+
+	const size_t rgbaBytes = static_cast<size_t>(outWidth) * static_cast<size_t>(outHeight) * 4u;
+	outRgbaPixels.assign(decoded, decoded + rgbaBytes);
+	stbi_image_free(decoded);
+	return true;
+}
+}
 
 CBitmapCache::CBitmapCache()
 {
@@ -416,10 +1043,16 @@ bool CGlobalBitmap::LoadImage(GLuint uiBitmapIndex, const std::string& filename,
 	std::string ext;
 	SplitExt(filename, ext, false);
 
-	if (0 == _stricmp(ext.c_str(), "jpg"))
+	if (0 == _stricmp(ext.c_str(), "jpg") || 0 == _stricmp(ext.c_str(), "jpeg"))
 		return OpenJpeg(uiBitmapIndex, filename, uiFilter, uiWrapMode);
 	else if (0 == _stricmp(ext.c_str(), "tga"))
 		return OpenTga(uiBitmapIndex, filename, uiFilter, uiWrapMode);
+	else if (0 == _stricmp(ext.c_str(), "png"))
+		return OpenPng(uiBitmapIndex, filename, uiFilter, uiWrapMode);
+	else if (0 == _stricmp(ext.c_str(), "bmp"))
+		return OpenBmp(uiBitmapIndex, filename, uiFilter, uiWrapMode);
+	else if (0 == _stricmp(ext.c_str(), "dds"))
+		return OpenDDS_DXT5(uiBitmapIndex, filename, uiFilter, uiWrapMode);
 
 	return false;
 }
@@ -650,6 +1283,8 @@ bool CGlobalBitmap::OpenJpeg(GLuint uiBitmapIndex, const std::string& filename, 
 	pNewBitmap->output_width = jpegwidth;
 	pNewBitmap->output_height = jpegheight;
 	pNewBitmap->Components = channels_in_file;
+	pNewBitmap->HasAlpha = false;
+	pNewBitmap->HasNonBinaryAlpha = false;
 	pNewBitmap->Ref = 1;
 	std::snprintf(pNewBitmap->FileName, MAX_BITMAP_FILE_NAME, "%s", filename.c_str());
 
@@ -696,93 +1331,84 @@ bool CGlobalBitmap::OpenJpeg(GLuint uiBitmapIndex, const std::string& filename, 
 
 bool CGlobalBitmap::OpenTga(GLuint uiBitmapIndex, const std::string& filename, GLuint uiFilter, GLuint uiWrapMode)
 {
-	std::string filename_ozt;
-	ExchangeExt(filename, "OZT", filename_ozt);
-
-	FILE* compressedFile = MU_FOPEN(filename_ozt.c_str(), "rb");
-
-	if (compressedFile == NULL)
+	std::vector<BYTE> encoded;
+	std::string resolvedPath;
+	if (!LoadPackedOrRawEncoded(filename, "OZT", 4, encoded, resolvedPath))
 	{
 		return false;
 	}
 
-	fseek(compressedFile, 0, SEEK_END);
-
-	long  fileSize = ftell(compressedFile);
-
-	if (fileSize <= 4)
-	{
-		fclose(compressedFile);
-		return false;
-	}
-
-	fileSize -= 4;  // Ajuste de tama�o
-	std::vector<BYTE> filebuffer(fileSize, 0);
-
-	fseek(compressedFile, 4, SEEK_SET);  // Saltar los primeros 24 bytes
-	fread(filebuffer.data(), 1, fileSize, compressedFile);
-	fclose(compressedFile);
-
-	int tgawidth, tgaheight, channels_in_file;
-
-	BYTE* imageData = stbi_load_from_memory(filebuffer.data(), fileSize, &tgawidth, &tgaheight, &channels_in_file, 0);
-
-	if (!imageData)
+	int sourceWidth = 0;
+	int sourceHeight = 0;
+	int sourceComponents = 0;
+	std::vector<BYTE> rgbaPixels;
+	if (!DecodeRGBAWithStbi(encoded, sourceWidth, sourceHeight, sourceComponents, rgbaPixels))
 	{
 		return false;
 	}
 
-	if ((channels_in_file != 3 && channels_in_file != 4) || tgawidth > MAX_WIDTH || tgaheight > MAX_HEIGHT)
+	if (sourceWidth > MAX_WIDTH || sourceHeight > MAX_HEIGHT)
 	{
-		stbi_image_free(imageData);
 		return false;
 	}
 
-	int textureWidth = leftoverSize(tgawidth);
+	const bool hasTransparentAlpha = HasTransparentAlpha(rgbaPixels.data(), static_cast<size_t>(sourceWidth) * static_cast<size_t>(sourceHeight));
+	const bool hasNonBinaryAlpha = hasTransparentAlpha &&
+		HasNonBinaryAlpha(rgbaPixels.data(), static_cast<size_t>(sourceWidth) * static_cast<size_t>(sourceHeight));
+	const int finalComponents = hasTransparentAlpha ? 4 : 3;
+	LogTextureAlphaDebug("LoadTga", resolvedPath, sourceComponents, finalComponents, sourceWidth, sourceHeight, hasTransparentAlpha);
 
-	int textureHeight = leftoverSize(tgaheight);
+#ifdef __ANDROID__
+	if (!hasTransparentAlpha)
+	{
+		__android_log_print(ANDROID_LOG_WARN, kTextureLogTag,
+			"Texture loaded without alpha: %s (srcComp=%d)", resolvedPath.c_str(), sourceComponents);
+	}
+#endif
+
+	const int textureWidth = leftoverSize(sourceWidth);
+	const int textureHeight = leftoverSize(sourceHeight);
 
 	BITMAP_t* pNewBitmap = new BITMAP_t;
-
 	pNewBitmap->BitmapIndex = uiBitmapIndex;
 	pNewBitmap->Width = (float)textureWidth;
 	pNewBitmap->Height = (float)textureHeight;
-	pNewBitmap->output_width = tgawidth;
-	pNewBitmap->output_height = tgaheight;
-	pNewBitmap->Components = channels_in_file;
+	pNewBitmap->output_width = sourceWidth;
+	pNewBitmap->output_height = sourceHeight;
+	pNewBitmap->Components = static_cast<BYTE>(finalComponents);
+	pNewBitmap->HasAlpha = (finalComponents == 4);
+	pNewBitmap->HasNonBinaryAlpha = (finalComponents == 4) ? hasNonBinaryAlpha : false;
 	pNewBitmap->Ref = 1;
 	std::snprintf(pNewBitmap->FileName, MAX_BITMAP_FILE_NAME, "%s", filename.c_str());
 
-
-	size_t textureBufferSize = textureWidth * textureHeight * pNewBitmap->Components;
-
+	const size_t textureBufferSize = static_cast<size_t>(textureWidth) * static_cast<size_t>(textureHeight) * static_cast<size_t>(finalComponents);
 	pNewBitmap->Buffer.resize(textureBufferSize, 0);
-
 	m_dwUsedTextureMemory += textureBufferSize;
 
-	BYTE* textbuff = pNewBitmap->Buffer.data();
-
-	if (tgawidth != textureWidth || tgaheight != textureHeight)
+	BYTE* textureBuffer = pNewBitmap->Buffer.data();
+	for (int row = 0; row < sourceHeight; ++row)
 	{
-		// Si la GPU NO soporta NPOT, copiar l�nea por l�nea
-		int row_size = tgawidth * channels_in_file;
+		const BYTE* srcRow = rgbaPixels.data() + static_cast<size_t>(row) * static_cast<size_t>(sourceWidth) * 4u;
+		BYTE* dstRow = textureBuffer + static_cast<size_t>(row) * static_cast<size_t>(textureWidth) * static_cast<size_t>(finalComponents);
 
-		for (int row = 0; row < tgaheight; row++)
+		if (finalComponents == 4)
 		{
-			std::copy(imageData + (row * row_size),
-				imageData + (row * row_size) + row_size,
-				textbuff + (row * textureWidth * channels_in_file));
+			memcpy(dstRow, srcRow, static_cast<size_t>(sourceWidth) * 4u);
+		}
+		else
+		{
+			for (int col = 0; col < sourceWidth; ++col)
+			{
+				dstRow[col * 3 + 0] = srcRow[col * 4 + 0];
+				dstRow[col * 3 + 1] = srcRow[col * 4 + 1];
+				dstRow[col * 3 + 2] = srcRow[col * 4 + 2];
+			}
 		}
 	}
-	else
-	{
-		std::copy(imageData, imageData + textureBufferSize, textbuff);
-	}
 
-	this->CreateMipmappedTexture(&pNewBitmap->TextureNumber, channels_in_file, textureWidth, textureHeight, textbuff, uiFilter, uiWrapMode);
+	this->CreateMipmappedTexture(&pNewBitmap->TextureNumber, finalComponents, textureWidth, textureHeight, textureBuffer, uiFilter, uiWrapMode);
 
 	m_mapBitmap.insert(type_bitmap_map::value_type(uiBitmapIndex, pNewBitmap));
-
 	m_BitmapName.push_back(std::pair<std::string, GLuint>(pNewBitmap->FileName, uiBitmapIndex));
 
 	if (uiBitmapIndex != BITMAP_INTERFACE_MAP && uiBitmapIndex != BITMAP_GUILD && uiBitmapIndex != BITMAP_FONT)
@@ -791,7 +1417,194 @@ bool CGlobalBitmap::OpenTga(GLuint uiBitmapIndex, const std::string& filename, G
 		pNewBitmap->Buffer.clear();
 	}
 
-	stbi_image_free(imageData);
+	return true;
+}
+
+bool CGlobalBitmap::OpenPng(GLuint uiBitmapIndex, const std::string& filename, GLuint uiFilter, GLuint uiWrapMode)
+{
+	// PNG assets are stored as regular files in Android resources and may also be packed as OZT.
+	return OpenTga(uiBitmapIndex, filename, uiFilter, uiWrapMode);
+}
+
+bool CGlobalBitmap::OpenBmp(GLuint uiBitmapIndex, const std::string& filename, GLuint uiFilter, GLuint uiWrapMode)
+{
+	std::vector<BYTE> encoded;
+	std::string resolvedPath;
+	if (!LoadPackedOrRawEncoded(filename, "OZB", 4, encoded, resolvedPath))
+	{
+		return false;
+	}
+
+	int sourceWidth = 0;
+	int sourceHeight = 0;
+	int sourceComponents = 0;
+	std::vector<BYTE> rgbaPixels;
+	if (!DecodeRGBAWithStbi(encoded, sourceWidth, sourceHeight, sourceComponents, rgbaPixels))
+	{
+		return false;
+	}
+
+	if (sourceWidth > MAX_WIDTH || sourceHeight > MAX_HEIGHT)
+	{
+		return false;
+	}
+
+	const bool hasTransparentAlpha = HasTransparentAlpha(rgbaPixels.data(), static_cast<size_t>(sourceWidth) * static_cast<size_t>(sourceHeight));
+	const bool hasNonBinaryAlpha = hasTransparentAlpha &&
+		HasNonBinaryAlpha(rgbaPixels.data(), static_cast<size_t>(sourceWidth) * static_cast<size_t>(sourceHeight));
+	const int finalComponents = hasTransparentAlpha ? 4 : 3;
+	LogTextureAlphaDebug("LoadBmp", resolvedPath, sourceComponents, finalComponents, sourceWidth, sourceHeight, hasTransparentAlpha);
+
+#ifdef __ANDROID__
+	if (!hasTransparentAlpha)
+	{
+		__android_log_print(ANDROID_LOG_WARN, kTextureLogTag,
+			"BMP loaded without alpha: %s (srcComp=%d)", resolvedPath.c_str(), sourceComponents);
+	}
+#endif
+
+	const int textureWidth = leftoverSize(sourceWidth);
+	const int textureHeight = leftoverSize(sourceHeight);
+	BITMAP_t* pNewBitmap = new BITMAP_t;
+	pNewBitmap->BitmapIndex = uiBitmapIndex;
+	pNewBitmap->Width = (float)textureWidth;
+	pNewBitmap->Height = (float)textureHeight;
+	pNewBitmap->output_width = sourceWidth;
+	pNewBitmap->output_height = sourceHeight;
+	pNewBitmap->Components = static_cast<BYTE>(finalComponents);
+	pNewBitmap->HasAlpha = (finalComponents == 4);
+	pNewBitmap->HasNonBinaryAlpha = (finalComponents == 4) ? hasNonBinaryAlpha : false;
+	pNewBitmap->Ref = 1;
+	std::snprintf(pNewBitmap->FileName, MAX_BITMAP_FILE_NAME, "%s", filename.c_str());
+
+	const size_t textureBufferSize = static_cast<size_t>(textureWidth) * static_cast<size_t>(textureHeight) * static_cast<size_t>(finalComponents);
+	pNewBitmap->Buffer.resize(textureBufferSize, 0);
+	m_dwUsedTextureMemory += textureBufferSize;
+
+	BYTE* textureBuffer = pNewBitmap->Buffer.data();
+	for (int row = 0; row < sourceHeight; ++row)
+	{
+		const BYTE* srcRow = rgbaPixels.data() + static_cast<size_t>(row) * static_cast<size_t>(sourceWidth) * 4u;
+		BYTE* dstRow = textureBuffer + static_cast<size_t>(row) * static_cast<size_t>(textureWidth) * static_cast<size_t>(finalComponents);
+
+		if (finalComponents == 4)
+		{
+			memcpy(dstRow, srcRow, static_cast<size_t>(sourceWidth) * 4u);
+		}
+		else
+		{
+			for (int col = 0; col < sourceWidth; ++col)
+			{
+				dstRow[col * 3 + 0] = srcRow[col * 4 + 0];
+				dstRow[col * 3 + 1] = srcRow[col * 4 + 1];
+				dstRow[col * 3 + 2] = srcRow[col * 4 + 2];
+			}
+		}
+	}
+
+	this->CreateMipmappedTexture(&pNewBitmap->TextureNumber, finalComponents, textureWidth, textureHeight, textureBuffer, uiFilter, uiWrapMode);
+	m_mapBitmap.insert(type_bitmap_map::value_type(uiBitmapIndex, pNewBitmap));
+	m_BitmapName.push_back(std::pair<std::string, GLuint>(pNewBitmap->FileName, uiBitmapIndex));
+
+	if (uiBitmapIndex != BITMAP_INTERFACE_MAP && uiBitmapIndex != BITMAP_GUILD && uiBitmapIndex != BITMAP_FONT)
+	{
+		m_dwUsedTextureMemory -= textureBufferSize;
+		pNewBitmap->Buffer.clear();
+	}
+
+	return true;
+}
+
+bool CGlobalBitmap::OpenDDS_DXT5(GLuint uiBitmapIndex, const std::string& filename, GLuint uiFilter, GLuint uiWrapMode)
+{
+	std::vector<BYTE> encoded;
+	std::string resolvedPath;
+	if (!LoadPackedOrRawEncodedMulti(filename, "OZD", 4, "OZT", 4, encoded, resolvedPath))
+	{
+		return false;
+	}
+
+	int sourceWidth = 0;
+	int sourceHeight = 0;
+	int sourceComponents = 0;
+	std::vector<BYTE> rgbaPixels;
+
+	if (!DecodeRGBAWithStbi(encoded, sourceWidth, sourceHeight, sourceComponents, rgbaPixels))
+	{
+		// Raw DDS (DXT1/3/5 and uncompressed RGBA/BGRA) fallback.
+		if (!DecodeDDS(encoded, sourceWidth, sourceHeight, sourceComponents, rgbaPixels))
+		{
+			return false;
+		}
+	}
+
+	if (sourceWidth <= 0 || sourceHeight <= 0 || sourceWidth > MAX_WIDTH || sourceHeight > MAX_HEIGHT)
+	{
+		return false;
+	}
+
+	const bool hasTransparentAlpha = HasTransparentAlpha(rgbaPixels.data(), static_cast<size_t>(sourceWidth) * static_cast<size_t>(sourceHeight));
+	const bool hasNonBinaryAlpha = hasTransparentAlpha &&
+		HasNonBinaryAlpha(rgbaPixels.data(), static_cast<size_t>(sourceWidth) * static_cast<size_t>(sourceHeight));
+	const int finalComponents = hasTransparentAlpha ? 4 : 3;
+	LogTextureAlphaDebug("LoadDds", resolvedPath, sourceComponents, finalComponents, sourceWidth, sourceHeight, hasTransparentAlpha);
+
+#ifdef __ANDROID__
+	if (!hasTransparentAlpha)
+	{
+		__android_log_print(ANDROID_LOG_WARN, kTextureLogTag,
+			"DDS loaded without alpha: %s (srcComp=%d)", resolvedPath.c_str(), sourceComponents);
+	}
+#endif
+
+	const int textureWidth = leftoverSize(sourceWidth);
+	const int textureHeight = leftoverSize(sourceHeight);
+	BITMAP_t* pNewBitmap = new BITMAP_t;
+	pNewBitmap->BitmapIndex = uiBitmapIndex;
+	pNewBitmap->Width = (float)textureWidth;
+	pNewBitmap->Height = (float)textureHeight;
+	pNewBitmap->output_width = sourceWidth;
+	pNewBitmap->output_height = sourceHeight;
+	pNewBitmap->Components = static_cast<BYTE>(finalComponents);
+	pNewBitmap->HasAlpha = (finalComponents == 4);
+	pNewBitmap->HasNonBinaryAlpha = (finalComponents == 4) ? hasNonBinaryAlpha : false;
+	pNewBitmap->Ref = 1;
+	std::snprintf(pNewBitmap->FileName, MAX_BITMAP_FILE_NAME, "%s", filename.c_str());
+
+	const size_t textureBufferSize = static_cast<size_t>(textureWidth) * static_cast<size_t>(textureHeight) * static_cast<size_t>(finalComponents);
+	pNewBitmap->Buffer.resize(textureBufferSize, 0);
+	m_dwUsedTextureMemory += textureBufferSize;
+
+	BYTE* textureBuffer = pNewBitmap->Buffer.data();
+	for (int row = 0; row < sourceHeight; ++row)
+	{
+		const BYTE* srcRow = rgbaPixels.data() + static_cast<size_t>(row) * static_cast<size_t>(sourceWidth) * 4u;
+		BYTE* dstRow = textureBuffer + static_cast<size_t>(row) * static_cast<size_t>(textureWidth) * static_cast<size_t>(finalComponents);
+
+		if (finalComponents == 4)
+		{
+			memcpy(dstRow, srcRow, static_cast<size_t>(sourceWidth) * 4u);
+		}
+		else
+		{
+			for (int col = 0; col < sourceWidth; ++col)
+			{
+				dstRow[col * 3 + 0] = srcRow[col * 4 + 0];
+				dstRow[col * 3 + 1] = srcRow[col * 4 + 1];
+				dstRow[col * 3 + 2] = srcRow[col * 4 + 2];
+			}
+		}
+	}
+
+	this->CreateMipmappedTexture(&pNewBitmap->TextureNumber, finalComponents, textureWidth, textureHeight, textureBuffer, uiFilter, uiWrapMode);
+	m_mapBitmap.insert(type_bitmap_map::value_type(uiBitmapIndex, pNewBitmap));
+	m_BitmapName.push_back(std::pair<std::string, GLuint>(pNewBitmap->FileName, uiBitmapIndex));
+
+	if (uiBitmapIndex != BITMAP_INTERFACE_MAP && uiBitmapIndex != BITMAP_GUILD && uiBitmapIndex != BITMAP_FONT)
+	{
+		m_dwUsedTextureMemory -= textureBufferSize;
+		pNewBitmap->Buffer.clear();
+	}
 
 	return true;
 }

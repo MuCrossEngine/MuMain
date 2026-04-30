@@ -21,6 +21,9 @@ uniform bool      u_useTexture;
 // Alpha test (mirrors glAlphaFunc)
 uniform bool  u_alphaTestEnabled;
 uniform float u_alphaTestRef;    // e.g. 0.25 for GL_GREATER
+uniform bool  u_blendEnabled;
+uniform bool  u_autoAlphaDiscardEnabled;
+uniform float u_autoAlphaDiscardRef;
 
 // Fog
 uniform bool  u_fogEnabled;
@@ -51,10 +54,25 @@ float CalcFogFactor()
 void main()
 {
     vec4 color;
+    vec4 texel = vec4(1.0);
     if (u_useTexture)
-        color = texture(u_texture, v_texcoord) * v_color;
+    {
+        texel = texture(u_texture, v_texcoord);
+        color = texel * v_color;
+    }
     else
         color = v_color;
+
+    // Fallback for legacy cutout assets: if a textured draw forgot to enable
+    // alpha test/blending, still discard fully transparent texels.
+    if (u_useTexture &&
+        u_autoAlphaDiscardEnabled &&
+        !u_alphaTestEnabled &&
+        !u_blendEnabled &&
+        texel.a <= u_autoAlphaDiscardRef)
+    {
+        discard;
+    }
 
     // Alpha test
     if (u_alphaTestEnabled && color.a <= u_alphaTestRef)

@@ -70,9 +70,39 @@ struct UniformLoc
     GLint globalAmbient;
     GLint texture, useTexture;
     GLint alphaTestEnabled, alphaTestRef;
+    GLint blendEnabled;
+    GLint autoAlphaDiscardEnabled, autoAlphaDiscardRef;
     GLint fogEnabled, fogMode, fogColor, fogStart, fogEnd, fogDensity;
 };
 static UniformLoc s_u;
+
+static bool  s_autoAlphaDiscardEnabled = true;
+static float s_autoAlphaDiscardRef = (1.0f / 255.0f);
+
+static void InitAlphaDiscardFallbackConfig()
+{
+    const char* enabled = std::getenv("MU_AUTO_ALPHA_DISCARD");
+    if (enabled && std::atoi(enabled) == 0)
+    {
+        s_autoAlphaDiscardEnabled = false;
+    }
+
+    const char* ref = std::getenv("MU_AUTO_ALPHA_REF");
+    if (ref && ref[0] != '\0')
+    {
+        const float parsed = std::strtof(ref, nullptr);
+        if (parsed >= 0.0f && parsed <= 1.0f)
+        {
+            s_autoAlphaDiscardRef = parsed;
+        }
+    }
+
+    LOGI("Auto alpha discard: enabled=%d ref=%.4f (MU_AUTO_ALPHA_DISCARD=%s MU_AUTO_ALPHA_REF=%s)",
+         s_autoAlphaDiscardEnabled ? 1 : 0,
+         s_autoAlphaDiscardRef,
+         enabled ? enabled : "unset",
+         ref ? ref : "unset");
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Matrix stacks — plain std::vector avoids std::deque multi-chunk complexity
@@ -236,6 +266,9 @@ static void CacheUniformLocations()
     ULOC(useTexture,      "u_useTexture");
     ULOC(alphaTestEnabled,"u_alphaTestEnabled");
     ULOC(alphaTestRef,    "u_alphaTestRef");
+    ULOC(blendEnabled,    "u_blendEnabled");
+    ULOC(autoAlphaDiscardEnabled, "u_autoAlphaDiscardEnabled");
+    ULOC(autoAlphaDiscardRef,     "u_autoAlphaDiscardRef");
     ULOC(fogEnabled,      "u_fogEnabled");
     ULOC(fogMode,         "u_fogMode");
     ULOC(fogColor,        "u_fogColor");
@@ -334,6 +367,7 @@ bool Init(int screenW, int screenH)
     if (!s_program) return false;
 
     CacheUniformLocations();
+    InitAlphaDiscardFallbackConfig();
 
     // Create streaming VAO/VBO
     glGenVertexArrays(1, &s_vao);
@@ -503,6 +537,9 @@ void FlushUniforms()
     // Alpha test
     glUniform1i(s_u.alphaTestEnabled, g_rs.alphaTest ? 1 : 0);
     glUniform1f(s_u.alphaTestRef, g_rs.alphaRef);
+    glUniform1i(s_u.blendEnabled, g_rs.blend ? 1 : 0);
+    glUniform1i(s_u.autoAlphaDiscardEnabled, s_autoAlphaDiscardEnabled ? 1 : 0);
+    glUniform1f(s_u.autoAlphaDiscardRef, s_autoAlphaDiscardRef);
 
     // Fog
     glUniform1i(s_u.fogEnabled, g_rs.fog ? 1 : 0);

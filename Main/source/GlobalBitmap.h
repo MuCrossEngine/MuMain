@@ -25,6 +25,8 @@ typedef struct
 	unsigned int output_width  = 0;
 	unsigned int output_height = 0;
 	BYTE	Components     = 0;
+	bool    HasAlpha        = false;
+	bool    HasNonBinaryAlpha = false;
 	GLuint	TextureNumber  = 0;
 	BYTE	Ref            = 0;
 	std::vector<BYTE> Buffer;
@@ -149,7 +151,9 @@ protected:
 
 	bool OpenJpeg(GLuint uiBitmapIndex, const std::string& filename, GLuint uiFilter = GL_NEAREST, GLuint uiWrapMode = GL_CLAMP_TO_EDGE);
 	bool OpenTga(GLuint uiBitmapIndex, const std::string& filename, GLuint uiFilter = GL_NEAREST, GLuint uiWrapMode = GL_CLAMP_TO_EDGE);
-	bool OpenDDS_DXT5(GLuint uiBitmapIndex, const std::string& filename);
+	bool OpenPng(GLuint uiBitmapIndex, const std::string& filename, GLuint uiFilter = GL_NEAREST, GLuint uiWrapMode = GL_CLAMP_TO_EDGE);
+	bool OpenBmp(GLuint uiBitmapIndex, const std::string& filename, GLuint uiFilter = GL_NEAREST, GLuint uiWrapMode = GL_CLAMP_TO_EDGE);
+	bool OpenDDS_DXT5(GLuint uiBitmapIndex, const std::string& filename, GLuint uiFilter = GL_NEAREST, GLuint uiWrapMode = GL_CLAMP_TO_EDGE);
 
 	void CreateMipmappedTexture(GLuint* TextureNumber, GLuint Components, GLuint Width, GLuint Height, BYTE* textureBuff, GLuint uiFilter, GLuint uiWrapMode);
 	//void CreateMipmappedTexture(BITMAP_t* pNewBitmap, GLuint uiFilter, GLuint uiWrapMode);

@@ -29,10 +29,17 @@ static inline int32_t ReadSerializedInt32(const unsigned char* data)
 #include "CameraMove.h"
 #include "PhysicsManager.h"
 #include "MuCrypto/MuCrypto.h"
+#ifdef __ANDROID__
+#include <android/log.h>
+#endif
 
 extern float MouseX;
 extern float MouseY;
 extern bool MouseLButton;
+#ifdef __ANDROID__
+extern bool AlphaTestEnable;
+extern int AlphaBlendType;
+#endif
 
 
 vec4_t BoneQuaternion[MAX_BONES];
@@ -1472,7 +1479,14 @@ void BMD::RenderMesh(int i, int RenderFlag, float Alpha, int BlendMesh, float Bl
 							}
 							else
 							{
-								EnableAlphaTest();
+								if (pBitmap->Components == 4 && pBitmap->HasNonBinaryAlpha)
+								{
+									EnableAlphaBlend3();
+								}
+								else
+								{
+									EnableAlphaTest();
+								}
 							}
 
 							if (RenderFlag & RENDER_NODEPTH)
@@ -1519,6 +1533,45 @@ void BMD::RenderMesh(int i, int RenderFlag, float Alpha, int BlendMesh, float Bl
 						EnableCullFace();
 						EnableDepthMask();
 					}
+
+					const bool hasSpecialBlendFlag =
+						(RenderFlag & RENDER_BRIGHT) ||
+						(RenderFlag & RENDER_DARK) ||
+						(RenderFlag & RENDER_LIGHTMAP) ||
+						(RenderFlag & RENDER_CHROME) ||
+						(RenderFlag & RENDER_CHROME2) ||
+						(RenderFlag & RENDER_CHROME3) ||
+						(RenderFlag & RENDER_CHROME4) ||
+						(RenderFlag & RENDER_CHROME5) ||
+						(RenderFlag & RENDER_CHROME6) ||
+						(RenderFlag & RENDER_CHROME7) ||
+						(RenderFlag & RENDER_CHROME8) ||
+						(RenderFlag & RENDER_OIL);
+
+					// Textures with non-binary alpha need true alpha blending (not cutout)
+					// to avoid dark/black fringes and opaque background artifacts.
+					if (renderFlags == RENDER_TEXTURE &&
+						pBitmap &&
+						pBitmap->Components == 4 &&
+						pBitmap->HasNonBinaryAlpha &&
+						!hasSpecialBlendFlag)
+					{
+						EnableAlphaBlend3();
+					}
+
+#ifdef __ANDROID__
+					if (pBitmap && pBitmap->Components == 4 && !AlphaTestEnable && AlphaBlendType == 0)
+					{
+						static int s_rgbaNoAlphaStateWarnCount = 0;
+						if (s_rgbaNoAlphaStateWarnCount < 80)
+						{
+							++s_rgbaNoAlphaStateWarnCount;
+							__android_log_print(ANDROID_LOG_WARN, "MURender",
+								"RGBA texture without alpha state: model=%s mesh=%d tex=%s renderFlags=0x%X alpha=%.3f",
+								FileName, i, pBitmap->FileName, renderFlags, Alpha);
+						}
+					}
+#endif
 
 					auto vertices = RenderArrayVertices;
 					auto colors = RenderArrayColors;
@@ -1863,7 +1916,18 @@ void BMD::RenderMeshTranslate(int i, int RenderFlag, float Alpha, int BlendMesh,
 		{
 			EnableAlphaBlendMinus();
 		}
-		else if (Alpha < 0.99f || pBitmap->Components == 4)
+		else if (pBitmap->Components == 4)
+		{
+			if (pBitmap->HasNonBinaryAlpha)
+			{
+				EnableAlphaBlend3();
+			}
+			else
+			{
+				EnableAlphaTest();
+			}
+		}
+		else if (Alpha < 0.99f)
 		{
 			EnableAlphaTest();
 		}
@@ -1887,6 +1951,37 @@ void BMD::RenderMeshTranslate(int i, int RenderFlag, float Alpha, int BlendMesh,
 	{
 		Render = RENDER_TEXTURE;
 	}
+
+	const bool hasSpecialBlendFlag =
+		(RenderFlag & RENDER_BRIGHT) ||
+		(RenderFlag & RENDER_DARK) ||
+		(RenderFlag & RENDER_LIGHTMAP) ||
+		(RenderFlag & RENDER_CHROME) ||
+		(RenderFlag & RENDER_CHROME2) ||
+		(RenderFlag & RENDER_CHROME6);
+
+	if (Render == RENDER_TEXTURE &&
+		pBitmap &&
+		pBitmap->Components == 4 &&
+		pBitmap->HasNonBinaryAlpha &&
+		!hasSpecialBlendFlag)
+	{
+		EnableAlphaBlend3();
+	}
+
+#ifdef __ANDROID__
+	if (pBitmap && pBitmap->Components == 4 && !AlphaTestEnable && AlphaBlendType == 0)
+	{
+		static int s_rgbaNoAlphaStateWarnCountTranslate = 0;
+		if (s_rgbaNoAlphaStateWarnCountTranslate < 80)
+		{
+			++s_rgbaNoAlphaStateWarnCountTranslate;
+			__android_log_print(ANDROID_LOG_WARN, "MURender",
+				"RGBA texture without alpha state (translate): model=%s mesh=%d tex=%s render=0x%X alpha=%.3f",
+				FileName, i, pBitmap->FileName, Render, Alpha);
+		}
+	}
+#endif
 
 	glBegin(GL_TRIANGLES);
 	for (int j = 0; j < m->NumTriangles; j++)

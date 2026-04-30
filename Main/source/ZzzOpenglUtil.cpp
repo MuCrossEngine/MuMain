@@ -11,6 +11,7 @@
 #include "Zzzinfomation.h"
 #include "NewUISystem.h"
 #include "CShaderGL.h"
+#include <cstdlib>
 #ifdef __ANDROID__
 #include <android/log.h>
 #endif
@@ -322,6 +323,23 @@ void BindTexture(int tex)
 	}
 }
 
+#ifdef __ANDROID__
+static bool UsePremultipliedAlphaBlend()
+{
+	static int s_cached = -1;
+	if (s_cached < 0)
+	{
+		const char* envValue = std::getenv("MU_PREMULT_ALPHA");
+		s_cached = (envValue && std::atoi(envValue) != 0) ? 1 : 0;
+		__android_log_print(ANDROID_LOG_INFO, "MURender",
+			"Alpha blend mode: %s (MU_PREMULT_ALPHA=%s)",
+			s_cached ? "premultiplied" : "straight",
+			envValue ? envValue : "unset");
+	}
+	return s_cached == 1;
+}
+#endif
+
 bool TextureStream = false;
 
 extern  int test;
@@ -457,7 +475,14 @@ void EnableAlphaTest(bool DepthMask)
 	{
 		AlphaBlendType = 2;
 		glEnable(GL_BLEND);
+#ifdef __ANDROID__
+		if (UsePremultipliedAlphaBlend())
+			glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+		else
+			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+#else
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+#endif
 	}
 	DisableCullFace();
 
@@ -556,7 +581,14 @@ void EnableAlphaBlend3()
 	{
 		AlphaBlendType = 6;
 		glEnable(GL_BLEND);
+#ifdef __ANDROID__
+		if (UsePremultipliedAlphaBlend())
+			glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+		else
+			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+#else
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+#endif
 	}
 	DisableCullFace();
 	DisableDepthMask();

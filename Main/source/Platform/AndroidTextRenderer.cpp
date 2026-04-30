@@ -171,7 +171,7 @@ static int RenderGlyph(DCState& dc, stbtt_fontinfo& font, int codepoint, int px,
             int px2 = x + x0 + gx;
             if (px2 < 0 || px2 >= dc.width) continue;
             uint8_t alpha = bitmap[gy * gw + gx];
-            if (alpha < 32) continue;
+            if (alpha == 0) continue;
 
             int idx = (py * dc.width + px2) * dc.bpp;
             dst[idx + 0] = 255; // B
