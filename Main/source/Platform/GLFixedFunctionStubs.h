@@ -369,12 +369,21 @@ inline bool HasActiveClientArrays()
 inline void EmitClientArrayVertex(GLint index)
 {
     float tex[2]   = {0.0f, 0.0f};
-    float col[4]   = {1.0f, 1.0f, 1.0f, 1.0f};
     float normal[3]= {0.0f, 0.0f, 1.0f};
     float pos[3]   = {0.0f, 0.0f, 0.0f};
 
     ReadFloatN(TexCoordArray(), index, tex, 2, 0.0f);
-    ReadFloatN(ColorArray(), index, col, 4, 1.0f);
+
+    // Only override vertex color from the array if GL_COLOR_ARRAY is active.
+    // Otherwise, preserve the current color set by glColor4f (including alpha).
+    if (ColorArray().enabled && ColorArray().pointer)
+    {
+        float col[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+        ReadFloatN(ColorArray(), index, col, 4, 1.0f);
+        GLESFF::ImmColor4f(col[0], col[1], col[2], col[3]);
+    }
+    // else: keep whatever was last set by glColor* → GLESFF::ImmColor4f
+
     ReadFloatN(NormalArray(), index, normal, 3, 0.0f);
     if (!NormalArray().enabled || NormalArray().pointer == nullptr)
     {
@@ -383,7 +392,6 @@ inline void EmitClientArrayVertex(GLint index)
     ReadFloatN(VertexArray(), index, pos, 3, 0.0f);
 
     GLESFF::ImmTexCoord2f(tex[0], tex[1]);
-    GLESFF::ImmColor4f(col[0], col[1], col[2], col[3]);
     GLESFF::ImmNormal3f(normal[0], normal[1], normal[2]);
     GLESFF::ImmVertex3f(pos[0], pos[1], pos[2]);
 }

@@ -33,6 +33,8 @@ extern int   MouseWheel;
 extern int WindowSizeX, WindowSizeY;
 // Logical render dimensions used by legacy UI/input hit-tests.
 extern unsigned int WindowWidth, WindowHeight;
+extern float g_fScreenRate_x;
+extern float g_fScreenRate_y;
 
 namespace GameMouseInput
 {
@@ -65,34 +67,42 @@ namespace GameMouseInput
 
     static void SetMousePos(float x, float y)
     {
-        float mappedX = x;
-        float mappedY = y;
+        float mappedRenderX = x;
+        float mappedRenderY = y;
 
         // Android motion events can arrive in physical surface coordinates
         // while the game runs in a fixed logical backbuffer (1280x720).
         if (WindowSizeX > 0 && WindowSizeY > 0 && WindowWidth > 0 && WindowHeight > 0)
         {
-            mappedX = x * (float)WindowWidth / (float)WindowSizeX;
-            mappedY = y * (float)WindowHeight / (float)WindowSizeY;
+            mappedRenderX = x * (float)WindowWidth / (float)WindowSizeX;
+            mappedRenderY = y * (float)WindowHeight / (float)WindowSizeY;
         }
 
-        // Clamp to logical screen used by legacy UI hit-tests.
-        if (mappedX < 0.f) mappedX = 0.f;
-        if (mappedY < 0.f) mappedY = 0.f;
-        if (WindowWidth > 0 && mappedX > (float)WindowWidth - 1.f) mappedX = (float)WindowWidth - 1.f;
-        if (WindowHeight > 0 && mappedY > (float)WindowHeight - 1.f) mappedY = (float)WindowHeight - 1.f;
+        // Clamp to render target bounds first (WindowWidth/WindowHeight).
+        if (mappedRenderX < 0.f) mappedRenderX = 0.f;
+        if (mappedRenderY < 0.f) mappedRenderY = 0.f;
+        if (WindowWidth > 0 && mappedRenderX > (float)WindowWidth - 1.f) mappedRenderX = (float)WindowWidth - 1.f;
+        if (WindowHeight > 0 && mappedRenderY > (float)WindowHeight - 1.f) mappedRenderY = (float)WindowHeight - 1.f;
 
-        MouseRenderX = mappedX;
-        MouseRenderY = mappedY;
-        MouseX = MouseRenderX;
-        MouseY = MouseRenderY;
-    }
+        // Match WINHANDLE.cpp behavior:
+        //   MouseRender* = render-space coordinates
+        //   Mouse*       = logical UI coordinates (640x480 space)
+        float logicalX = mappedRenderX;
+        float logicalY = mappedRenderY;
+        if (g_fScreenRate_x > 0.0f) logicalX = mappedRenderX / g_fScreenRate_x;
+        if (g_fScreenRate_y > 0.0f) logicalY = mappedRenderY / g_fScreenRate_y;
 
-    // Bridge: also update SEASON3B::CNewKeyInput so IsPress(VK_LBUTTON) works
-    static inline void SetVKey(int vk, SEASON3B::CNewKeyInput::KEY_STATE st)
-    {
-        if (g_pNewKeyInput)
-            g_pNewKeyInput->SetKeyState(vk, st);
+        const float logicalWidth = (g_fScreenRate_x > 0.0f) ? ((float)WindowWidth / g_fScreenRate_x) : (float)WindowWidth;
+        const float logicalHeight = (g_fScreenRate_y > 0.0f) ? ((float)WindowHeight / g_fScreenRate_y) : (float)WindowHeight;
+        if (logicalX < 0.f) logicalX = 0.f;
+        if (logicalY < 0.f) logicalY = 0.f;
+        if (logicalWidth > 0.f && logicalX > logicalWidth - 1.f) logicalX = logicalWidth - 1.f;
+        if (logicalHeight > 0.f && logicalY > logicalHeight - 1.f) logicalY = logicalHeight - 1.f;
+
+        MouseRenderX = mappedRenderX;
+        MouseRenderY = mappedRenderY;
+        MouseX = logicalX;
+        MouseY = logicalY;
     }
 
     static void FireLButtonDown()
@@ -100,14 +110,13 @@ namespace GameMouseInput
         MouseLButton     = true;
         MouseLButtonPush = true;
         MouseLButtonPop  = false;
-        SetVKey(VK_LBUTTON, SEASON3B::CNewKeyInput::KEY_PRESS);
+        // VK_LBUTTON state is driven by ScanAsyncKeyState() from MouseLButton.
     }
 
     static void FireLButtonUp()
     {
-        // Do NOT clear MouseLButton here — DOWN+UP may arrive before Scene() runs.
-        // Defer the clear to Update() (after Scene()) so the click is visible for
-        // exactly one frame.
+        // Defer MouseLButton=false to Update() so that ScanAsyncKeyState()
+        // sees the press for at least one frame before transitioning to release.
         MouseLButtonPop  = true;
         s_pendingLButtonRelease = true;
     }
@@ -117,7 +126,7 @@ namespace GameMouseInput
         MouseRButton     = true;
         MouseRButtonPush = true;
         MouseRButtonPop  = false;
-        SetVKey(VK_RBUTTON, SEASON3B::CNewKeyInput::KEY_PRESS);
+        // VK_RBUTTON state is driven by ScanAsyncKeyState() from MouseRButton.
     }
 
     static void FireRButtonUp()
@@ -227,31 +236,18 @@ namespace GameMouseInput
 
     void Update()
     {
-        // Advance virtual key states after scene/input update has consumed this frame.
-        if (g_pNewKeyInput)
+        // Apply deferred releases: clear MouseLButton/MouseRButton AFTER Scene()
+        // so ScanAsyncKeyState() (at start of next frame) can see the transition.
+        if (s_pendingLButtonRelease)
         {
-            // Apply deferred releases (tap DOWN+UP arrived before Scene() ran this frame)
-            if (s_pendingLButtonRelease)
-            {
-                s_pendingLButtonRelease = false;
-                MouseLButton = false;   // NOW clear — Scene() has already run
-                g_pNewKeyInput->SetKeyState(VK_LBUTTON, SEASON3B::CNewKeyInput::KEY_RELEASE);
-            }
-            else if (g_pNewKeyInput->IsPress(VK_LBUTTON) && MouseLButton)
-                g_pNewKeyInput->SetKeyState(VK_LBUTTON, SEASON3B::CNewKeyInput::KEY_REPEAT);
-            else if (g_pNewKeyInput->IsRelease(VK_LBUTTON) && !MouseLButton)
-                g_pNewKeyInput->SetKeyState(VK_LBUTTON, SEASON3B::CNewKeyInput::KEY_NONE);
+            s_pendingLButtonRelease = false;
+            MouseLButton = false;
+        }
 
-            if (s_pendingRButtonRelease)
-            {
-                s_pendingRButtonRelease = false;
-                MouseRButton = false;   // NOW clear — Scene() has already run
-                g_pNewKeyInput->SetKeyState(VK_RBUTTON, SEASON3B::CNewKeyInput::KEY_RELEASE);
-            }
-            else if (g_pNewKeyInput->IsPress(VK_RBUTTON) && MouseRButton)
-                g_pNewKeyInput->SetKeyState(VK_RBUTTON, SEASON3B::CNewKeyInput::KEY_REPEAT);
-            else if (g_pNewKeyInput->IsRelease(VK_RBUTTON) && !MouseRButton)
-                g_pNewKeyInput->SetKeyState(VK_RBUTTON, SEASON3B::CNewKeyInput::KEY_NONE);
+        if (s_pendingRButtonRelease)
+        {
+            s_pendingRButtonRelease = false;
+            MouseRButton = false;
         }
 
         // Clear one-frame flags at the END of each frame

@@ -607,6 +607,32 @@ void SEASON3B::CNewKeyInput::ScanAsyncKeyState()
 	if (gwinhandle->CheckWndActive())
 	{
 #ifdef __ANDROID__
+		// On Android, touch events update MouseLButton/MouseRButton between frames.
+		// Drive the VK_LBUTTON/VK_RBUTTON state machine from those globals,
+		// mirroring the Windows GetAsyncKeyState() logic.
+		// MouseLButton/MouseRButton are globals from ZzzOpenglUtil.h (included via stdafx).
+		struct { int vk; bool down; } mouseKeys[] = {
+			{ VK_LBUTTON, ::MouseLButton },
+			{ VK_RBUTTON, ::MouseRButton },
+		};
+
+		for (auto& mk : mouseKeys)
+		{
+			if (mk.down)
+			{
+				if (m_pInputInfo[mk.vk].byKeyState == KEY_NONE || m_pInputInfo[mk.vk].byKeyState == KEY_RELEASE)
+					m_pInputInfo[mk.vk].byKeyState = KEY_PRESS;
+				else if (m_pInputInfo[mk.vk].byKeyState == KEY_PRESS)
+					m_pInputInfo[mk.vk].byKeyState = KEY_REPEAT;
+			}
+			else
+			{
+				if (m_pInputInfo[mk.vk].byKeyState == KEY_REPEAT || m_pInputInfo[mk.vk].byKeyState == KEY_PRESS)
+					m_pInputInfo[mk.vk].byKeyState = KEY_RELEASE;
+				else if (m_pInputInfo[mk.vk].byKeyState == KEY_RELEASE)
+					m_pInputInfo[mk.vk].byKeyState = KEY_NONE;
+			}
+		}
 #else
 		for (int key = 0; key < 256; key++)
 		{

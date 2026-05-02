@@ -1562,13 +1562,21 @@ void BMD::RenderMesh(int i, int RenderFlag, float Alpha, int BlendMesh, float Bl
 #ifdef __ANDROID__
 					if (pBitmap && pBitmap->Components == 4 && !AlphaTestEnable && AlphaBlendType == 0)
 					{
-						static int s_rgbaNoAlphaStateWarnCount = 0;
-						if (s_rgbaNoAlphaStateWarnCount < 80)
+						// RGBA texture about to be drawn without alpha handling —
+						// enable alpha test to prevent black-background artifacts.
+						if (pBitmap->HasNonBinaryAlpha)
+							EnableAlphaBlend3();
+						else
+							EnableAlphaTest();
+
+						static int s_rgbaFixupCount = 0;
+						if (s_rgbaFixupCount < 40)
 						{
-							++s_rgbaNoAlphaStateWarnCount;
+							++s_rgbaFixupCount;
 							__android_log_print(ANDROID_LOG_WARN, "MURender",
-								"RGBA texture without alpha state: model=%s mesh=%d tex=%s renderFlags=0x%X alpha=%.3f",
-								FileName, i, pBitmap->FileName, renderFlags, Alpha);
+								"RGBA alpha fixup: model=%s mesh=%d tex=%s renderFlags=0x%X alpha=%.3f nonBinary=%d",
+								FileName, i, pBitmap->FileName, renderFlags, Alpha,
+								pBitmap->HasNonBinaryAlpha ? 1 : 0);
 						}
 					}
 #endif

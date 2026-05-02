@@ -2297,15 +2297,20 @@ inline BOOL GetVolumeInformation(const char*,void*,DWORD,DWORD* sn,DWORD*,DWORD*
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Cursor / mouse shims — read from the game's global MouseX/MouseY
+// Cursor / mouse shims — read from the game's global mouse coordinates
 // (defined in ZzzOpenglUtil.cpp, declared in ZzzOpenglUtil.h)
 // ─────────────────────────────────────────────────────────────────────────────
 extern float MouseX;
 extern float MouseY;
+extern float MouseRenderX;
+extern float MouseRenderY;
 
 inline BOOL GetCursorPos(POINT* pt)
 {
-    if (pt) { pt->x = (LONG)MouseX; pt->y = (LONG)MouseY; }
+    // CInput and CWin/CButton/CSprite UI use CInput::GetScreenWidth()/Height()
+    // which are WindowWidth×WindowHeight (render-space, e.g. 1280×720).
+    // Return render-space coordinates so hit-tests match button positions.
+    if (pt) { pt->x = (LONG)MouseRenderX; pt->y = (LONG)MouseRenderY; }
     return TRUE;
 }
 // On Android, touch coords are already in client (window) space
