@@ -1853,6 +1853,12 @@ inline HFONT   CreateFontA(int h, int, int, int, int wt, DWORD, DWORD, DWORD, DW
     {
         pixelHeight = 16;
     }
+    // Scale font to native resolution (logical 640x480 → window 1280x720)
+    extern float g_fScreenRate_x;
+    if (g_fScreenRate_x > 1.0f)
+    {
+        pixelHeight = (int)(pixelHeight * g_fScreenRate_x);
+    }
     HFONT font = AndroidTextRenderer::CreateFont(pixelHeight, wt >= FW_BOLD);
     if (font)
     {

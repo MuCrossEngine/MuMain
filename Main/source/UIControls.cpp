@@ -2738,10 +2738,17 @@ bool CUIRenderTextOriginal::Create(HDC hDC)
 	DIB_INFO = (BITMAPINFO*)new BYTE[sizeof(BITMAPINFOHEADER) + sizeof(PALETTEENTRY) * 256];
 	memset(DIB_INFO, 0x00, sizeof(BITMAPINFOHEADER));
 	DIB_INFO->bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+#ifdef __ANDROID__
+	DIB_INFO->bmiHeader.biWidth = (int)WindowWidth;			//. 1280 (native)
+	DIB_INFO->bmiHeader.biHeight = -(int)WindowHeight;		//. 720 (native)
+	DIB_INFO->bmiHeader.biPlanes = 1;
+	DIB_INFO->bmiHeader.biBitCount = 32;
+#else
 	DIB_INFO->bmiHeader.biWidth = gwinhandle->GetScreenX();		//. 640
 	DIB_INFO->bmiHeader.biHeight = -(gwinhandle->GetScreenY());		//. 480
 	DIB_INFO->bmiHeader.biPlanes = 1;
 	DIB_INFO->bmiHeader.biBitCount = 24;
+#endif
 	DIB_INFO->bmiHeader.biCompression = BI_RGB;
 
 	m_hBitmap = CreateDIBSection(hDC, DIB_INFO, DIB_RGB_COLORS, (void**)&m_pFontBuffer, NULL, NULL);
@@ -2829,9 +2836,27 @@ void CUIRenderTextOriginal::WriteText(int iOffset, int iWidth, int iHeight)
 	const int LIMIT_WIDTH = 256, LIMIT_HEIGHT = 32;
 
 	SIZE FontDCSize = { gwinhandle->GetScreenX(), gwinhandle->GetScreenY() };
+#ifdef __ANDROID__
+	FontDCSize.cx = (long)WindowWidth;
+	FontDCSize.cy = (long)WindowHeight;
+	int iSrcBpp = 4;
+	int iPitch = FontDCSize.cx * 4;
+	// Callers pass byte offset assuming 3 bpp; convert to 4 bpp
+	int iPixelOffset = iOffset / 3;
+	iOffset = iPixelOffset * 4;
+#else
+	int iSrcBpp = 3;
 	int iPitch = ((FontDCSize.cx * 24 + 31) & ~31) >> 3;
+#endif
 
 	BITMAP_t* pBitmapFont = &Bitmaps[BITMAP_FONT];
+
+#ifdef __ANDROID__
+	// Ensure buffer is large enough for RGBA writes
+	size_t requiredSize = (size_t)LIMIT_WIDTH * LIMIT_HEIGHT * 4;
+	if (pBitmapFont->Buffer.size() < requiredSize)
+		pBitmapFont->Buffer.resize(requiredSize, 0);
+#endif
 
 	BYTE* buff = pBitmapFont->Buffer.data();
 
@@ -2849,15 +2874,30 @@ void CUIRenderTextOriginal::WriteText(int iOffset, int iWidth, int iHeight)
 				return;
 			}
 
-			if (*(m_pFontBuffer + SrcIndex) == 255)	// ����
+#ifdef __ANDROID__
+			BYTE alpha = *(m_pFontBuffer + SrcIndex + 3);
+			if (alpha > 0)
 			{
-				*((unsigned int*)(buff + DstIndex)) = m_dwTextColor;
+				DWORD color = m_dwTextColor;
+				BYTE srcAlpha = (BYTE)((color >> 24) & 0xFF);
+				BYTE finalAlpha = (BYTE)((srcAlpha * alpha) / 255);
+				*((unsigned int*)(buff + DstIndex)) = (color & 0x00FFFFFF) | ((DWORD)finalAlpha << 24);
 			}
-			else									// ���
+			else
 			{
 				*((unsigned int*)(buff + DstIndex)) = 0;
 			}
-			SrcIndex += 3;
+#else
+			if (*(m_pFontBuffer + SrcIndex) == 255)	// foreground
+			{
+				*((unsigned int*)(buff + DstIndex)) = m_dwTextColor;
+			}
+			else									// background
+			{
+				*((unsigned int*)(buff + DstIndex)) = 0;
+			}
+#endif
+			SrcIndex += iSrcBpp;
 			DstIndex += 4;
 		}
 	}
@@ -3034,6 +3074,19 @@ void CUIRenderTextOriginal::RenderText(int iPos_x, int iPos_y, const unicode::t_
 	{
 		::SetBkColor(m_hFontDC, RGB(0, 0, 0));
 		::SetTextColor(m_hFontDC, RGB(255, 255, 255));
+#ifdef __ANDROID__
+		// Clear the DIB area before rendering (Android TextOut doesn't clear background)
+		if (m_pFontBuffer)
+		{
+			int clearWidth = (int)RealRenderingSize.cx;
+			int clearHeight = (int)RealRenderingSize.cy;
+			if (clearWidth > (int)WindowWidth) clearWidth = (int)WindowWidth;
+			if (clearHeight > (int)WindowHeight) clearHeight = (int)WindowHeight;
+			int rowBytes = (int)WindowWidth * 4;
+			for (int cy = 0; cy < clearHeight; cy++)
+				memset(m_pFontBuffer + cy * rowBytes, 0, clearWidth * 4);
+		}
+#endif
 		g_pMultiLanguage->_TextOut(m_hFontDC, 0, 0, pszText, lstrlen(pszText));
 	}
 
@@ -3176,6 +3229,18 @@ void CUIRenderTextOriginal::RenderFont(int iPos_x, int iPos_y, const unicode::t_
 	{
 		::SetBkColor(m_hFontDC, RGB(0, 0, 0));
 		::SetTextColor(m_hFontDC, RGB(255, 255, 255));
+#ifdef __ANDROID__
+		if (m_pFontBuffer)
+		{
+			int clearWidth = (int)RealRenderingSize.cx;
+			int clearHeight = (int)RealRenderingSize.cy;
+			if (clearWidth > (int)WindowWidth) clearWidth = (int)WindowWidth;
+			if (clearHeight > (int)WindowHeight) clearHeight = (int)WindowHeight;
+			int rowBytes = (int)WindowWidth * 4;
+			for (int cy = 0; cy < clearHeight; cy++)
+				memset(m_pFontBuffer + cy * rowBytes, 0, clearWidth * 4);
+		}
+#endif
 		g_pMultiLanguage->_TextOut(m_hFontDC, 0, 0, pszText, lstrlen(pszText));
 	}
 
@@ -3318,6 +3383,18 @@ void CUIRenderTextOriginal::RenderTextClipped(float iPos_x, float iPos_y, const 
 	{
 		::SetBkColor(m_hFontDC, RGB(0, 0, 0));
 		::SetTextColor(m_hFontDC, RGB(255, 255, 255));
+#ifdef __ANDROID__
+		if (m_pFontBuffer)
+		{
+			int clearWidth = (int)RealRenderingSize.cx;
+			int clearHeight = (int)RealRenderingSize.cy;
+			if (clearWidth > (int)WindowWidth) clearWidth = (int)WindowWidth;
+			if (clearHeight > (int)WindowHeight) clearHeight = (int)WindowHeight;
+			int rowBytes = (int)WindowWidth * 4;
+			for (int cy = 0; cy < clearHeight; cy++)
+				memset(m_pFontBuffer + cy * rowBytes, 0, clearWidth * 4);
+		}
+#endif
 		g_pMultiLanguage->_TextOut(m_hFontDC, 0, 0, pszText, lstrlen(pszText));
 	}
 
@@ -3818,7 +3895,11 @@ void CUITextInputBox::SetSize(int iWidth, int iHeight)
 	DIB_INFO->bmiHeader.biWidth = iWidth * g_fScreenRate_x;
 	DIB_INFO->bmiHeader.biHeight = -(iHeight * g_fScreenRate_y);
 	DIB_INFO->bmiHeader.biPlanes = 1;
+#ifdef __ANDROID__
+	DIB_INFO->bmiHeader.biBitCount = 32;
+#else
 	DIB_INFO->bmiHeader.biBitCount = 24;
+#endif
 	DIB_INFO->bmiHeader.biCompression = BI_RGB;
 
 	m_hBitmap = CreateDIBSection(hDC, DIB_INFO, DIB_RGB_COLORS, (void**)&m_pFontBuffer, NULL, NULL);
