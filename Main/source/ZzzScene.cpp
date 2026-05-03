@@ -2672,21 +2672,29 @@ void MoveMainScene()
 
 #ifdef __ANDROID__
 		// Load remaining data deferred from OpenBasicData.
-		// OpenPlayers/OpenPlayerTextures already loaded during character-select transition.
+		// Character scene already loads players/items/textures for visual parity.
 		// IMPORTANT: LoadMainSceneInterface must happen BEFORE ResetSkillHotKey.
 		{
 			extern void OpenItems();
 			extern void OpenItemTextures();
 			extern void OpenSkills();
 			extern void OpenImages();
-			LogMemScene("MoveMainScene:before-deferred-OpenItems");
-			OpenItems();
-			LogMemScene("MoveMainScene:after-deferred-OpenItems");
-			mallopt(M_PURGE, 0);
-			LogMemScene("MoveMainScene:before-deferred-OpenItemTextures");
-			OpenItemTextures();
-			LogMemScene("MoveMainScene:after-deferred-OpenItemTextures");
-			mallopt(M_PURGE, 0);
+			auto* pWingPreviewModel = gmClientModels->GetModel(MODEL_WING + 3);
+			if (pWingPreviewModel == nullptr || pWingPreviewModel->NumActions <= 0)
+			{
+				LogMemScene("MoveMainScene:before-deferred-OpenItems-fallback");
+				OpenItems();
+				LogMemScene("MoveMainScene:after-deferred-OpenItems-fallback");
+				mallopt(M_PURGE, 0);
+				LogMemScene("MoveMainScene:before-deferred-OpenItemTextures-fallback");
+				OpenItemTextures();
+				LogMemScene("MoveMainScene:after-deferred-OpenItemTextures-fallback");
+				mallopt(M_PURGE, 0);
+			}
+			else
+			{
+				LogMemScene("MoveMainScene:deferred-OpenItems-skipped");
+			}
 			LogMemScene("MoveMainScene:before-deferred-OpenSkills");
 			OpenSkills();
 			LogMemScene("MoveMainScene:after-deferred-OpenSkills");

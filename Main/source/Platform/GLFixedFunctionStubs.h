@@ -186,6 +186,12 @@ inline Fn Proc(const char* name)
 #ifndef GL_ADD
 #  define GL_ADD                0x0104
 #endif
+#ifndef GL_COMBINE
+#  define GL_COMBINE            0x8570
+#endif
+#ifndef GL_RGB_SCALE
+#  define GL_RGB_SCALE          0x8573
+#endif
 
 // Shade model (ES3 always smooth — kept for source compat)
 #ifndef GL_SMOOTH
@@ -494,7 +500,7 @@ inline void glNormal3fv(const float* v)           { GLESFF::ImmNormal3f(v[0],v[1
 // Texture environment (store but ignore on ES3 — shader does modulate)
 // ─────────────────────────────────────────────────────────────────────────────
 inline void glTexEnvf(GLenum t,GLenum p,float v)  { GLESFF::TexEnvf(t,p,v); }
-inline void glTexEnvi(GLenum,GLenum,int)           { /* no-op */ }
+inline void glTexEnvi(GLenum t,GLenum p,int v)    { GLESFF::TexEnvf(t,p,(float)v); }
 inline void glTexEnvfv(GLenum,GLenum,const float*) { /* no-op */ }
 
 // glBindTexture redirect — keeps g_rs in sync

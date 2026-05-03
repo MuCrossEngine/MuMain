@@ -509,7 +509,15 @@ void EnableAlphaBlend()
 	{
 		AlphaBlendType = 3;
 		glEnable(GL_BLEND);
+#ifdef __ANDROID__
+		// Additive glow in GLES should preserve source alpha intensity.
+		if (UsePremultipliedAlphaBlend())
+			glBlendFunc(GL_ONE, GL_ONE);
+		else
+			glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+#else
 		glBlendFunc(GL_ONE, GL_ONE);
+#endif
 	}
 	DisableCullFace();
 	DisableDepthMask();

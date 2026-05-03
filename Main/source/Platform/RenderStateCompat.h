@@ -22,6 +22,15 @@ enum RsMatrixMode { RS_MODELVIEW = 0, RS_PROJECTION = 1, RS_TEXTURE = 2 };
 // ── Fog mode (mirrors GL_LINEAR / GL_EXP / GL_EXP2) ─────────────────────────
 enum RsFogMode { RS_FOG_LINEAR = 0, RS_FOG_EXP = 1, RS_FOG_EXP2 = 2 };
 
+// Texture env mode (fixed-function glTexEnv combine subset)
+enum RsTexEnvMode
+{
+    RS_TEXENV_MODULATE = 0,
+    RS_TEXENV_ADD = 1,
+    RS_TEXENV_REPLACE = 2,
+    RS_TEXENV_MODULATE_X2 = 3
+};
+
 struct RenderState
 {
     // ── Enable flags ─────────────────────────────────────────────────────────
@@ -50,6 +59,13 @@ struct RenderState
     // ── Alpha test ────────────────────────────────────────────────────────────
     GLenum alphaFunc = GL_GREATER;
     float  alphaRef  = 0.0f;
+
+    // ── Texture environment (glTexEnv compatibility) ─────────────────────────
+    RsTexEnvMode texEnvMode = RS_TEXENV_MODULATE;
+    float        texEnvRgbScale = 1.0f;
+
+    // ── Texture coordinates ───────────────────────────────────────────────────
+    bool flipTexCoordY = false;
 
     // ── Fog ───────────────────────────────────────────────────────────────────
     RsFogMode  fogMode    = RS_FOG_LINEAR;

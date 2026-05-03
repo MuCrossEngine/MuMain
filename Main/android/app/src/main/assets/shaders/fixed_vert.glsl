@@ -18,6 +18,7 @@ in vec3  a_normal;
 uniform mat4 u_mvp;           // modelview * projection
 uniform mat4 u_modelview;     // modelview only (for lighting)
 uniform mat3 u_normalMatrix;  // transpose(inverse(modelview)) 3x3
+uniform bool u_flipTexcoordY;
 
 // Lighting (mirror glLightfv / glMaterialfv)
 uniform bool  u_lightingEnabled;
@@ -42,7 +43,7 @@ void main()
     vec4 eyePos = u_modelview * vec4(a_position, 1.0);
     gl_Position = u_mvp * vec4(a_position, 1.0);
 
-    v_texcoord = a_texcoord;
+    v_texcoord = u_flipTexcoordY ? vec2(a_texcoord.x, 1.0 - a_texcoord.y) : a_texcoord;
     v_fogDepth = abs(eyePos.z);
 
     if (u_lightingEnabled)

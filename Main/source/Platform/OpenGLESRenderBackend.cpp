@@ -29,6 +29,27 @@
 #ifndef GL_POLYGON
 #  define GL_POLYGON 0x0009
 #endif
+#ifndef GL_TEXTURE_ENV
+#  define GL_TEXTURE_ENV 0x2300
+#endif
+#ifndef GL_TEXTURE_ENV_MODE
+#  define GL_TEXTURE_ENV_MODE 0x2200
+#endif
+#ifndef GL_MODULATE
+#  define GL_MODULATE 0x2100
+#endif
+#ifndef GL_REPLACE
+#  define GL_REPLACE 0x1E01
+#endif
+#ifndef GL_ADD
+#  define GL_ADD 0x0104
+#endif
+#ifndef GL_COMBINE
+#  define GL_COMBINE 0x8570
+#endif
+#ifndef GL_RGB_SCALE
+#  define GL_RGB_SCALE 0x8573
+#endif
 
 #include <vector>
 #include <string>
@@ -69,6 +90,8 @@ struct UniformLoc
     GLint matAmbient, matDiffuse, matSpecular, matEmission, matShininess;
     GLint globalAmbient;
     GLint texture, useTexture;
+    GLint texEnvMode, texEnvRgbScale;
+    GLint flipTexcoordY;
     GLint alphaTestEnabled, alphaTestRef;
     GLint blendEnabled;
     GLint autoAlphaDiscardEnabled, autoAlphaDiscardRef;
@@ -78,6 +101,7 @@ static UniformLoc s_u;
 
 static bool  s_autoAlphaDiscardEnabled = true;
 static float s_autoAlphaDiscardRef = (1.0f / 255.0f);
+static bool  s_forceFlipTexcoordY = false;
 
 static void InitAlphaDiscardFallbackConfig()
 {
@@ -102,6 +126,17 @@ static void InitAlphaDiscardFallbackConfig()
          s_autoAlphaDiscardRef,
          enabled ? enabled : "unset",
          ref ? ref : "unset");
+}
+
+static void InitTextureCoordConfig()
+{
+    const char* flip = std::getenv("MU_TEXCOORD_FLIP_Y");
+    s_forceFlipTexcoordY = (flip && std::atoi(flip) != 0);
+    g_rs.flipTexCoordY = s_forceFlipTexcoordY;
+
+    LOGI("Texture UV flipY: %s (MU_TEXCOORD_FLIP_Y=%s)",
+         s_forceFlipTexcoordY ? "enabled" : "disabled",
+         flip ? flip : "unset");
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -264,6 +299,9 @@ static void CacheUniformLocations()
     ULOC(globalAmbient,   "u_globalAmbient");
     ULOC(texture,         "u_texture");
     ULOC(useTexture,      "u_useTexture");
+    ULOC(texEnvMode,      "u_texEnvMode");
+    ULOC(texEnvRgbScale,  "u_texEnvRgbScale");
+    ULOC(flipTexcoordY,   "u_flipTexcoordY");
     ULOC(alphaTestEnabled,"u_alphaTestEnabled");
     ULOC(alphaTestRef,    "u_alphaTestRef");
     ULOC(blendEnabled,    "u_blendEnabled");
@@ -292,7 +330,14 @@ void RS_ApplyToDriver()
     // Depth
     if (g_rs.depthTest) { glEnable(GL_DEPTH_TEST); glDepthFunc(g_rs.depthFunc); }
     else                  glDisable(GL_DEPTH_TEST);
-    glDepthMask(g_rs.depthMask ? GL_TRUE : GL_FALSE);
+
+    // Additive/glow pass should not write depth or it can hide objects behind.
+    bool effectiveDepthMask = g_rs.depthMask;
+    if (g_rs.blend && g_rs.blendDst == GL_ONE)
+    {
+        effectiveDepthMask = false;
+    }
+    glDepthMask(effectiveDepthMask ? GL_TRUE : GL_FALSE);
 
     // Cull
     if (g_rs.cullFace) { glEnable(GL_CULL_FACE); glCullFace(g_rs.cullFaceMode); }
@@ -368,6 +413,7 @@ bool Init(int screenW, int screenH)
 
     CacheUniformLocations();
     InitAlphaDiscardFallbackConfig();
+    InitTextureCoordConfig();
 
     // Create streaming VAO/VBO
     glGenVertexArrays(1, &s_vao);
@@ -527,6 +573,9 @@ void FlushUniforms()
     // Texture
     bool useTexture = g_rs.texture2D && (g_rs.boundTexture != 0);
     glUniform1i(s_u.useTexture, useTexture ? 1 : 0);
+    glUniform1i(s_u.texEnvMode, (int)g_rs.texEnvMode);
+    glUniform1f(s_u.texEnvRgbScale, g_rs.texEnvRgbScale);
+    glUniform1i(s_u.flipTexcoordY, g_rs.flipTexCoordY ? 1 : 0);
     if (useTexture)
     {
         glActiveTexture(GL_TEXTURE0);
@@ -668,7 +717,48 @@ void BindTexture(GLenum /*target*/, GLuint tex)
     if (tex) DriverBindTexture(GL_TEXTURE_2D, tex);
 }
 
-void TexEnvf(GLenum /*target*/, GLenum /*pname*/, float /*param*/) { /* stored in RS if needed */ }
+void TexEnvf(GLenum target, GLenum pname, float param)
+{
+    if (target != GL_TEXTURE_ENV)
+    {
+        return;
+    }
+
+    if (pname == GL_TEXTURE_ENV_MODE)
+    {
+        const int mode = (int)param;
+        g_rs.texEnvRgbScale = 1.0f;
+        switch (mode)
+        {
+        case GL_ADD:
+            g_rs.texEnvMode = RS_TEXENV_ADD;
+            break;
+        case GL_REPLACE:
+            g_rs.texEnvMode = RS_TEXENV_REPLACE;
+            break;
+        case GL_COMBINE:
+            // Treat COMBINE as MODULATE; rgb scale can emulate MODULATE*2.
+            g_rs.texEnvMode = RS_TEXENV_MODULATE;
+            break;
+        case GL_MODULATE:
+        default:
+            g_rs.texEnvMode = RS_TEXENV_MODULATE;
+            break;
+        }
+        return;
+    }
+
+    if (pname == GL_RGB_SCALE)
+    {
+        const float clamped = (param < 1.0f) ? 1.0f : ((param > 4.0f) ? 4.0f : param);
+        g_rs.texEnvRgbScale = clamped;
+
+        if (g_rs.texEnvMode == RS_TEXENV_MODULATE)
+        {
+            g_rs.texEnvMode = (clamped >= 2.0f) ? RS_TEXENV_MODULATE_X2 : RS_TEXENV_MODULATE;
+        }
+    }
+}
 
 void RasterPos2i(int /*x*/, int /*y*/) { /* no-op — 2-D positioning handled by caller's matrices */ }
 

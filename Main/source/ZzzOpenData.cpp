@@ -6119,7 +6119,47 @@ void OpenBasicData(HDC hDC)
 
 	g_ErrorReport.Write("> First Load Files OK.\r\n");
 #else
-	LogMem("OpenBasicData:first-textures-skipped");
+	LogMem("OpenBasicData:first-textures-android-minimal");
+	// Minimal effect set required by equipment glow and linked item effects in CHARACTER_SCENE.
+	LoadBitmap("Effect\\flare01.jpg", BITMAP_LIGHT, GL_LINEAR, GL_CLAMP_TO_EDGE);
+	LoadBitmap("Object9\\Impack03.jpg", BITMAP_LIGHT + 1, GL_LINEAR, GL_CLAMP_TO_EDGE);
+	LoadBitmap("Effect\\cra_04.jpg", BITMAP_LIGHT + 2, GL_LINEAR, GL_CLAMP_TO_EDGE);
+	LoadBitmap("Effect\\Impack01.jpg", BITMAP_LIGHT + 3, GL_LINEAR, GL_CLAMP_TO_EDGE);
+	LoadBitmap("Effect\\Shiny01.jpg", BITMAP_SHINY, GL_LINEAR, GL_CLAMP_TO_EDGE);
+	LoadBitmap("Effect\\Shiny02.jpg", BITMAP_SHINY + 1, GL_LINEAR, GL_CLAMP_TO_EDGE);
+	LoadBitmap("Effect\\Shiny03.jpg", BITMAP_SHINY + 2, GL_LINEAR, GL_CLAMP_TO_EDGE);
+	LoadBitmap("Effect\\eye01.jpg", BITMAP_SHINY + 3, GL_LINEAR, GL_CLAMP_TO_EDGE);
+	LoadBitmap("Effect\\ring.jpg", BITMAP_SHINY + 4, GL_LINEAR, GL_CLAMP_TO_EDGE);
+	LoadBitmap("Effect\\Shiny04.jpg", BITMAP_SHINY + 5, GL_LINEAR, GL_CLAMP_TO_EDGE);
+	LoadBitmap("Effect\\shiny05.jpg", BITMAP_SHINY + 6, GL_LINEAR, GL_CLAMP_TO_EDGE);
+	LoadBitmap("Effect\\Spark02.jpg", BITMAP_SPARK, GL_LINEAR, GL_CLAMP_TO_EDGE);
+	LoadBitmap("Effect\\Spark03.jpg", BITMAP_SPARK + 1, GL_LINEAR, GL_CLAMP_TO_EDGE);
+	LoadBitmap("Effect\\Spark.jpg", BITMAP_SPARK + 2, GL_LINEAR, GL_CLAMP_TO_EDGE);
+	LoadBitmap("Effect\\Chrome01.jpg", BITMAP_CHROME, GL_LINEAR, GL_REPEAT);
+	LoadBitmap("Effect\\bab2.jpg", BITMAP_CHROME + 1, GL_LINEAR, GL_REPEAT);
+	LoadBitmap("Effect\\Chrome02.jpg", BITMAP_CHROME2, GL_NEAREST, GL_CLAMP_TO_EDGE);
+	LoadBitmap("Effect\\Chrome03.jpg", BITMAP_CHROME3, GL_NEAREST, GL_CLAMP_TO_EDGE);
+	LoadBitmap("Effect\\Chrome06.jpg", BITMAP_CHROME6, GL_NEAREST, GL_CLAMP_TO_EDGE);
+	LoadBitmap("Effect\\Chrome07.jpg", BITMAP_CHROME7, GL_NEAREST, GL_CLAMP_TO_EDGE);
+	LoadBitmap("Effect\\energy01.jpg", BITMAP_CHROME_ENERGY, GL_NEAREST, GL_CLAMP_TO_EDGE);
+	LoadBitmap("Effect\\energy02.jpg", BITMAP_CHROME_ENERGY2, GL_LINEAR, GL_CLAMP_TO_EDGE);
+	LoadBitmap("Effect\\Flare.jpg", BITMAP_FLARE, GL_LINEAR, GL_CLAMP_TO_EDGE);
+	LoadBitmap("Effect\\Flare02.jpg", BITMAP_FLARE + 1, GL_LINEAR, GL_REPEAT);
+	LoadBitmap("Effect\\flareBlue.jpg", BITMAP_FLARE_BLUE, GL_LINEAR, GL_CLAMP_TO_EDGE);
+	LoadBitmap("Effect\\flareRed.jpg", BITMAP_FLARE_RED, GL_LINEAR, GL_CLAMP_TO_EDGE);
+	LoadBitmap("Effect\\JointThunder01.jpg", BITMAP_JOINT_THUNDER, GL_LINEAR, GL_REPEAT);
+	LoadBitmap("Effect\\JointSpirit01.jpg", BITMAP_JOINT_SPIRIT, GL_LINEAR, GL_CLAMP_TO_EDGE);
+	LoadBitmap("Effect\\JointSpirit02.jpg", BITMAP_JOINT_SPIRIT2, GL_LINEAR, GL_CLAMP_TO_EDGE);
+	LoadBitmap("Effect\\JointLaser01.jpg", BITMAP_JOINT_ENERGY, GL_LINEAR);
+	LoadBitmap("Effect\\lightning2.jpg", BITMAP_LIGHTNING + 1, GL_LINEAR, GL_CLAMP_TO_EDGE);
+	LoadBitmap("Effect\\Clud64.jpg", BITMAP_CLUD64, GL_LINEAR, GL_CLAMP_TO_EDGE);
+	LoadBitmap("Effect\\2.jpg", BITMAP_2LINE, GL_LINEAR, GL_REPEAT);
+	LoadBitmap("Skill\\Skull.jpg", BITMAP_SKULL, GL_NEAREST);
+	LoadBitmap("Effect\\WATERFALL1.jpg", BITMAP_WATERFALL_1, GL_LINEAR, GL_CLAMP_TO_EDGE);
+	LoadBitmap("Effect\\WATERFALL2.jpg", BITMAP_WATERFALL_2, GL_LINEAR, GL_CLAMP_TO_EDGE);
+	LoadBitmap("Effect\\WATERFALL3.jpg", BITMAP_WATERFALL_3, GL_LINEAR, GL_CLAMP_TO_EDGE);
+	LoadBitmap("Effect\\WATERFALL4.jpg", BITMAP_WATERFALL_4, GL_LINEAR, GL_CLAMP_TO_EDGE);
+	LoadBitmap("Effect\\WATERFALL5.jpg", BITMAP_WATERFALL_5, GL_LINEAR, GL_CLAMP_TO_EDGE);
 #endif // !__ANDROID__
 	LogMem("OpenBasicData:first-textures-done");
 
@@ -6142,11 +6182,13 @@ void OpenBasicData(HDC hDC)
 	OpenItemTextures();
 	rUIMng.RenderTitleSceneUI(hDC, 5, 12);
 #else
-	// On Android, load player textures for character selection scene
+	// On Android, character-selection also needs full equipped-item visuals.
 	OpenPlayerTextures();
 	LogMem("OpenBasicData:OpenPlayerTextures-done");
-	// Items/ItemTextures still deferred to MoveMainScene
-	LogMem("OpenBasicData:Items+ItemTextures-deferred");
+	OpenItems();
+	LogMem("OpenBasicData:OpenItems-done");
+	OpenItemTextures();
+	LogMem("OpenBasicData:OpenItemTextures-done");
 #endif
 
 	LogMem("OpenBasicData:before-LoadingProgressive");
