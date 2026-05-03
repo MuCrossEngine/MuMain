@@ -34,7 +34,8 @@ void CGMHeadChat::AddGuildName(CHAT* c, CHARACTER* Owner)
 	{
 		std::string summary;
 		GetShopTitleSummary(Owner, summary);
-		strcpy(c->szShopTitle, summary.c_str());
+		strncpy(c->szShopTitle, summary.c_str(), sizeof(c->szShopTitle) - 1);
+		c->szShopTitle[sizeof(c->szShopTitle) - 1] = '\0';
 	}
 	else
 	{
@@ -47,7 +48,7 @@ void CGMHeadChat::AddGuildName(CHAT* c, CHARACTER* Owner)
 	{
 		if (pCharacter->GuildMarkIndex >= 0 && GuildMark[pCharacter->GuildMarkIndex].UnionName[0])
 		{
-			wsprintf(c->Union, "%s>", GuildMark[pCharacter->GuildMarkIndex].UnionName);
+			snprintf(c->Union, sizeof(c->Union), "%s>", GuildMark[pCharacter->GuildMarkIndex].UnionName);
 		}
 		else
 		{
@@ -59,9 +60,9 @@ void CGMHeadChat::AddGuildName(CHAT* c, CHARACTER* Owner)
 			c->GuildColor = 0;
 
 			if (c->Union[0] != NULL)
-				wsprintf(c->Guild, "<%s - %s", GuildMark[Owner->GuildMarkIndex].GuildName, c->Union);
+				snprintf(c->Guild, sizeof(c->Guild), "<%s - %s", GuildMark[Owner->GuildMarkIndex].GuildName, c->Union);
 			else
-				wsprintf(c->Guild, "<%s>", GuildMark[Owner->GuildMarkIndex].GuildName);
+				snprintf(c->Guild, sizeof(c->Guild), "<%s>", GuildMark[Owner->GuildMarkIndex].GuildName);
 		}
 		else
 		{
@@ -74,25 +75,25 @@ void CGMHeadChat::AddGuildName(CHAT* c, CHARACTER* Owner)
 		if (Owner->GuildMarkIndex >= 0 && GuildMark[Owner->GuildMarkIndex].UnionName[0])
 		{
 			if (Owner->GuildRelationShip == GR_UNION)
-				wsprintf(c->Union, "<%s> %s", GuildMark[Owner->GuildMarkIndex].UnionName, GlobalText[1295]);
+				snprintf(c->Union, sizeof(c->Union), "<%s> %s", GuildMark[Owner->GuildMarkIndex].UnionName, GlobalText[1295]);
 			if (Owner->GuildRelationShip == GR_UNIONMASTER)
 			{
 				if (Owner->GuildStatus == G_MASTER)
-					wsprintf(c->Union, "<%s> %s", GuildMark[Owner->GuildMarkIndex].UnionName, GlobalText[1296]);
+					snprintf(c->Union, sizeof(c->Union), "<%s> %s", GuildMark[Owner->GuildMarkIndex].UnionName, GlobalText[1296]);
 				else
-					wsprintf(c->Union, "<%s> %s", GuildMark[Owner->GuildMarkIndex].UnionName, GlobalText[1295]);
+					snprintf(c->Union, sizeof(c->Union), "<%s> %s", GuildMark[Owner->GuildMarkIndex].UnionName, GlobalText[1295]);
 			}
 			else if (Owner->GuildRelationShip == GR_RIVAL)
 			{
 				if (Owner->GuildStatus == G_MASTER)
-					wsprintf(c->Union, "<%s> %s", GuildMark[Owner->GuildMarkIndex].UnionName, GlobalText[1298]);
+					snprintf(c->Union, sizeof(c->Union), "<%s> %s", GuildMark[Owner->GuildMarkIndex].UnionName, GlobalText[1298]);
 				else
-					wsprintf(c->Union, "<%s> %s", GuildMark[Owner->GuildMarkIndex].UnionName, GlobalText[1297]);
+					snprintf(c->Union, sizeof(c->Union), "<%s> %s", GuildMark[Owner->GuildMarkIndex].UnionName, GlobalText[1297]);
 			}
 			else if (Owner->GuildRelationShip == GR_RIVALUNION)
-				wsprintf(c->Union, "<%s> %s", GuildMark[Owner->GuildMarkIndex].UnionName, GlobalText[1299]);
+				snprintf(c->Union, sizeof(c->Union), "<%s> %s", GuildMark[Owner->GuildMarkIndex].UnionName, GlobalText[1299]);
 			else
-				wsprintf(c->Union, "<%s>", GuildMark[Owner->GuildMarkIndex].UnionName);
+				snprintf(c->Union, sizeof(c->Union), "<%s>", GuildMark[Owner->GuildMarkIndex].UnionName);
 		}
 		else
 		{
@@ -104,15 +105,15 @@ void CGMHeadChat::AddGuildName(CHAT* c, CHARACTER* Owner)
 			c->GuildColor = Owner->GuildTeam;
 
 			if (Owner->GuildStatus == G_PERSON)
-				wsprintf(c->Guild, "[%s] %s", GuildMark[Owner->GuildMarkIndex].GuildName, GlobalText[1330]);
+				snprintf(c->Guild, sizeof(c->Guild), "[%s] %s", GuildMark[Owner->GuildMarkIndex].GuildName, GlobalText[1330]);
 			else if (Owner->GuildStatus == G_MASTER)
-				wsprintf(c->Guild, "[%s] %s", GuildMark[Owner->GuildMarkIndex].GuildName, GlobalText[1300]);
+				snprintf(c->Guild, sizeof(c->Guild), "[%s] %s", GuildMark[Owner->GuildMarkIndex].GuildName, GlobalText[1300]);
 			else if (Owner->GuildStatus == G_SUB_MASTER)
-				wsprintf(c->Guild, "[%s] %s", GuildMark[Owner->GuildMarkIndex].GuildName, GlobalText[1301]);
+				snprintf(c->Guild, sizeof(c->Guild), "[%s] %s", GuildMark[Owner->GuildMarkIndex].GuildName, GlobalText[1301]);
 			else if (Owner->GuildStatus == G_BATTLE_MASTER)
-				wsprintf(c->Guild, "[%s] %s", GuildMark[Owner->GuildMarkIndex].GuildName, GlobalText[1302]);
+				snprintf(c->Guild, sizeof(c->Guild), "[%s] %s", GuildMark[Owner->GuildMarkIndex].GuildName, GlobalText[1302]);
 			else
-				wsprintf(c->Guild, "[%s]", GuildMark[Owner->GuildMarkIndex].GuildName);
+				snprintf(c->Guild, sizeof(c->Guild), "[%s]", GuildMark[Owner->GuildMarkIndex].GuildName);
 		}
 		else
 		{
