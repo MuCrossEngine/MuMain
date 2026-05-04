@@ -307,7 +307,7 @@ void BindTexture(int tex)
 			if (b->TextureNumber == 0)
 			{
 				static int s_nullTexWarnCount = 0;
-				if (s_nullTexWarnCount < 20)
+				if (s_nullTexWarnCount < 1)
 				{
 					++s_nullTexWarnCount;
 					__android_log_print(ANDROID_LOG_WARN, "MURender",

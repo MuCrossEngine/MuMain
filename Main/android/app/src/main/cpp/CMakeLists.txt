@@ -4,6 +4,11 @@ project("mucrossengine" CXX C)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_C_STANDARD 11)
 
+if(ANDROID AND CMAKE_BUILD_TYPE STREQUAL "Debug")
+    set(CMAKE_C_FLAGS_DEBUG "-O2 -g -DNDEBUG" CACHE STRING "Android debug C flags" FORCE)
+    set(CMAKE_CXX_FLAGS_DEBUG "-O2 -g -DNDEBUG" CACHE STRING "Android debug C++ flags" FORCE)
+endif()
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Paths
 # ─────────────────────────────────────────────────────────────────────────────

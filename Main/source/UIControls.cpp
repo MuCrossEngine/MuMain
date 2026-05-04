@@ -2831,6 +2831,30 @@ void CUIRenderTextOriginal::SetFont(HFONT hFont)
 	SelectObject(m_hFontDC, hFont);
 }
 
+#ifdef __ANDROID__
+namespace
+{
+void UploadDynamicTextTexture(BITMAP_t* bitmap)
+{
+	if (bitmap == NULL || bitmap->TextureNumber == 0)
+	{
+		return;
+	}
+
+	const GLsizei textureWidth = static_cast<GLsizei>(bitmap->Width);
+	const GLsizei textureHeight = static_cast<GLsizei>(bitmap->Height);
+	if (textureWidth <= 0 || textureHeight <= 0 || bitmap->Buffer.empty())
+	{
+		return;
+	}
+
+	glBindTexture(GL_TEXTURE_2D, bitmap->TextureNumber);
+
+	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, textureWidth, textureHeight, GL_RGBA, GL_UNSIGNED_BYTE, bitmap->Buffer.data());
+}
+}
+#endif
+
 void CUIRenderTextOriginal::WriteText(int iOffset, int iWidth, int iHeight)
 {
 	const int LIMIT_WIDTH = 256, LIMIT_HEIGHT = 32;
@@ -2932,8 +2956,12 @@ void CUIRenderTextOriginal::UploadText(int sx, int sy, int Width, int Height, bo
 
 	if (Width > 0 && Height > 0 && sx + Width > 0 && sy + Height > 0)
 	{
+	#ifdef __ANDROID__
+		UploadDynamicTextTexture(b);
+	#else
 		glBindTexture(GL_TEXTURE_2D, b->TextureNumber);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, (int)b->Width, (int)b->Height, 0, GL_RGBA, GL_UNSIGNED_BYTE, b->Buffer.data());
+	#endif
 
 		float TextureUWidth = (Width + 0.01f) / b->Width;
 		float TextureVHeight = (Height + 0.01f) / b->Height;
@@ -4044,8 +4072,12 @@ void CUITextInputBox::UploadText(int sx, int sy, int Width, int Height)
 	}
 	if (Width > 0 && Height > 0 && sx + Width > 0 && sy + Height > 0)
 	{
+	#ifdef __ANDROID__
+		UploadDynamicTextTexture(b);
+	#else
 		glBindTexture(GL_TEXTURE_2D, b->TextureNumber);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, (int)b->Width, (int)b->Height, 0, GL_RGBA, GL_UNSIGNED_BYTE, b->Buffer.data());
+	#endif
 
 		float TextureUWidth = (Width + 0.01f) / b->Width;
 		float TextureVHeight = (Height + 0.01f) / b->Height;

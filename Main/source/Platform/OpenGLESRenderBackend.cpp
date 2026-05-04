@@ -105,6 +105,7 @@ static UniformLoc s_u;
 
 static float s_alphaCutoff = 0.1f;  // universal cutoff: discard texel.a < this
 static bool  s_forceFlipTexcoordY = false;
+static bool  s_validateEachDraw = false;
 
 static void InitAlphaDiscardFallbackConfig()
 {
@@ -132,6 +133,16 @@ static void InitTextureCoordConfig()
     LOGI("Texture UV flipY: %s (MU_TEXCOORD_FLIP_Y=%s)",
          s_forceFlipTexcoordY ? "enabled" : "disabled",
          flip ? flip : "unset");
+}
+
+static void InitRenderValidationConfig()
+{
+    const char* validate = std::getenv("MU_GLES_VALIDATE_EACH_DRAW");
+    s_validateEachDraw = (validate && std::atoi(validate) != 0);
+
+    LOGI("Per-draw glGetError validation: %s (MU_GLES_VALIDATE_EACH_DRAW=%s)",
+         s_validateEachDraw ? "enabled" : "disabled",
+         validate ? validate : "unset");
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -325,15 +336,81 @@ static void CacheUniformLocations()
 // ─────────────────────────────────────────────────────────────────────────────
 RenderState g_rs;
 
+struct DriverStateCache
+{
+    bool initialized = false;
+
+    bool blend = false;
+    GLenum blendSrc = GL_ONE;
+    GLenum blendDst = GL_ZERO;
+
+    bool depthTest = true;
+    GLenum depthFunc = GL_LESS;
+    bool depthMask = true;
+
+    bool cullFace = false;
+    GLenum cullFaceMode = GL_BACK;
+
+    bool polygonOffsetFill = false;
+    float polygonOffsetFactor = 0.0f;
+    float polygonOffsetUnits = 0.0f;
+
+    bool scissorTest = false;
+    int scissorX = 0;
+    int scissorY = 0;
+    int scissorW = 0;
+    int scissorH = 0;
+
+    float lineWidth = 1.0f;
+
+    GLuint program = 0;
+
+    bool textureBindingValid = false;
+    GLenum activeTextureUnit = GL_TEXTURE0;
+    GLuint boundTexture2D = 0;
+};
+
+static DriverStateCache s_driverState;
+
+static void ResetDriverStateCache()
+{
+    s_driverState = DriverStateCache{};
+}
+
 void RS_ApplyToDriver()
 {
+    const bool forceAll = !s_driverState.initialized;
+    if (forceAll)
+    {
+        s_driverState.initialized = true;
+    }
+
     // Blend
-    if (g_rs.blend) { glEnable(GL_BLEND); glBlendFunc(g_rs.blendSrc, g_rs.blendDst); }
-    else              glDisable(GL_BLEND);
+    if (forceAll || s_driverState.blend != g_rs.blend)
+    {
+        if (g_rs.blend) glEnable(GL_BLEND);
+        else            glDisable(GL_BLEND);
+        s_driverState.blend = g_rs.blend;
+    }
+    if (g_rs.blend && (forceAll || s_driverState.blendSrc != g_rs.blendSrc || s_driverState.blendDst != g_rs.blendDst))
+    {
+        glBlendFunc(g_rs.blendSrc, g_rs.blendDst);
+        s_driverState.blendSrc = g_rs.blendSrc;
+        s_driverState.blendDst = g_rs.blendDst;
+    }
 
     // Depth
-    if (g_rs.depthTest) { glEnable(GL_DEPTH_TEST); glDepthFunc(g_rs.depthFunc); }
-    else                  glDisable(GL_DEPTH_TEST);
+    if (forceAll || s_driverState.depthTest != g_rs.depthTest)
+    {
+        if (g_rs.depthTest) glEnable(GL_DEPTH_TEST);
+        else                glDisable(GL_DEPTH_TEST);
+        s_driverState.depthTest = g_rs.depthTest;
+    }
+    if (g_rs.depthTest && (forceAll || s_driverState.depthFunc != g_rs.depthFunc))
+    {
+        glDepthFunc(g_rs.depthFunc);
+        s_driverState.depthFunc = g_rs.depthFunc;
+    }
 
     // ── Depth-write policy ─────────────────────────────────────────────────
     // The game engine has three blend categories:
@@ -370,30 +447,67 @@ void RS_ApplyToDriver()
             effectiveDepthMask = false;
         }
     }
-    glDepthMask(effectiveDepthMask ? GL_TRUE : GL_FALSE);
+    if (forceAll || s_driverState.depthMask != effectiveDepthMask)
+    {
+        glDepthMask(effectiveDepthMask ? GL_TRUE : GL_FALSE);
+        s_driverState.depthMask = effectiveDepthMask;
+    }
 
     // Cull
-    if (g_rs.cullFace) { glEnable(GL_CULL_FACE); glCullFace(g_rs.cullFaceMode); }
-    else                 glDisable(GL_CULL_FACE);
+    if (forceAll || s_driverState.cullFace != g_rs.cullFace)
+    {
+        if (g_rs.cullFace) glEnable(GL_CULL_FACE);
+        else               glDisable(GL_CULL_FACE);
+        s_driverState.cullFace = g_rs.cullFace;
+    }
+    if (g_rs.cullFace && (forceAll || s_driverState.cullFaceMode != g_rs.cullFaceMode))
+    {
+        glCullFace(g_rs.cullFaceMode);
+        s_driverState.cullFaceMode = g_rs.cullFaceMode;
+    }
 
     // Polygon offset
-    if (g_rs.polygonOffsetFill)
+    if (forceAll || s_driverState.polygonOffsetFill != g_rs.polygonOffsetFill)
     {
-        glEnable(GL_POLYGON_OFFSET_FILL);
-        glPolygonOffset(g_rs.polygonOffsetFactor, g_rs.polygonOffsetUnits);
+        if (g_rs.polygonOffsetFill) glEnable(GL_POLYGON_OFFSET_FILL);
+        else                        glDisable(GL_POLYGON_OFFSET_FILL);
+        s_driverState.polygonOffsetFill = g_rs.polygonOffsetFill;
     }
-    else glDisable(GL_POLYGON_OFFSET_FILL);
+    if (g_rs.polygonOffsetFill && (forceAll ||
+        s_driverState.polygonOffsetFactor != g_rs.polygonOffsetFactor ||
+        s_driverState.polygonOffsetUnits  != g_rs.polygonOffsetUnits))
+    {
+        glPolygonOffset(g_rs.polygonOffsetFactor, g_rs.polygonOffsetUnits);
+        s_driverState.polygonOffsetFactor = g_rs.polygonOffsetFactor;
+        s_driverState.polygonOffsetUnits = g_rs.polygonOffsetUnits;
+    }
 
     // Scissor
-    if (g_rs.scissorTest)
+    if (forceAll || s_driverState.scissorTest != g_rs.scissorTest)
     {
-        glEnable(GL_SCISSOR_TEST);
-        glScissor(g_rs.scissorX, g_rs.scissorY, g_rs.scissorW, g_rs.scissorH);
+        if (g_rs.scissorTest) glEnable(GL_SCISSOR_TEST);
+        else                  glDisable(GL_SCISSOR_TEST);
+        s_driverState.scissorTest = g_rs.scissorTest;
     }
-    else glDisable(GL_SCISSOR_TEST);
+    if (g_rs.scissorTest && (forceAll ||
+        s_driverState.scissorX != g_rs.scissorX ||
+        s_driverState.scissorY != g_rs.scissorY ||
+        s_driverState.scissorW != g_rs.scissorW ||
+        s_driverState.scissorH != g_rs.scissorH))
+    {
+        glScissor(g_rs.scissorX, g_rs.scissorY, g_rs.scissorW, g_rs.scissorH);
+        s_driverState.scissorX = g_rs.scissorX;
+        s_driverState.scissorY = g_rs.scissorY;
+        s_driverState.scissorW = g_rs.scissorW;
+        s_driverState.scissorH = g_rs.scissorH;
+    }
 
     // Line width (clamped to [1,1] on most GLES3 — best effort)
-    glLineWidth(g_rs.lineWidth);
+    if (forceAll || s_driverState.lineWidth != g_rs.lineWidth)
+    {
+        glLineWidth(g_rs.lineWidth);
+        s_driverState.lineWidth = g_rs.lineWidth;
+    }
 }
 
 void RS_SetLightPosition(const float* pos4)
@@ -412,6 +526,7 @@ namespace GLESFF {
 bool Init(int screenW, int screenH)
 {
     s_screenW = screenW; s_screenH = screenH;
+    ResetDriverStateCache();
 
     // Resolve native GL function pointers via dlsym (bypasses our GLFixedFunctionStubs inline overrides).
     ResolveNativeGLProcs();
@@ -447,6 +562,7 @@ bool Init(int screenW, int screenH)
     CacheUniformLocations();
     InitAlphaDiscardFallbackConfig();
     InitTextureCoordConfig();
+    InitRenderValidationConfig();
 
     // Create streaming VAO/VBO
     glGenVertexArrays(1, &s_vao);
@@ -485,6 +601,7 @@ bool Init(int screenW, int screenH)
 
 void Shutdown()
 {
+    ResetDriverStateCache();
     if (s_vbo)     { glDeleteBuffers(1, &s_vbo);       s_vbo = 0; }
     if (s_vao)     { glDeleteVertexArrays(1, &s_vao);  s_vao = 0; }
     if (s_program) { glDeleteProgram(s_program);       s_program = 0; }
@@ -576,19 +693,32 @@ glm::mat3 GetNormalMatrix()
 // ── Uniforms upload ───────────────────────────────────────────────────────────
 void FlushUniforms()
 {
-    glUseProgram(s_program);
+    if (s_driverState.program != s_program)
+    {
+        glUseProgram(s_program);
+        s_driverState.program = s_program;
+    }
 
     glm::mat4 mvp = GetMVP();
     glm::mat4 mv  = GetModelView();
-    glm::mat3 nm  = GetNormalMatrix();
+    const bool lightingEnabled = g_rs.lighting;
 
     glUniformMatrix4fv(s_u.mvp,        1, GL_FALSE, glm::value_ptr(mvp));
     glUniformMatrix4fv(s_u.modelview,  1, GL_FALSE, glm::value_ptr(mv));
-    glUniformMatrix3fv(s_u.normalMatrix,1,GL_FALSE, glm::value_ptr(nm));
+    if (lightingEnabled)
+    {
+        glm::mat3 nm = GetNormalMatrix();
+        glUniformMatrix3fv(s_u.normalMatrix, 1, GL_FALSE, glm::value_ptr(nm));
+    }
+    else
+    {
+        const glm::mat3 identityNormal(1.0f);
+        glUniformMatrix3fv(s_u.normalMatrix, 1, GL_FALSE, glm::value_ptr(identityNormal));
+    }
 
     // Lighting
-    glUniform1i(s_u.lightingEnabled, g_rs.lighting ? 1 : 0);
-    if (g_rs.lighting)
+    glUniform1i(s_u.lightingEnabled, lightingEnabled ? 1 : 0);
+    if (lightingEnabled)
     {
         glUniform4fv(s_u.lightAmbient,  1, glm::value_ptr(g_rs.lightAmbient));
         glUniform4fv(s_u.lightDiffuse,  1, glm::value_ptr(g_rs.lightDiffuse));
@@ -613,8 +743,17 @@ void FlushUniforms()
     glUniform1i(s_u.flipTexcoordY, g_rs.flipTexCoordY ? 1 : 0);
     if (useTexture)
     {
-        glActiveTexture(GL_TEXTURE0);
-        DriverBindTexture(GL_TEXTURE_2D, g_rs.boundTexture);
+        if (!s_driverState.textureBindingValid || s_driverState.activeTextureUnit != GL_TEXTURE0)
+        {
+            glActiveTexture(GL_TEXTURE0);
+            s_driverState.activeTextureUnit = GL_TEXTURE0;
+        }
+        if (!s_driverState.textureBindingValid || s_driverState.boundTexture2D != g_rs.boundTexture)
+        {
+            DriverBindTexture(GL_TEXTURE_2D, g_rs.boundTexture);
+            s_driverState.boundTexture2D = g_rs.boundTexture;
+        }
+        s_driverState.textureBindingValid = true;
         glUniform1i(s_u.texture, 0);
     }
 
@@ -660,6 +799,20 @@ void ImmBegin(GLenum mode)
     s_immVerts.clear();
 }
 
+void ImmReserve(int vertexCount)
+{
+    if (vertexCount <= 0)
+    {
+        return;
+    }
+
+    const size_t target = s_immVerts.size() + static_cast<size_t>(vertexCount);
+    if (target > s_immVerts.capacity())
+    {
+        s_immVerts.reserve(target);
+    }
+}
+
 void ImmVertex3f(float x, float y, float z)
 {
     ImmVertex v;
@@ -668,6 +821,19 @@ void ImmVertex3f(float x, float y, float z)
     v.color[0]=s_curColor[0]; v.color[1]=s_curColor[1];
     v.color[2]=s_curColor[2]; v.color[3]=s_curColor[3];
     v.normal[0]=s_curNormal[0]; v.normal[1]=s_curNormal[1]; v.normal[2]=s_curNormal[2];
+    s_immVerts.push_back(v);
+}
+
+void ImmVertexPacked(float x, float y, float z,
+                     float s, float t,
+                     float r, float g, float b, float a,
+                     float nx, float ny, float nz)
+{
+    ImmVertex v;
+    v.pos[0] = x;  v.pos[1] = y;  v.pos[2] = z;
+    v.uv[0] = s;   v.uv[1] = t;
+    v.color[0] = r; v.color[1] = g; v.color[2] = b; v.color[3] = a;
+    v.normal[0] = nx; v.normal[1] = ny; v.normal[2] = nz;
     s_immVerts.push_back(v);
 }
 
@@ -739,18 +905,20 @@ void ImmEnd()
     glBindVertexArray(s_vao);
     glBindBuffer(GL_ARRAY_BUFFER, s_vbo);
 
-    // Orphan + re-upload
+    // Stream upload in a single driver call.
     size_t bytes = count * sizeof(ImmVertex);
-    glBufferData(GL_ARRAY_BUFFER, bytes, nullptr, GL_STREAM_DRAW);
-    glBufferSubData(GL_ARRAY_BUFFER, 0, bytes, src.data());
+    glBufferData(GL_ARRAY_BUFFER, bytes, src.data(), GL_STREAM_DRAW);
 
     DriverDrawArrays(s_immMode, 0, (GLsizei)count);
 
-    GLenum err = glGetError();
-    if (err != GL_NO_ERROR)
+    if (s_validateEachDraw)
     {
-        LOGE("ImmEnd: glGetError=0x%04x mode=0x%04x count=%zu prog=%u",
-             (unsigned)err, (unsigned)s_immMode, count, s_program);
+        GLenum err = glGetError();
+        if (err != GL_NO_ERROR)
+        {
+            LOGE("ImmEnd: glGetError=0x%04x mode=0x%04x count=%zu prog=%u",
+                 (unsigned)err, (unsigned)s_immMode, count, s_program);
+        }
     }
 
     glBindVertexArray(0);
@@ -764,12 +932,25 @@ void BindTexture(GLenum /*target*/, GLuint tex)
     g_rs.boundTexture = tex;
     if (tex)
     {
-        DriverBindTexture(GL_TEXTURE_2D, tex);
+        if (!s_driverState.textureBindingValid || s_driverState.activeTextureUnit != GL_TEXTURE0)
+        {
+            glActiveTexture(GL_TEXTURE0);
+            s_driverState.activeTextureUnit = GL_TEXTURE0;
+        }
+        if (!s_driverState.textureBindingValid || s_driverState.boundTexture2D != tex)
+        {
+            DriverBindTexture(GL_TEXTURE_2D, tex);
+            s_driverState.boundTexture2D = tex;
+        }
+        s_driverState.textureBindingValid = true;
+
         auto it = s_textureHasAlpha.find(tex);
         g_rs.boundTextureHasAlpha = (it != s_textureHasAlpha.end()) ? it->second : false;
     }
     else
     {
+        s_driverState.textureBindingValid = false;
+        s_driverState.boundTexture2D = 0;
         g_rs.boundTextureHasAlpha = false;
     }
 }

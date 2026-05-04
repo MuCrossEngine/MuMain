@@ -54,7 +54,12 @@ glm::mat3         GetNormalMatrix();
 
 // ── Immediate mode ────────────────────────────────────────────────────────────
 void  ImmBegin(GLenum mode);
+void  ImmReserve(int vertexCount);
 void  ImmVertex3f(float x, float y, float z);
+void  ImmVertexPacked(float x, float y, float z,
+					  float s, float t,
+					  float r, float g, float b, float a,
+					  float nx, float ny, float nz);
 void  ImmVertex3fv(const float* v);
 void  ImmVertex2f(float x, float y);
 void  ImmTexCoord2f(float s, float t);

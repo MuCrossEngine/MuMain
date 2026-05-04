@@ -14,6 +14,7 @@
 #include <EGL/egl.h>
 #include <dlfcn.h>
 #include <cstdint>
+#include <vector>
 #include "OpenGLESRenderBackend.h"
 #include "RenderStateCompat.h"
 
@@ -401,6 +402,94 @@ inline void EmitClientArrayVertex(GLint index)
     GLESFF::ImmNormal3f(normal[0], normal[1], normal[2]);
     GLESFF::ImmVertex3f(pos[0], pos[1], pos[2]);
 }
+
+inline void EmitClientArrayVertexPacked(GLint index, const float* baseColor)
+{
+    float tex[2]   = {0.0f, 0.0f};
+    float normal[3]= {0.0f, 0.0f, 1.0f};
+    float pos[3]   = {0.0f, 0.0f, 0.0f};
+    float col[4]   = {baseColor[0], baseColor[1], baseColor[2], baseColor[3]};
+
+    const auto& ta = TexCoordArray();
+    if (ta.enabled && ta.pointer)
+    {
+        const uint8_t* p = ElementPtr(ta, index);
+        if (p && ta.type == GL_FLOAT)
+        {
+            const float* fp = reinterpret_cast<const float*>(p);
+            if (ta.size > 0) tex[0] = fp[0];
+            if (ta.size > 1) tex[1] = fp[1];
+        }
+        else
+        {
+            ReadFloatN(ta, index, tex, 2, 0.0f);
+        }
+    }
+
+    const auto& ca = ColorArray();
+    if (ca.enabled && ca.pointer)
+    {
+        col[0] = 1.0f; col[1] = 1.0f; col[2] = 1.0f; col[3] = 1.0f;
+        const uint8_t* p = ElementPtr(ca, index);
+        if (p && ca.type == GL_UNSIGNED_BYTE)
+        {
+            const uint8_t* cp = reinterpret_cast<const uint8_t*>(p);
+            if (ca.size > 0) col[0] = (float)cp[0] / 255.0f;
+            if (ca.size > 1) col[1] = (float)cp[1] / 255.0f;
+            if (ca.size > 2) col[2] = (float)cp[2] / 255.0f;
+            if (ca.size > 3) col[3] = (float)cp[3] / 255.0f;
+        }
+        else if (p && ca.type == GL_FLOAT)
+        {
+            const float* cp = reinterpret_cast<const float*>(p);
+            if (ca.size > 0) col[0] = cp[0];
+            if (ca.size > 1) col[1] = cp[1];
+            if (ca.size > 2) col[2] = cp[2];
+            if (ca.size > 3) col[3] = cp[3];
+        }
+        else
+        {
+            ReadFloatN(ca, index, col, 4, 1.0f);
+        }
+    }
+
+    const auto& na = NormalArray();
+    if (na.enabled && na.pointer)
+    {
+        normal[0] = 0.0f; normal[1] = 0.0f; normal[2] = 0.0f;
+        const uint8_t* p = ElementPtr(na, index);
+        if (p && na.type == GL_FLOAT)
+        {
+            const float* np = reinterpret_cast<const float*>(p);
+            if (na.size > 0) normal[0] = np[0];
+            if (na.size > 1) normal[1] = np[1];
+            if (na.size > 2) normal[2] = np[2];
+        }
+        else
+        {
+            ReadFloatN(na, index, normal, 3, 0.0f);
+        }
+    }
+
+    const auto& va = VertexArray();
+    const uint8_t* vp = ElementPtr(va, index);
+    if (vp && va.type == GL_FLOAT)
+    {
+        const float* fp = reinterpret_cast<const float*>(vp);
+        if (va.size > 0) pos[0] = fp[0];
+        if (va.size > 1) pos[1] = fp[1];
+        if (va.size > 2) pos[2] = fp[2];
+    }
+    else
+    {
+        ReadFloatN(va, index, pos, 3, 0.0f);
+    }
+
+    GLESFF::ImmVertexPacked(pos[0], pos[1], pos[2],
+                            tex[0], tex[1],
+                            col[0], col[1], col[2], col[3],
+                            normal[0], normal[1], normal[2]);
+}
 } // namespace GLClientCompat
 
 inline void glEnableClientState(GLenum array)
@@ -725,19 +814,22 @@ inline void glDrawArrays(GLenum mode, GLint first, GLsizei count)
 {
     if (mode == GL_QUADS && GLClientCompat::HasActiveClientArrays())
     {
+        float baseColor[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+        GLESFF::GetCurrentColor(baseColor);
         GLESFF::ImmBegin(GL_TRIANGLES);
         const GLsizei quadCount = count / 4;
+        GLESFF::ImmReserve(quadCount * 6);
         for (GLsizei q = 0; q < quadCount; ++q)
         {
             const GLint base = first + q * 4;
 
-            GLClientCompat::EmitClientArrayVertex(base + 0);
-            GLClientCompat::EmitClientArrayVertex(base + 1);
-            GLClientCompat::EmitClientArrayVertex(base + 2);
+            GLClientCompat::EmitClientArrayVertexPacked(base + 0, baseColor);
+            GLClientCompat::EmitClientArrayVertexPacked(base + 1, baseColor);
+            GLClientCompat::EmitClientArrayVertexPacked(base + 2, baseColor);
 
-            GLClientCompat::EmitClientArrayVertex(base + 0);
-            GLClientCompat::EmitClientArrayVertex(base + 2);
-            GLClientCompat::EmitClientArrayVertex(base + 3);
+            GLClientCompat::EmitClientArrayVertexPacked(base + 0, baseColor);
+            GLClientCompat::EmitClientArrayVertexPacked(base + 2, baseColor);
+            GLClientCompat::EmitClientArrayVertexPacked(base + 3, baseColor);
         }
         GLESFF::ImmEnd();
         return;
@@ -745,10 +837,13 @@ inline void glDrawArrays(GLenum mode, GLint first, GLsizei count)
 
     if (GLClientCompat::HasActiveClientArrays())
     {
+        float baseColor[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+        GLESFF::GetCurrentColor(baseColor);
         GLESFF::ImmBegin(mode);
+        GLESFF::ImmReserve(count);
         for (GLint i = 0; i < count; ++i)
         {
-            GLClientCompat::EmitClientArrayVertex(first + i);
+            GLClientCompat::EmitClientArrayVertexPacked(first + i, baseColor);
         }
         GLESFF::ImmEnd();
         return;
@@ -764,6 +859,31 @@ inline void glDrawArrays(GLenum mode, GLint first, GLsizei count)
 
     if (mode == GL_QUADS)
     {
+        using FnElem = void (*)(GLenum, GLsizei, GLenum, const void*);
+        static FnElem fnElem = GLFixedNative::Proc<FnElem>("glDrawElements");
+        if (fnElem && first >= 0)
+        {
+            const GLsizei quadCount = count / 4;
+            const GLsizei triIndexCount = quadCount * 6;
+            static thread_local std::vector<GLuint> s_quadIndices;
+            s_quadIndices.resize((size_t)triIndexCount);
+
+            size_t out = 0;
+            for (GLsizei q = 0; q < quadCount; ++q)
+            {
+                const GLuint base = (GLuint)(first + q * 4);
+                s_quadIndices[out++] = base + 0;
+                s_quadIndices[out++] = base + 1;
+                s_quadIndices[out++] = base + 2;
+                s_quadIndices[out++] = base + 0;
+                s_quadIndices[out++] = base + 2;
+                s_quadIndices[out++] = base + 3;
+            }
+
+            fnElem(GL_TRIANGLES, triIndexCount, GL_UNSIGNED_INT, s_quadIndices.data());
+            return;
+        }
+
         const GLsizei quadCount = count / 4;
         for (GLsizei q = 0; q < quadCount; ++q)
         {
@@ -798,10 +918,13 @@ inline void glDrawElements(GLenum mode, GLsizei count, GLenum type, const void* 
 
     if (GLClientCompat::HasActiveClientArrays())
     {
+        float baseColor[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+        GLESFF::GetCurrentColor(baseColor);
         if (mode == GL_QUADS)
         {
             GLESFF::ImmBegin(GL_TRIANGLES);
             const GLsizei quadCount = count / 4;
+            GLESFF::ImmReserve(quadCount * 6);
             for (GLsizei q = 0; q < quadCount; ++q)
             {
                 const GLint i0 = ReadElementIndex(q * 4 + 0);
@@ -813,19 +936,20 @@ inline void glDrawElements(GLenum mode, GLsizei count, GLenum type, const void* 
                     continue;
                 }
 
-                GLClientCompat::EmitClientArrayVertex(i0);
-                GLClientCompat::EmitClientArrayVertex(i1);
-                GLClientCompat::EmitClientArrayVertex(i2);
+                GLClientCompat::EmitClientArrayVertexPacked(i0, baseColor);
+                GLClientCompat::EmitClientArrayVertexPacked(i1, baseColor);
+                GLClientCompat::EmitClientArrayVertexPacked(i2, baseColor);
 
-                GLClientCompat::EmitClientArrayVertex(i0);
-                GLClientCompat::EmitClientArrayVertex(i2);
-                GLClientCompat::EmitClientArrayVertex(i3);
+                GLClientCompat::EmitClientArrayVertexPacked(i0, baseColor);
+                GLClientCompat::EmitClientArrayVertexPacked(i2, baseColor);
+                GLClientCompat::EmitClientArrayVertexPacked(i3, baseColor);
             }
             GLESFF::ImmEnd();
             return;
         }
 
         GLESFF::ImmBegin(mode);
+        GLESFF::ImmReserve(count);
         for (GLsizei i = 0; i < count; ++i)
         {
             const GLint idx = ReadElementIndex(i);
@@ -833,7 +957,7 @@ inline void glDrawElements(GLenum mode, GLsizei count, GLenum type, const void* 
             {
                 continue;
             }
-            GLClientCompat::EmitClientArrayVertex(idx);
+            GLClientCompat::EmitClientArrayVertexPacked(idx, baseColor);
         }
         GLESFF::ImmEnd();
         return;
@@ -849,6 +973,47 @@ inline void glDrawElements(GLenum mode, GLsizei count, GLenum type, const void* 
 
     if (mode == GL_QUADS)
     {
+        GLint elementArrayBuffer = 0;
+        glGetIntegerv(GL_ELEMENT_ARRAY_BUFFER_BINDING, &elementArrayBuffer);
+
+        // Only convert on CPU when indices are in client memory.
+        // If an element-array buffer is bound, keep the per-quad fallback.
+        if (elementArrayBuffer == 0)
+        {
+            const GLsizei quadCount = count / 4;
+            const GLsizei triIndexCount = quadCount * 6;
+            static thread_local std::vector<GLuint> s_quadIndices;
+            s_quadIndices.resize((size_t)triIndexCount);
+
+            size_t out = 0;
+            for (GLsizei q = 0; q < quadCount; ++q)
+            {
+                const GLint i0 = ReadElementIndex(q * 4 + 0);
+                const GLint i1 = ReadElementIndex(q * 4 + 1);
+                const GLint i2 = ReadElementIndex(q * 4 + 2);
+                const GLint i3 = ReadElementIndex(q * 4 + 3);
+                if (i0 < 0 || i1 < 0 || i2 < 0 || i3 < 0)
+                {
+                    continue;
+                }
+
+                s_quadIndices[out++] = (GLuint)i0;
+                s_quadIndices[out++] = (GLuint)i1;
+                s_quadIndices[out++] = (GLuint)i2;
+                s_quadIndices[out++] = (GLuint)i0;
+                s_quadIndices[out++] = (GLuint)i2;
+                s_quadIndices[out++] = (GLuint)i3;
+            }
+
+            if (out == 0)
+            {
+                return;
+            }
+
+            fn(GL_TRIANGLES, (GLsizei)out, GL_UNSIGNED_INT, s_quadIndices.data());
+            return;
+        }
+
         const size_t indexSize = GLClientCompat::TypeSize(type);
         if (indexSize == 0)
         {
