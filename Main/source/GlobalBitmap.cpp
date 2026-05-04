@@ -1043,18 +1043,44 @@ bool CGlobalBitmap::LoadImage(GLuint uiBitmapIndex, const std::string& filename,
 	std::string ext;
 	SplitExt(filename, ext, false);
 
-	if (0 == _stricmp(ext.c_str(), "jpg") || 0 == _stricmp(ext.c_str(), "jpeg"))
-		return OpenJpeg(uiBitmapIndex, filename, uiFilter, uiWrapMode);
-	else if (0 == _stricmp(ext.c_str(), "tga"))
-		return OpenTga(uiBitmapIndex, filename, uiFilter, uiWrapMode);
-	else if (0 == _stricmp(ext.c_str(), "png"))
-		return OpenPng(uiBitmapIndex, filename, uiFilter, uiWrapMode);
-	else if (0 == _stricmp(ext.c_str(), "bmp"))
-		return OpenBmp(uiBitmapIndex, filename, uiFilter, uiWrapMode);
-	else if (0 == _stricmp(ext.c_str(), "dds"))
-		return OpenDDS_DXT5(uiBitmapIndex, filename, uiFilter, uiWrapMode);
+#ifdef __ANDROID__
+	if (uiBitmapIndex == 31713)
+	{
+		__android_log_print(ANDROID_LOG_WARN,
+			kTextureLogTag,
+			"LoadImage request idx=31713 file=%s ext=%s filter=0x%x wrap=0x%x",
+			filename.c_str(),
+			ext.c_str(),
+			uiFilter,
+			uiWrapMode);
+	}
+#endif
 
-	return false;
+	bool loaded = false;
+
+	if (0 == _stricmp(ext.c_str(), "jpg") || 0 == _stricmp(ext.c_str(), "jpeg"))
+		loaded = OpenJpeg(uiBitmapIndex, filename, uiFilter, uiWrapMode);
+	else if (0 == _stricmp(ext.c_str(), "tga"))
+		loaded = OpenTga(uiBitmapIndex, filename, uiFilter, uiWrapMode);
+	else if (0 == _stricmp(ext.c_str(), "png"))
+		loaded = OpenPng(uiBitmapIndex, filename, uiFilter, uiWrapMode);
+	else if (0 == _stricmp(ext.c_str(), "bmp"))
+		loaded = OpenBmp(uiBitmapIndex, filename, uiFilter, uiWrapMode);
+	else if (0 == _stricmp(ext.c_str(), "dds"))
+		loaded = OpenDDS_DXT5(uiBitmapIndex, filename, uiFilter, uiWrapMode);
+
+#ifdef __ANDROID__
+	if (uiBitmapIndex == 31713)
+	{
+		__android_log_print(ANDROID_LOG_WARN,
+			kTextureLogTag,
+			"LoadImage result idx=31713 file=%s loaded=%d",
+			filename.c_str(),
+			loaded ? 1 : 0);
+	}
+#endif
+
+	return loaded;
 }
 
 void CGlobalBitmap::UnloadImage(GLuint uiBitmapIndex, bool bForce)
@@ -1117,6 +1143,16 @@ BITMAP_t* CGlobalBitmap::GetTexture(GLuint uiBitmapIndex)
 		static BITMAP_t s_Error;
 		memset(&s_Error, 0, sizeof(BITMAP_t));
 		strcpy(s_Error.FileName, "CGlobalBitmap::GetTexture Error!!!");
+	#ifdef __ANDROID__
+		static int s_missingTextureWarnCount = 0;
+		if (s_missingTextureWarnCount < 120)
+		{
+			++s_missingTextureWarnCount;
+			__android_log_print(ANDROID_LOG_WARN, kTextureLogTag,
+				"GetTexture missing index=%u (fallback error bitmap)",
+				static_cast<unsigned>(uiBitmapIndex));
+		}
+	#endif
 		pBitmap = &s_Error;
 	}
 	return pBitmap;
@@ -1315,6 +1351,9 @@ bool CGlobalBitmap::OpenJpeg(GLuint uiBitmapIndex, const std::string& filename, 
 	}
 
 	this->CreateMipmappedTexture(&pNewBitmap->TextureNumber, channels_in_file, textureWidth, textureHeight, textbuff, uiFilter, uiWrapMode);
+#ifdef __ANDROID__
+	GLESFF::RegisterTextureFormat(pNewBitmap->TextureNumber, channels_in_file == 4);
+#endif
 
 	m_mapBitmap.insert(type_bitmap_map::value_type(uiBitmapIndex, pNewBitmap));
 
@@ -1355,7 +1394,15 @@ bool CGlobalBitmap::OpenTga(GLuint uiBitmapIndex, const std::string& filename, G
 	const bool hasTransparentAlpha = HasTransparentAlpha(rgbaPixels.data(), static_cast<size_t>(sourceWidth) * static_cast<size_t>(sourceHeight));
 	const bool hasNonBinaryAlpha = hasTransparentAlpha &&
 		HasNonBinaryAlpha(rgbaPixels.data(), static_cast<size_t>(sourceWidth) * static_cast<size_t>(sourceHeight));
-	const int finalComponents = hasTransparentAlpha ? 4 : 3;
+	int finalComponents = hasTransparentAlpha ? 4 : 3;
+#ifdef __ANDROID__
+	// Legacy render paths branch heavily on Components==4.
+	// Preserve RGBA for 4-channel sources even when alpha is fully opaque.
+	if (sourceComponents == 4)
+	{
+		finalComponents = 4;
+	}
+#endif
 	LogTextureAlphaDebug("LoadTga", resolvedPath, sourceComponents, finalComponents, sourceWidth, sourceHeight, hasTransparentAlpha);
 
 #ifdef __ANDROID__
@@ -1407,6 +1454,11 @@ bool CGlobalBitmap::OpenTga(GLuint uiBitmapIndex, const std::string& filename, G
 	}
 
 	this->CreateMipmappedTexture(&pNewBitmap->TextureNumber, finalComponents, textureWidth, textureHeight, textureBuffer, uiFilter, uiWrapMode);
+#ifdef __ANDROID__
+	// Track usable transparency, not storage format.
+	// Some assets are uploaded as RGBA for compatibility but have fully opaque alpha.
+	GLESFF::RegisterTextureFormat(pNewBitmap->TextureNumber, hasTransparentAlpha);
+#endif
 
 	m_mapBitmap.insert(type_bitmap_map::value_type(uiBitmapIndex, pNewBitmap));
 	m_BitmapName.push_back(std::pair<std::string, GLuint>(pNewBitmap->FileName, uiBitmapIndex));
@@ -1452,7 +1504,13 @@ bool CGlobalBitmap::OpenBmp(GLuint uiBitmapIndex, const std::string& filename, G
 	const bool hasTransparentAlpha = HasTransparentAlpha(rgbaPixels.data(), static_cast<size_t>(sourceWidth) * static_cast<size_t>(sourceHeight));
 	const bool hasNonBinaryAlpha = hasTransparentAlpha &&
 		HasNonBinaryAlpha(rgbaPixels.data(), static_cast<size_t>(sourceWidth) * static_cast<size_t>(sourceHeight));
-	const int finalComponents = hasTransparentAlpha ? 4 : 3;
+	int finalComponents = hasTransparentAlpha ? 4 : 3;
+#ifdef __ANDROID__
+	if (sourceComponents == 4)
+	{
+		finalComponents = 4;
+	}
+#endif
 	LogTextureAlphaDebug("LoadBmp", resolvedPath, sourceComponents, finalComponents, sourceWidth, sourceHeight, hasTransparentAlpha);
 
 #ifdef __ANDROID__
@@ -1503,6 +1561,11 @@ bool CGlobalBitmap::OpenBmp(GLuint uiBitmapIndex, const std::string& filename, G
 	}
 
 	this->CreateMipmappedTexture(&pNewBitmap->TextureNumber, finalComponents, textureWidth, textureHeight, textureBuffer, uiFilter, uiWrapMode);
+#ifdef __ANDROID__
+	// Track usable transparency, not storage format.
+	// Some assets are uploaded as RGBA for compatibility but have fully opaque alpha.
+	GLESFF::RegisterTextureFormat(pNewBitmap->TextureNumber, hasTransparentAlpha);
+#endif
 	m_mapBitmap.insert(type_bitmap_map::value_type(uiBitmapIndex, pNewBitmap));
 	m_BitmapName.push_back(std::pair<std::string, GLuint>(pNewBitmap->FileName, uiBitmapIndex));
 
@@ -1546,7 +1609,13 @@ bool CGlobalBitmap::OpenDDS_DXT5(GLuint uiBitmapIndex, const std::string& filena
 	const bool hasTransparentAlpha = HasTransparentAlpha(rgbaPixels.data(), static_cast<size_t>(sourceWidth) * static_cast<size_t>(sourceHeight));
 	const bool hasNonBinaryAlpha = hasTransparentAlpha &&
 		HasNonBinaryAlpha(rgbaPixels.data(), static_cast<size_t>(sourceWidth) * static_cast<size_t>(sourceHeight));
-	const int finalComponents = hasTransparentAlpha ? 4 : 3;
+	int finalComponents = hasTransparentAlpha ? 4 : 3;
+#ifdef __ANDROID__
+	if (sourceComponents == 4)
+	{
+		finalComponents = 4;
+	}
+#endif
 	LogTextureAlphaDebug("LoadDds", resolvedPath, sourceComponents, finalComponents, sourceWidth, sourceHeight, hasTransparentAlpha);
 
 #ifdef __ANDROID__
@@ -1597,6 +1666,11 @@ bool CGlobalBitmap::OpenDDS_DXT5(GLuint uiBitmapIndex, const std::string& filena
 	}
 
 	this->CreateMipmappedTexture(&pNewBitmap->TextureNumber, finalComponents, textureWidth, textureHeight, textureBuffer, uiFilter, uiWrapMode);
+#ifdef __ANDROID__
+	// Track usable transparency, not storage format.
+	// Some assets are uploaded as RGBA for compatibility but have fully opaque alpha.
+	GLESFF::RegisterTextureFormat(pNewBitmap->TextureNumber, hasTransparentAlpha);
+#endif
 	m_mapBitmap.insert(type_bitmap_map::value_type(uiBitmapIndex, pNewBitmap));
 	m_BitmapName.push_back(std::pair<std::string, GLuint>(pNewBitmap->FileName, uiBitmapIndex));
 

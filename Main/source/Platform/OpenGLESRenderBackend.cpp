@@ -55,6 +55,7 @@
 #include <string>
 #include <cstdio>
 #include <cmath>
+#include <unordered_map>
 
 #define LOG_TAG "MURender"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO,  LOG_TAG, __VA_ARGS__)
@@ -90,41 +91,35 @@ struct UniformLoc
     GLint matAmbient, matDiffuse, matSpecular, matEmission, matShininess;
     GLint globalAmbient;
     GLint texture, useTexture;
+    GLint texture2DEnabled;
     GLint texEnvMode, texEnvRgbScale;
     GLint flipTexcoordY;
     GLint alphaTestEnabled, alphaTestRef;
     GLint blendEnabled;
-    GLint autoAlphaDiscardEnabled, autoAlphaDiscardRef;
+    GLint alphaCutoff;
+    GLint additiveBlend;
+    GLint textureHasAlpha;
     GLint fogEnabled, fogMode, fogColor, fogStart, fogEnd, fogDensity;
 };
 static UniformLoc s_u;
 
-static bool  s_autoAlphaDiscardEnabled = true;
-static float s_autoAlphaDiscardRef = (1.0f / 255.0f);
+static float s_alphaCutoff = 0.1f;  // universal cutoff: discard texel.a < this
 static bool  s_forceFlipTexcoordY = false;
 
 static void InitAlphaDiscardFallbackConfig()
 {
-    const char* enabled = std::getenv("MU_AUTO_ALPHA_DISCARD");
-    if (enabled && std::atoi(enabled) == 0)
-    {
-        s_autoAlphaDiscardEnabled = false;
-    }
-
-    const char* ref = std::getenv("MU_AUTO_ALPHA_REF");
+    const char* ref = std::getenv("MU_ALPHA_CUTOFF");
     if (ref && ref[0] != '\0')
     {
         const float parsed = std::strtof(ref, nullptr);
         if (parsed >= 0.0f && parsed <= 1.0f)
         {
-            s_autoAlphaDiscardRef = parsed;
+            s_alphaCutoff = parsed;
         }
     }
 
-    LOGI("Auto alpha discard: enabled=%d ref=%.4f (MU_AUTO_ALPHA_DISCARD=%s MU_AUTO_ALPHA_REF=%s)",
-         s_autoAlphaDiscardEnabled ? 1 : 0,
-         s_autoAlphaDiscardRef,
-         enabled ? enabled : "unset",
+    LOGI("Alpha cutoff: %.4f (MU_ALPHA_CUTOFF=%s)",
+         s_alphaCutoff,
          ref ? ref : "unset");
 }
 
@@ -147,6 +142,13 @@ static std::vector<glm::mat4> s_modelviewStack;
 static std::vector<glm::mat4> s_projectionStack;
 static std::vector<glm::mat4> s_textureStack;
 static int s_matrixMode = 0; // 0=MV, 1=Proj, 2=Tex
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Texture format tracking: maps GL texture ID → true if GL_RGBA (has alpha).
+// Populated by RegisterTextureFormat(), queried by BindTexture().
+// ─────────────────────────────────────────────────────────────────────────────
+static std::unordered_map<GLuint, bool> s_textureHasAlpha;
+
 // Use dlsym to get native GLES3 function pointers.
 // eglGetProcAddress returns NULL for core functions on many Android
 // implementations; dlsym("libGLESv2.so") bypasses our GLFixedFunctionStubs
@@ -299,14 +301,16 @@ static void CacheUniformLocations()
     ULOC(globalAmbient,   "u_globalAmbient");
     ULOC(texture,         "u_texture");
     ULOC(useTexture,      "u_useTexture");
+    ULOC(texture2DEnabled,"u_texture2DEnabled");
     ULOC(texEnvMode,      "u_texEnvMode");
     ULOC(texEnvRgbScale,  "u_texEnvRgbScale");
     ULOC(flipTexcoordY,   "u_flipTexcoordY");
     ULOC(alphaTestEnabled,"u_alphaTestEnabled");
     ULOC(alphaTestRef,    "u_alphaTestRef");
     ULOC(blendEnabled,    "u_blendEnabled");
-    ULOC(autoAlphaDiscardEnabled, "u_autoAlphaDiscardEnabled");
-    ULOC(autoAlphaDiscardRef,     "u_autoAlphaDiscardRef");
+    ULOC(alphaCutoff,            "u_alphaCutoff");
+    ULOC(additiveBlend,          "u_additiveBlend");
+    ULOC(textureHasAlpha,        "u_textureHasAlpha");
     ULOC(fogEnabled,      "u_fogEnabled");
     ULOC(fogMode,         "u_fogMode");
     ULOC(fogColor,        "u_fogColor");
@@ -331,11 +335,40 @@ void RS_ApplyToDriver()
     if (g_rs.depthTest) { glEnable(GL_DEPTH_TEST); glDepthFunc(g_rs.depthFunc); }
     else                  glDisable(GL_DEPTH_TEST);
 
-    // Additive/glow pass should not write depth or it can hide objects behind.
+    // ── Depth-write policy ─────────────────────────────────────────────────
+    // The game engine has three blend categories:
+    //
+    //  Category              BlendFunc                     DepthWrite
+    //  ────────────────────  ────────────────────────────  ──────────
+    //  Opaque                blend OFF                     g_rs.depthMask (ON)
+    //  Alpha-test cutout     SRC_ALPHA / ONE_MINUS_SRC_A   g_rs.depthMask (ON)
+    //  Additive glow         ONE / ONE                     forced OFF
+    //  Subtractive           ZERO / ONE_MINUS_SRC_COLOR    forced OFF
+    //  Soft additive         ONE_MINUS_SRC_COLOR / ONE     forced OFF
+    //  Other effects         ONE / ONE_MINUS_SRC_COLOR     forced OFF
+    //
+    // For alpha-test cutout (SRC_ALPHA/ONE_MINUS_SRC_ALPHA), the fragment
+    // shader `discard` already prevents transparent fragments from writing
+    // depth, so opaque pixels (alpha >= cutoff) write depth correctly.
+    // This is critical for trees, fences, grass, wings with RGBA textures.
+    //
+    // For additive/subtractive blends, depth write must be OFF because these
+    // are overlay effects (glow, fire, light shafts) that should never occlude
+    // geometry behind them.
     bool effectiveDepthMask = g_rs.depthMask;
-    if (g_rs.blend && g_rs.blendDst == GL_ONE)
+    if (g_rs.blend)
     {
-        effectiveDepthMask = false;
+        // Standard alpha blend: the shader discard handles transparency,
+        // so depth write follows the game's explicit depthMask setting.
+        // All other blend modes (additive, subtractive, etc.) force OFF.
+        bool isStandardAlphaBlend =
+            (g_rs.blendSrc == GL_SRC_ALPHA &&
+             g_rs.blendDst == GL_ONE_MINUS_SRC_ALPHA);
+
+        if (!isStandardAlphaBlend)
+        {
+            effectiveDepthMask = false;
+        }
     }
     glDepthMask(effectiveDepthMask ? GL_TRUE : GL_FALSE);
 
@@ -571,8 +604,10 @@ void FlushUniforms()
     }
 
     // Texture
-    bool useTexture = g_rs.texture2D && (g_rs.boundTexture != 0);
+    bool texture2DEnabled = g_rs.texture2D;
+    bool useTexture = texture2DEnabled && (g_rs.boundTexture != 0);
     glUniform1i(s_u.useTexture, useTexture ? 1 : 0);
+    glUniform1i(s_u.texture2DEnabled, texture2DEnabled ? 1 : 0);
     glUniform1i(s_u.texEnvMode, (int)g_rs.texEnvMode);
     glUniform1f(s_u.texEnvRgbScale, g_rs.texEnvRgbScale);
     glUniform1i(s_u.flipTexcoordY, g_rs.flipTexCoordY ? 1 : 0);
@@ -587,8 +622,21 @@ void FlushUniforms()
     glUniform1i(s_u.alphaTestEnabled, g_rs.alphaTest ? 1 : 0);
     glUniform1f(s_u.alphaTestRef, g_rs.alphaRef);
     glUniform1i(s_u.blendEnabled, g_rs.blend ? 1 : 0);
-    glUniform1i(s_u.autoAlphaDiscardEnabled, s_autoAlphaDiscardEnabled ? 1 : 0);
-    glUniform1f(s_u.autoAlphaDiscardRef, s_autoAlphaDiscardRef);
+    glUniform1f(s_u.alphaCutoff, s_alphaCutoff);
+
+    // Additive/subtractive blend detection:
+    // Standard alpha blend (SRC_ALPHA / ONE_MINUS_SRC_ALPHA) uses alpha-cutoff
+    // discard to remove black rectangles.  All other blend modes are additive
+    // or subtractive effects where black → invisible via blend equation, so
+    // the alpha-cutoff discard must be suppressed.
+    bool isAdditive = g_rs.blend &&
+        !(g_rs.blendSrc == GL_SRC_ALPHA &&
+          g_rs.blendDst == GL_ONE_MINUS_SRC_ALPHA);
+    glUniform1i(s_u.additiveBlend, isAdditive ? 1 : 0);
+
+    // Texture format: tells the shader whether the bound texture has a real
+    // alpha channel (GL_RGBA) or is RGB-only (alpha always 1.0).
+    glUniform1i(s_u.textureHasAlpha, g_rs.boundTextureHasAlpha ? 1 : 0);
 
     // Fog
     glUniform1i(s_u.fogEnabled, g_rs.fog ? 1 : 0);
@@ -714,7 +762,22 @@ void ImmEnd()
 void BindTexture(GLenum /*target*/, GLuint tex)
 {
     g_rs.boundTexture = tex;
-    if (tex) DriverBindTexture(GL_TEXTURE_2D, tex);
+    if (tex)
+    {
+        DriverBindTexture(GL_TEXTURE_2D, tex);
+        auto it = s_textureHasAlpha.find(tex);
+        g_rs.boundTextureHasAlpha = (it != s_textureHasAlpha.end()) ? it->second : false;
+    }
+    else
+    {
+        g_rs.boundTextureHasAlpha = false;
+    }
+}
+
+void RegisterTextureFormat(GLuint texID, bool hasAlpha)
+{
+    if (texID != 0)
+        s_textureHasAlpha[texID] = hasAlpha;
 }
 
 void TexEnvf(GLenum target, GLenum pname, float param)

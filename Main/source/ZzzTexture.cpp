@@ -339,7 +339,21 @@ bool LoadBitmap(const char* szFileName, GLuint uiTextureIndex, GLuint uiFilter, 
 
 	if (bCheck)
 	{
-		if (false == Bitmaps.LoadImage(uiTextureIndex, szFullPath, uiFilter, uiWrapMode))
+		const bool loaded = Bitmaps.LoadImage(uiTextureIndex, szFullPath, uiFilter, uiWrapMode);
+#ifdef __ANDROID__
+		if (uiTextureIndex == 31713)
+		{
+			__android_log_print(ANDROID_LOG_WARN,
+				"MUTexture",
+				"LoadBitmap idx=31713 path=%s check=%d loaded=%d filter=0x%x wrap=0x%x",
+				szFullPath,
+				bCheck ? 1 : 0,
+				loaded ? 1 : 0,
+				uiFilter,
+				uiWrapMode);
+		}
+#endif
+		if (!loaded)
 		{
 #ifdef __ANDROID__
 			__android_log_print(ANDROID_LOG_ERROR,
@@ -357,7 +371,22 @@ bool LoadBitmap(const char* szFileName, GLuint uiTextureIndex, GLuint uiFilter, 
 		}
 		return true;
 	}
-	return Bitmaps.LoadImage(uiTextureIndex, szFullPath, uiFilter, uiWrapMode);
+
+	const bool loaded = Bitmaps.LoadImage(uiTextureIndex, szFullPath, uiFilter, uiWrapMode);
+#ifdef __ANDROID__
+	if (uiTextureIndex == 31713)
+	{
+		__android_log_print(ANDROID_LOG_WARN,
+			"MUTexture",
+			"LoadBitmap idx=31713 path=%s check=%d loaded=%d filter=0x%x wrap=0x%x",
+			szFullPath,
+			bCheck ? 1 : 0,
+			loaded ? 1 : 0,
+			uiFilter,
+			uiWrapMode);
+	}
+#endif
+	return loaded;
 }
 
 void DeleteBitmap(GLuint uiTextureIndex, bool bForce)

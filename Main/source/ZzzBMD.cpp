@@ -1190,27 +1190,37 @@ void BMD::RenderMesh(int i, int RenderFlag, float Alpha, int BlendMesh, float Bl
 
 			if (Texture != BITMAP_HIDE)
 			{
+				int safeSkin = Skin;
+				if (safeSkin < 0)
+				{
+					safeSkin = 0;
+				}
+				else if (safeSkin >= 60)
+				{
+					safeSkin %= 60;
+				}
+
 				switch (Texture)
 				{
 				case BITMAP_SKIN:
 					if (HideSkin == true)
 						return;
-					Texture = Skin + BITMAP_SKIN;
+					Texture = safeSkin + BITMAP_SKIN;
 					break;
 				case BITMAP_HQSKIN:
 					if (HideSkin == true)
 						return;
-					Texture = Skin + BITMAP_HQSKIN;
+					Texture = safeSkin + BITMAP_HQSKIN;
 					break;
 				case BITMAP_HQSKIN2:
 					if (HideSkin == true)
 						return;
-					Texture = Skin + BITMAP_HQSKIN2;
+					Texture = safeSkin + BITMAP_HQSKIN2;
 					break;
 				case BITMAP_HQSKIN3:
 					if (HideSkin == true)
 						return;
-					Texture = Skin + BITMAP_HQSKIN3;
+					Texture = safeSkin + BITMAP_HQSKIN3;
 					break;
 				case BITMAP_WATER:
 					if (HideSkin == true)
@@ -1220,12 +1230,12 @@ void BMD::RenderMesh(int i, int RenderFlag, float Alpha, int BlendMesh, float Bl
 				case BITMAP_HAIR:
 					if (HideSkin == true)
 						return;
-					Texture = Skin + BITMAP_HAIR;
+					Texture = safeSkin + BITMAP_HAIR;
 					break;
 				case BITMAP_HQHAIR:
 					if (HideSkin == true)
 						return;
-					Texture = Skin + BITMAP_HQHAIR;
+					Texture = safeSkin + BITMAP_HQHAIR;
 					break;
 				}
 
@@ -1239,7 +1249,46 @@ void BMD::RenderMesh(int i, int RenderFlag, float Alpha, int BlendMesh, float Bl
 						return;
 					}
 
+#ifdef __ANDROID__
+					if (Texture == 31713)
+					{
+						static int s_missing31713MeshLogCount = 0;
+						if (s_missing31713MeshLogCount < 80)
+						{
+							++s_missing31713MeshLogCount;
+							__android_log_print(ANDROID_LOG_WARN,
+								"MURender",
+								"RenderMesh uses tex=31713 model=%s mesh=%d meshTex=%s renderFlag=0x%X meshTextureOverride=%d",
+								FileName,
+								i,
+								Textures[m->Texture].FileName,
+								RenderFlag,
+								MeshTexture);
+						}
+					}
+#endif
+
 					BITMAP_t* pBitmap = Bitmaps.GetTexture(Texture);
+
+#ifdef __ANDROID__
+					if (pBitmap && pBitmap->TextureNumber == 0 && (RenderFlag & RENDER_COLOR) == 0)
+					{
+						static int s_invalidTextureSkipCount = 0;
+						if (s_invalidTextureSkipCount < 120)
+						{
+							++s_invalidTextureSkipCount;
+							__android_log_print(ANDROID_LOG_WARN,
+								"MURender",
+								"Skip mesh draw: invalid texture obj=0 idx=%d model=%s mesh=%d texName=%s renderFlag=0x%X",
+								Texture,
+								FileName,
+								i,
+								Textures[m->Texture].FileName,
+								RenderFlag);
+						}
+						return;
+					}
+#endif
 
 					bool EnableWave = false;
 					int streamMesh = StreamMesh;
@@ -1288,7 +1337,7 @@ void BMD::RenderMesh(int i, int RenderFlag, float Alpha, int BlendMesh, float Bl
 
 						if (Alpha < 0.99)
 						{
-							EnableAlphaTest(true);
+							EnableAlphaTest();
 							glColor4f(BodyLight[0], BodyLight[1], BodyLight[2], Alpha);
 						}
 						else
@@ -1479,14 +1528,7 @@ void BMD::RenderMesh(int i, int RenderFlag, float Alpha, int BlendMesh, float Bl
 							}
 							else
 							{
-								if (pBitmap->Components == 4 && pBitmap->HasNonBinaryAlpha)
-								{
-									EnableAlphaBlend3();
-								}
-								else
-								{
-									EnableAlphaTest();
-								}
+								EnableAlphaTest();
 							}
 
 							if (RenderFlag & RENDER_NODEPTH)
@@ -1533,53 +1575,6 @@ void BMD::RenderMesh(int i, int RenderFlag, float Alpha, int BlendMesh, float Bl
 						EnableCullFace();
 						EnableDepthMask();
 					}
-
-					const bool hasSpecialBlendFlag =
-						(RenderFlag & RENDER_BRIGHT) ||
-						(RenderFlag & RENDER_DARK) ||
-						(RenderFlag & RENDER_LIGHTMAP) ||
-						(RenderFlag & RENDER_CHROME) ||
-						(RenderFlag & RENDER_CHROME2) ||
-						(RenderFlag & RENDER_CHROME3) ||
-						(RenderFlag & RENDER_CHROME4) ||
-						(RenderFlag & RENDER_CHROME5) ||
-						(RenderFlag & RENDER_CHROME6) ||
-						(RenderFlag & RENDER_CHROME7) ||
-						(RenderFlag & RENDER_CHROME8) ||
-						(RenderFlag & RENDER_OIL);
-
-					// Textures with non-binary alpha need true alpha blending (not cutout)
-					// to avoid dark/black fringes and opaque background artifacts.
-					if (renderFlags == RENDER_TEXTURE &&
-						pBitmap &&
-						pBitmap->Components == 4 &&
-						pBitmap->HasNonBinaryAlpha &&
-						!hasSpecialBlendFlag)
-					{
-						EnableAlphaBlend3();
-					}
-
-#ifdef __ANDROID__
-					if (pBitmap && pBitmap->Components == 4 && !AlphaTestEnable && AlphaBlendType == 0)
-					{
-						// RGBA texture about to be drawn without alpha handling —
-						// enable alpha test to prevent black-background artifacts.
-						if (pBitmap->HasNonBinaryAlpha)
-							EnableAlphaBlend3();
-						else
-							EnableAlphaTest();
-
-						static int s_rgbaFixupCount = 0;
-						if (s_rgbaFixupCount < 40)
-						{
-							++s_rgbaFixupCount;
-							__android_log_print(ANDROID_LOG_WARN, "MURender",
-								"RGBA alpha fixup: model=%s mesh=%d tex=%s renderFlags=0x%X alpha=%.3f nonBinary=%d",
-								FileName, i, pBitmap->FileName, renderFlags, Alpha,
-								pBitmap->HasNonBinaryAlpha ? 1 : 0);
-						}
-					}
-#endif
 
 					auto vertices = RenderArrayVertices;
 					auto colors = RenderArrayColors;
@@ -1784,7 +1779,16 @@ void BMD::RenderMeshTranslate(int i, int RenderFlag, float Alpha, int BlendMesh,
 	else if (Texture == BITMAP_SKIN)
 	{
 		if (HideSkin) return;
-		Texture = BITMAP_SKIN + Skin;
+		int safeSkin = Skin;
+		if (safeSkin < 0)
+		{
+			safeSkin = 0;
+		}
+		else if (safeSkin >= 60)
+		{
+			safeSkin %= 60;
+		}
+		Texture = BITMAP_SKIN + safeSkin;
 	}
 	else if (Texture == BITMAP_WATER)
 	{
@@ -1793,7 +1797,46 @@ void BMD::RenderMeshTranslate(int i, int RenderFlag, float Alpha, int BlendMesh,
 	if (MeshTexture != -1)
 		Texture = MeshTexture;
 
+#ifdef __ANDROID__
+	if (Texture == 31713)
+	{
+		static int s_missing31713TranslateLogCount = 0;
+		if (s_missing31713TranslateLogCount < 80)
+		{
+			++s_missing31713TranslateLogCount;
+			__android_log_print(ANDROID_LOG_WARN,
+				"MURender",
+				"RenderMeshTranslate uses tex=31713 model=%s mesh=%d meshTex=%s renderFlag=0x%X meshTextureOverride=%d",
+				FileName,
+				i,
+				Textures[m->Texture].FileName,
+				RenderFlag,
+				MeshTexture);
+		}
+	}
+#endif
+
 	BITMAP_t* pBitmap = Bitmaps.GetTexture(Texture);
+
+#ifdef __ANDROID__
+	if (pBitmap && pBitmap->TextureNumber == 0 && (RenderFlag & RENDER_COLOR) == 0)
+	{
+		static int s_invalidTextureSkipCountTranslate = 0;
+		if (s_invalidTextureSkipCountTranslate < 120)
+		{
+			++s_invalidTextureSkipCountTranslate;
+			__android_log_print(ANDROID_LOG_WARN,
+				"MURender",
+				"Skip translate draw: invalid texture obj=0 idx=%d model=%s mesh=%d texName=%s renderFlag=0x%X",
+				Texture,
+				FileName,
+				i,
+				Textures[m->Texture].FileName,
+				RenderFlag);
+		}
+		return;
+	}
+#endif
 
 	bool EnableWave = false;
 	int streamMesh = StreamMesh;
@@ -1924,18 +1967,7 @@ void BMD::RenderMeshTranslate(int i, int RenderFlag, float Alpha, int BlendMesh,
 		{
 			EnableAlphaBlendMinus();
 		}
-		else if (pBitmap->Components == 4)
-		{
-			if (pBitmap->HasNonBinaryAlpha)
-			{
-				EnableAlphaBlend3();
-			}
-			else
-			{
-				EnableAlphaTest();
-			}
-		}
-		else if (Alpha < 0.99f)
+		else if (Alpha < 0.99f || pBitmap->Components == 4)
 		{
 			EnableAlphaTest();
 		}
@@ -1959,37 +1991,6 @@ void BMD::RenderMeshTranslate(int i, int RenderFlag, float Alpha, int BlendMesh,
 	{
 		Render = RENDER_TEXTURE;
 	}
-
-	const bool hasSpecialBlendFlag =
-		(RenderFlag & RENDER_BRIGHT) ||
-		(RenderFlag & RENDER_DARK) ||
-		(RenderFlag & RENDER_LIGHTMAP) ||
-		(RenderFlag & RENDER_CHROME) ||
-		(RenderFlag & RENDER_CHROME2) ||
-		(RenderFlag & RENDER_CHROME6);
-
-	if (Render == RENDER_TEXTURE &&
-		pBitmap &&
-		pBitmap->Components == 4 &&
-		pBitmap->HasNonBinaryAlpha &&
-		!hasSpecialBlendFlag)
-	{
-		EnableAlphaBlend3();
-	}
-
-#ifdef __ANDROID__
-	if (pBitmap && pBitmap->Components == 4 && !AlphaTestEnable && AlphaBlendType == 0)
-	{
-		static int s_rgbaNoAlphaStateWarnCountTranslate = 0;
-		if (s_rgbaNoAlphaStateWarnCountTranslate < 80)
-		{
-			++s_rgbaNoAlphaStateWarnCountTranslate;
-			__android_log_print(ANDROID_LOG_WARN, "MURender",
-				"RGBA texture without alpha state (translate): model=%s mesh=%d tex=%s render=0x%X alpha=%.3f",
-				FileName, i, pBitmap->FileName, Render, Alpha);
-		}
-	}
-#endif
 
 	glBegin(GL_TRIANGLES);
 	for (int j = 0; j < m->NumTriangles; j++)

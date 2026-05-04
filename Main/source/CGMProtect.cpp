@@ -11,6 +11,10 @@
 #include "CGMRenderGroupMesh.h"
 #include "../../Util/CCRC32.H"
 
+#ifdef __ANDROID__
+#include <android/log.h>
+#endif
+
 #ifndef __ANDROID__
 #include <tlhelp32.h>
 #include <intrin.h>
@@ -390,7 +394,7 @@ void CGMProtect::LoadItemModel()
 		CUSTOM_ITEM_INFO* f = &CustomItem[i];
 
 		if (f->isUsable() == false)
-			return;
+			continue;
 
 		f->OpenLoad();
 	}
@@ -403,7 +407,7 @@ void CGMProtect::LoadPetsModel()
 		CUSTOM_PET_STACK* f = &CustomPetItem[i];
 
 		if (f->isUsable() == false)
-			return;
+			continue;
 
 		f->OpenLoad();
 
@@ -459,7 +463,7 @@ void CGMProtect::LoadClawModel(int itemindex, int model_L, int model_R)
 		CUSTOM_ITEM_INFO* f = &CustomItem[i];
 
 		if (f->isUsable() == false)
-			return;
+			continue;
 
 		if (f->Itemindex == itemindex)
 		{
@@ -478,7 +482,7 @@ void CGMProtect::LoadImageTexture()
 		CUSTOM_IMAGE_INFO* f = &CustomImagen[i];
 
 		if (f->isUsable() == false)
-			return;
+			continue;
 
 		f->OpenLoad();
 	}
@@ -491,7 +495,7 @@ bool CGMProtect::GetItemColor(int itemindex, float* color)
 		CUSTOM_ITEM_INFO* f = &CustomItem[i];
 
 		if (f->isUsable() == false)
-			return false;
+			continue;
 
 		if (f->Itemindex == itemindex)
 		{
@@ -511,7 +515,7 @@ bool CGMProtect::IsPetBug(int itemindex)
 			CUSTOM_PET_STACK* f = &CustomPetItem[i];
 
 			if (f->isUsable() == false)
-				break;
+				continue;
 
 			if (f->ItemIndex == itemindex
 				&& (f->MovementType == 5
@@ -535,7 +539,7 @@ int CGMProtect::GetPetMovement(int itemindex)
 			CUSTOM_PET_STACK* f = &CustomPetItem[i];
 
 			if (f->isUsable() == false)
-				break;
+				continue;
 
 			if (f->ItemIndex == itemindex)
 			{
@@ -595,7 +599,7 @@ CUSTOM_PET_STACK* CGMProtect::GetPetAction(int itemindex)
 			CUSTOM_PET_STACK* f = &CustomPetItem[i];
 
 			if (f->isUsable() == false)
-				break;
+				continue;
 
 			if (f->ItemIndex == itemindex)
 			{
@@ -638,7 +642,7 @@ bool CGMProtect::GetNpcName(int IndexNpc, char* Name, int PositionX, int Positio
 		CUSTOM_NPC_NAME* f = &CustomNpcName[i];
 
 		if (f->isUsable() == false)
-			break;
+			continue;
 
 		if (f->IndexNpc != IndexNpc)
 		{
@@ -679,6 +683,45 @@ bool CGMProtect::IsRenderWave(const char* Name)
 
 void CGMProtect::LoadingProgressive()
 {
+#ifdef __ANDROID__
+	size_t usableItems = 0;
+	for (size_t i = 0; i < CustomItem.size(); ++i)
+	{
+		if (CustomItem[i].isUsable())
+		{
+			++usableItems;
+		}
+	}
+
+	size_t usableImages = 0;
+	for (size_t i = 0; i < CustomImagen.size(); ++i)
+	{
+		if (CustomImagen[i].isUsable())
+		{
+			++usableImages;
+		}
+	}
+
+	size_t usablePets = 0;
+	for (size_t i = 0; i < CustomPetItem.size(); ++i)
+	{
+		if (CustomPetItem[i].isUsable())
+		{
+			++usablePets;
+		}
+	}
+
+	__android_log_print(ANDROID_LOG_INFO,
+		"MUCustom",
+		"LoadingProgressive begin items=%zu images=%zu pets=%zu monsters=%zu itemMesh=%zu defaultMesh=%zu",
+		usableItems,
+		usableImages,
+		usablePets,
+		CustomMonster.size(),
+		CustomItemRenderMesh.size(),
+		CustomDefaultRenderMesh.size());
+#endif
+
 	GMMonsterMng->LoadDataMonster(CustomMonster.data(), CustomMonster.size());
 
 	GMItemEffect->LoadDataEffect(0, CustomEffectStatics.data(), CustomEffectStatics.size());
@@ -707,6 +750,12 @@ void CGMProtect::LoadingProgressive()
 
 	this->LoadImageTexture();
 
+#ifdef __ANDROID__
+	__android_log_print(ANDROID_LOG_INFO,
+		"MUCustom",
+		"LoadingProgressive end (post-clear pending)");
+#endif
+
 	CustomItemRenderMesh.clear();
 
 	CustomEffectStatics.clear();
@@ -718,6 +767,12 @@ void CGMProtect::LoadingProgressive()
 	CustomPetEffectDinamic.clear();
 
 	CustomDefaultRenderMesh.clear();
+
+#ifdef __ANDROID__
+	__android_log_print(ANDROID_LOG_INFO,
+		"MUCustom",
+		"LoadingProgressive clear done");
+#endif
 }
 
 void CGMProtect::runtime_open_module_crc32(std::string FileName, DWORD _crc32)

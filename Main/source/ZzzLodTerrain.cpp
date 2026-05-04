@@ -2051,7 +2051,7 @@ bool RenderTerrainTile(float xf, float yf, int xi, int yi, float lodf, int lodi,
 		{
 			if (2 <= path->GetClosedStatus(TerrainIndex1))
 			{
-				EnableAlphaTest();
+			EnableAlphaTest();
 				DisableTexture();
 				glBegin(GL_TRIANGLE_FAN);
 				if (4 <= path->GetClosedStatus(TerrainIndex1))

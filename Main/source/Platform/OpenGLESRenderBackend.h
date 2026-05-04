@@ -66,7 +66,11 @@ void  ImmEnd();    // flush accumulated vertices as a draw call
 // ── Texture ───────────────────────────────────────────────────────────────────
 void  BindTexture(GLenum target, GLuint tex);
 void  TexEnvf(GLenum target, GLenum pname, float param);  // no-op / stored
-
+// Texture format tracking: call after glTexImage2D to register whether the
+// texture has a real alpha channel.  BindTexture reads this to set
+// g_rs.boundTextureHasAlpha, which the shader uses to decide between
+// alpha-cutoff discard (RGBA) and color-key discard (RGB).
+void  RegisterTextureFormat(GLuint texID, bool hasAlpha);
 // ── Raster position (for 2-D blits) ──────────────────────────────────────────
 void  RasterPos2i(int x, int y);
 

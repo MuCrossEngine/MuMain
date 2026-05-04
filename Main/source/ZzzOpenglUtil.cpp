@@ -311,7 +311,14 @@ void BindTexture(int tex)
 				{
 					++s_nullTexWarnCount;
 					__android_log_print(ANDROID_LOG_WARN, "MURender",
-						"BindTexture: tex=%d has TextureNumber=0 (not loaded?)", tex);
+						"BindTexture: tex=%d has TextureNumber=0 file=%s comp=%d out=%dx%d alpha=%d nonBinary=%d",
+						tex,
+						b->FileName,
+						(int)b->Components,
+						b->output_width,
+						b->output_height,
+						b->HasAlpha ? 1 : 0,
+						b->HasNonBinaryAlpha ? 1 : 0);
 				}
 			}
 #endif
@@ -322,23 +329,6 @@ void BindTexture(int tex)
 		}
 	}
 }
-
-#ifdef __ANDROID__
-static bool UsePremultipliedAlphaBlend()
-{
-	static int s_cached = -1;
-	if (s_cached < 0)
-	{
-		const char* envValue = std::getenv("MU_PREMULT_ALPHA");
-		s_cached = (envValue && std::atoi(envValue) != 0) ? 1 : 0;
-		__android_log_print(ANDROID_LOG_INFO, "MURender",
-			"Alpha blend mode: %s (MU_PREMULT_ALPHA=%s)",
-			s_cached ? "premultiplied" : "straight",
-			envValue ? envValue : "unset");
-	}
-	return s_cached == 1;
-}
-#endif
 
 bool TextureStream = false;
 
@@ -475,14 +465,7 @@ void EnableAlphaTest(bool DepthMask)
 	{
 		AlphaBlendType = 2;
 		glEnable(GL_BLEND);
-#ifdef __ANDROID__
-		if (UsePremultipliedAlphaBlend())
-			glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-		else
-			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-#else
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-#endif
 	}
 	DisableCullFace();
 
@@ -509,15 +492,7 @@ void EnableAlphaBlend()
 	{
 		AlphaBlendType = 3;
 		glEnable(GL_BLEND);
-#ifdef __ANDROID__
-		// Additive glow in GLES should preserve source alpha intensity.
-		if (UsePremultipliedAlphaBlend())
-			glBlendFunc(GL_ONE, GL_ONE);
-		else
-			glBlendFunc(GL_SRC_ALPHA, GL_ONE);
-#else
 		glBlendFunc(GL_ONE, GL_ONE);
-#endif
 	}
 	DisableCullFace();
 	DisableDepthMask();
@@ -589,14 +564,7 @@ void EnableAlphaBlend3()
 	{
 		AlphaBlendType = 6;
 		glEnable(GL_BLEND);
-#ifdef __ANDROID__
-		if (UsePremultipliedAlphaBlend())
-			glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-		else
-			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-#else
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-#endif
 	}
 	DisableCullFace();
 	DisableDepthMask();
@@ -1298,6 +1266,17 @@ void BeginBitmap()
 
 	glLoadIdentity();
 	DisableDepthTest();
+
+#ifdef __ANDROID__
+	// GLES 3.0 has no hardware GL_ALPHA_TEST.  On desktop the alpha-test
+	// alone was enough to discard fully-transparent texels even when
+	// GL_BLEND was off.  On GLES we emulate alpha-test with a shader
+	// discard, but we still need GL_BLEND enabled for semi-transparent
+	// UI elements to composite correctly over the 3D scene.
+	// For fully-opaque fragments (alpha==1) the result is identical:
+	//   src*1 + dst*0 == src
+	EnableAlphaTest(false);
+#endif
 }
 
 void EndBitmap()

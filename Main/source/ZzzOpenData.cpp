@@ -6160,6 +6160,98 @@ void OpenBasicData(HDC hDC)
 	LoadBitmap("Effect\\WATERFALL3.jpg", BITMAP_WATERFALL_3, GL_LINEAR, GL_CLAMP_TO_EDGE);
 	LoadBitmap("Effect\\WATERFALL4.jpg", BITMAP_WATERFALL_4, GL_LINEAR, GL_CLAMP_TO_EDGE);
 	LoadBitmap("Effect\\WATERFALL5.jpg", BITMAP_WATERFALL_5, GL_LINEAR, GL_CLAMP_TO_EDGE);
+
+	// Keep Android startup lean, but preload the wing/weapon overlay textures
+	// used by CHARACTER_SCENE equipment previews and glow passes.
+	LoadBitmap("Item\\Texture\\wing3chaking2.jpg", BITMAP_ITEM_NIGHT_3RDWING_R, GL_LINEAR, GL_CLAMP_TO_EDGE);
+
+	LoadBitmap("Item\\Texture\\black_gold_crom05.jpg", BITMAP_black_gold_crom05, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\absolute02_swordrender.jpg", BITMAP_absolute02_swordrender, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\black_gold_crom03.jpg", BITMAP_black_gold_crom03, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Effect\\flame_chrome.jpg", BITMAP_flame_chrome, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\ground_wind2.jpg", BITMAP_ground_wind2, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\alicewing4db_render.jpg", BITMAP_alicewing4db_render, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\elfwing4da_render01.jpg", BITMAP_elfwing4da_render01, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\elfwing4da_render02.jpg", BITMAP_elfwing4da_render02, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\magicianwing4da_render.jpg", BITMAP_magicianwing4da_render, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\dknightwing4db_render.jpg", BITMAP_dknightwing4db_render, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Effect\\line_of_big_R.jpg", BITMAP_line_of_big_R, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\soulknightswordB_render.jpg", BITMAP_soulknightswordB_render, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\soulknightswordA_render.jpg", BITMAP_soulknightswordA_render, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\soulmagicswordA_render.jpg", BITMAP_soulmagicswordA_render, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\hs_soularcherbowA01_render.jpg", BITMAP_hs_soularcherbowA01_render, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\sd_SoulWizardStaff01_render.jpg", BITMAP_sd_SoulWizardStaff01_render, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\sd_soulsummonerstickA02_render.jpg", BITMAP_sd_soulsummonerstickA02_render, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\soulfighterclawA_render.jpg", BITMAP_soulfighterclawA_render, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\hs_blueeyeknightA03r.jpg", BITMAP_hs_blueeyeknightA03r, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Effect\\black_gold_crom04_mono.jpg", BITMAP_black_gold_crom04_mono, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\hs_blueeyeknightA02_render.jpg", BITMAP_hs_blueeyeknightA02_render, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\fire_15frame_mono.jpg", BITMAP_fire_15frame_mono, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\alpha_line2.jpg", BITMAP_alpha_line2, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\blueeyemagicsword02r.jpg", BITMAP_blueeyemagicsword02r, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\blueeyemagicsword03r.jpg", BITMAP_blueeyemagicsword03r, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Effect\\black_gold_crom04.jpg", BITMAP_black_gold_crom04, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\blueeyesceptre_render.jpg", BITMAP_blueeyesceptre_render, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\Blue_eyebow02r.jpg", BITMAP_Blue_eyebow02r, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\blue_eye_ws02_render.jpg", BITMAP_blue_eye_ws02_render, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\bsummoners02_render.jpg", BITMAP_bsummoners02_render, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\Blueeyeclaw_render.jpg", BITMAP_Blueeyeclaw_render, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\mace_mastr02s_render.jpg", BITMAP_mace_mastr02s_render, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\Darkangel_StaffA_render.jpg", BITMAP_Darkangel_StaffA_render, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\sd_soullance01_render.jpg", BITMAP_sd_soullance01_render, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\runewing3db_render.jpg", BITMAP_runewing3db_render, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\runewing4db_render.jpg", BITMAP_runewing4db_render, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\runewing4dc_star01.jpg", BITMAP_runewing4dc_star01, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\runewing4dc_star02.jpg", BITMAP_runewing4dc_star02, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\hs_blueeyelanceA02r.jpg", BITMAP_hs_blueeyelanceA02r, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Effect\\MMsSs2_r.jpg", BITMAP_MMsSs2_r, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\mace5master02_render.jpg", BITMAP_mace5master02_render, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Effect\\wings_van_render.jpg", BITMAP_wings_van_render, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Effect\\benzia_wing4_render.jpg", BITMAP_benzia_wing4_render, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Effect\\benzia_wing4a_render.jpg", BITMAP_benzia_wing4a_render, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Effect\\benzia_wing4b_render.jpg", BITMAP_benzia_wing4b_render, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\season_wing_period_render.jpg", BITMAP_season_wing_period_render, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\firek_sq_mono.jpg", BITMAP_firek_sq_mono, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Effect\\0120.jpg", BITMAP_0120, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Effect\\0143.jpg", BITMAP_0143, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Effect\\ChaWing_renderbright.jpg", BITMAP_ChaWing_renderbright, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Effect\\KCWWingP_Render.jpg", BITMAP_KCWWingP_Render, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Effect\\KCWWingR_Render.jpg", BITMAP_KCWWingR_Render, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\BoodAnelsword_render.jpg", BITMAP_BoodAnelsword_render, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\BAGsword_render.jpg", BITMAP_BAGsword_render, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\bloodclaw2_render.jpg", BITMAP_bloodclaw2_render, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\booldangel_sapterr.jpg", BITMAP_booldangel_sapterr, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\blood_bow_render.jpg", BITMAP_blood_bow_render, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\bloodangelstaff01_render.jpg", BITMAP_bloodangelstaff01_render, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\bloodangelstaff02.jpg", BITMAP_bloodangelstaff02, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\bloodangelstick01_render.jpg", BITMAP_bloodangelstick01_render, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Effect\\black_gold_crom02.jpg", BITMAP_black_gold_crom02, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Effect\\black_gold_crom02_mono.jpg", BITMAP_black_gold_crom02_mono, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\AngelicBow_overlay.jpg", BITMAP_AngelicBow_overlay, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\sd_wing3C_render.jpg", BITMAP_sd_wing3C_render, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\sd_wing3B_render.jpg", BITMAP_sd_wing3B_render, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\K_StylizedMoon_E02.jpg", BITMAP_K_StylizedMoon_E02, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\K_StylizedMoon_SwordB02_Render01.jpg", BITMAP_K_StylizedMoon_SwordB02_Render01, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\K_StylizedMoon_SwordB02_Render02.jpg", BITMAP_K_StylizedMoon_SwordB02_Render02, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\sd_wing4C_Red_render.jpg", BITMAP_sd_wing4C_Red_render, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\sd_wing4D_render.jpg", BITMAP_sd_wing4D_render, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\growlancerwing4db_render.jpg", BITMAP_growlancerwing4db_render, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\gra.jpg", BITMAP_gra, GL_LINEAR, GL_CLAMP_TO_EDGE, false, false);
+	LoadBitmap("Item\\Texture\\gra2.jpg", BITMAP_gra2, GL_LINEAR, GL_CLAMP_TO_EDGE, false, false);
+	LoadBitmap("Item\\Texture\\gra3.jpg", BITMAP_gra3, GL_LINEAR, GL_CLAMP_TO_EDGE, false, false);
+
+	LoadBitmap("Item\\Texture\\admangto.tga", BITMAP_admangto, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\deathha.tga", BITMAP_deathha, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\deathjung.tga", BITMAP_deathjung, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\darklordwing4de.tga", BITMAP_darklordwing4de, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\darklordwing4de_render.jpg", BITMAP_darklordwing4de_render, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\darklordwing4dd.tga", BITMAP_darklordwing4dd, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\darklordwing4dd_render.JPG", BITMAP_darklordwing4dd_render, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\ragefighterwing4db.TGA", BITMAP_ragefighterwing4db, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\ragefighterwing4db_render.JPG", BITMAP_ragefighterwing4db_render, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\season_wing_periodc.tga", BITMAP_season_wing_periodc, GL_LINEAR, GL_REPEAT, false, false);
+	LoadBitmap("Item\\Texture\\season_wing_periodc2.tga", BITMAP_season_wing_periodc2, GL_LINEAR, GL_REPEAT, false, false);
+	LogMem("OpenBasicData:first-textures-android-overlays");
 #endif // !__ANDROID__
 	LogMem("OpenBasicData:first-textures-done");
 
@@ -6192,11 +6284,11 @@ void OpenBasicData(HDC hDC)
 #endif
 
 	LogMem("OpenBasicData:before-LoadingProgressive");
-#ifndef __ANDROID__
 	GMProtect->LoadingProgressive();
-	LogMem("OpenBasicData:LoadingProgressive-done");
+#ifdef __ANDROID__
+	LogMem("OpenBasicData:LoadingProgressive-done-android");
 #else
-	LogMem("OpenBasicData:LoadingProgressive-skipped");
+	LogMem("OpenBasicData:LoadingProgressive-done");
 #endif
 	rUIMng.RenderTitleSceneUI(hDC, 6, 12);
 
@@ -6210,8 +6302,11 @@ void OpenBasicData(HDC hDC)
 	OpenSounds();
 	rUIMng.RenderTitleSceneUI(hDC, 9, 12);
 #else
-	// Skip OpenSkills/Images/Sounds on Android — not needed for character-selection scene
-	LogMem("OpenBasicData:OpenSkills+Images+Sounds-skipped");
+	// Character-select still references interface/effect bitmap IDs from OpenImages.
+	OpenImages();
+	LogMem("OpenBasicData:OpenImages-done-android");
+	// Keep heavier runtime systems deferred on Android startup.
+	LogMem("OpenBasicData:OpenSkills+Sounds-skipped");
 #endif
 
 	g_ServerListManager->LoadServerListScript();

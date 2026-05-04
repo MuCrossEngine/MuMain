@@ -92,6 +92,7 @@ struct RenderState
 
     // ── Active texture unit & bound texture ───────────────────────────────────
     GLuint boundTexture = 0;
+    bool   boundTextureHasAlpha = false; // true if bound texture is GL_RGBA
 
     // ── Color (glColor*) ──────────────────────────────────────────────────────
     glm::vec4 currentColor = {1,1,1,1};

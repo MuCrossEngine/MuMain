@@ -1,6 +1,9 @@
 #include "stdafx.h"
 #include "GlobalBitmap.h"
 #include "supportingfeature.h"
+#ifdef __ANDROID__
+#include <android/log.h>
+#endif
 
 void CUSTOM_ITEM_INFO::release()
 {
@@ -134,7 +137,8 @@ void CUSTOM_ITEM_INFO::OpenLoad()
 		{
 			gmClientModels->AccessModel(modelId, "Data\\Item\\", filename);
 		}
-		gmClientModels->OpenTexture(modelId, "Item\\Texture\\", GL_REPEAT, GL_NEAREST);
+		gmClientModels->OpenTexture(modelId, "Item\\Texture\\", GL_REPEAT, GL_NEAREST, false);
+		gmClientModels->OpenTexture(modelId, "Custom\\", GL_REPEAT, GL_NEAREST, false);
 	}
 }
 
@@ -146,7 +150,8 @@ void CUSTOM_WING_INFO::OpenLoad()
 
 		gmClientModels->AccessModel(modelId, "Data\\Item\\", filename);
 
-		gmClientModels->OpenTexture(modelId, "Item\\Texture\\", GL_REPEAT, GL_NEAREST);
+		gmClientModels->OpenTexture(modelId, "Item\\Texture\\", GL_REPEAT, GL_NEAREST, false);
+		gmClientModels->OpenTexture(modelId, "Custom\\", GL_REPEAT, GL_NEAREST, false);
 	}
 }
 
@@ -158,7 +163,8 @@ void CUSTOM_PET_STACK::OpenLoad()
 
 		gmClientModels->AccessModel(modelId, "Data\\Item\\", filename);
 
-		gmClientModels->OpenTexture(modelId, "Item\\Texture\\", GL_REPEAT, GL_NEAREST);
+		gmClientModels->OpenTexture(modelId, "Item\\Texture\\", GL_REPEAT, GL_NEAREST, false);
+		gmClientModels->OpenTexture(modelId, "Custom\\", GL_REPEAT, GL_NEAREST, false);
 	}
 }
 
@@ -231,7 +237,53 @@ void CUSTOM_IMAGE_INFO::OpenLoad()
 	if (isUsable())
 	{
 		char Pathdirectory[MAX_PATH];
+		char FallbackPath[MAX_PATH];
+		bool loaded = false;
+		const char* loadedFrom = nullptr;
+
 		sprintf_s(Pathdirectory, "Item\\Texture\\%s", ImgName);
-		LoadBitmap(Pathdirectory, ImgIndex, Wrap, Type, true, false);
+		loaded = LoadBitmap(Pathdirectory, ImgIndex, Wrap, Type, false, false);
+		if (loaded)
+		{
+			loadedFrom = Pathdirectory;
+		}
+
+		if (!loaded)
+		{
+			sprintf_s(FallbackPath, "Custom\\%s", ImgName);
+			loaded = LoadBitmap(FallbackPath, ImgIndex, Wrap, Type, false, false);
+			if (loaded)
+			{
+				loadedFrom = FallbackPath;
+			}
+		}
+
+		if (!loaded)
+		{
+			loaded = LoadBitmap(ImgName, ImgIndex, Wrap, Type, false, false);
+			if (loaded)
+			{
+				loadedFrom = ImgName;
+			}
+		}
+
+#ifdef __ANDROID__
+		if (!loaded)
+		{
+			__android_log_print(ANDROID_LOG_WARN,
+				"MUCustom",
+				"CUSTOM_IMAGE load failed idx=%d name=%s",
+				ImgIndex,
+				ImgName);
+		}
+		else
+		{
+			__android_log_print(ANDROID_LOG_INFO,
+				"MUCustom",
+				"CUSTOM_IMAGE loaded idx=%d from=%s",
+				ImgIndex,
+				loadedFrom ? loadedFrom : "<null>");
+		}
+#endif
 	}
 }

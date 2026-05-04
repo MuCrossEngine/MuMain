@@ -210,7 +210,11 @@ void CGMModelManager::OpenTexture(int modelType, char* SubFolder, int Wrap, int 
 			}
 			else if (tolower(__ext[1]) == 't')
 			{
+			#ifdef __ANDROID__
+				pModel->IndexTexture[i] = Bitmaps.LoadImage(szFullPath, GL_LINEAR_MIPMAP_LINEAR, Wrap);
+			#else
 				pModel->IndexTexture[i] = Bitmaps.LoadImage(szFullPath, GL_NEAREST_MIPMAP_NEAREST, Wrap);
+			#endif
 			}
 			else if (tolower(__ext[1]) == 'j')
 			{

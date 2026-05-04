@@ -949,7 +949,7 @@ void Draw_RenderObject(OBJECT* o, bool Translate, int Select, int ExtraMon)
 
 					Vector(1.0f, 0.0f, 0.0f, vLight);
 					Vector((float)(rand() % 10 - 10) * 0.5f, 0.f, (float)(rand() % 40 - 20) * 0.5f, vPos);
-					b->TransformPosition(BoneTransform[14], vPos, vPosition, false);	// ÅÎ
+					b->TransformPosition(BoneTransform[14], vPos, vPosition, false);	// ï¿½ï¿½
 					CreateParticleSync(BITMAP_SPARK + 1, vPosition, o->Angle, vLight, 15, 0.7f + (fLuminosity * 0.05f));
 				}
 				b->StreamMesh = -1;
@@ -2421,7 +2421,7 @@ void Draw_RenderObject(OBJECT* o, bool Translate, int Select, int ExtraMon)
 					b->RenderMesh(2, RENDER_TEXTURE, o->Alpha, o->BlendMesh, o->BlendMeshLight, o->BlendMeshTexCoordU, o->BlendMeshTexCoordV);
 					b->RenderMesh(3, RENDER_TEXTURE, o->Alpha, o->BlendMesh, o->BlendMeshLight, o->BlendMeshTexCoordU, o->BlendMeshTexCoordV);
 					b->RenderMesh(4, RENDER_TEXTURE, o->Alpha, o->BlendMesh, o->BlendMeshLight, o->BlendMeshTexCoordU, o->BlendMeshTexCoordV);
-					// ³¯°³
+					// ï¿½ï¿½ï¿½ï¿½
 					Vector(1.0f, 1.0f, 1.0f, b->BodyLight);
 					b->RenderMesh(5, RENDER_TEXTURE, o->Alpha, o->BlendMesh, o->BlendMeshLight, o->BlendMeshTexCoordU, o->BlendMeshTexCoordV);
 					b->RenderMesh(5, RENDER_TEXTURE | RENDER_BRIGHT, o->Alpha, 5, 0.1f, o->BlendMeshTexCoordU, o->BlendMeshTexCoordV);
