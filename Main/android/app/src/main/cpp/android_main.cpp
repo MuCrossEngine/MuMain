@@ -87,6 +87,68 @@ static std::deque<wchar_t> g_pendingImeChars;
 static int                 g_pendingImeBackspaceCount = 0;
 static DWORD               g_lastHackTick = 0;
 
+static constexpr int kAndroidRenderWidth = 960;
+static constexpr int kAndroidRenderHeight = 540;
+
+struct FramePerfStats
+{
+    int frameCount = 0;
+    double totalFrameMs = 0.0;
+    double totalNetMs = 0.0;
+    double totalSceneMs = 0.0;
+    double totalSwapMs = 0.0;
+};
+
+static FramePerfStats g_framePerfStats;
+
+static double PerfMsSince(const std::chrono::steady_clock::time_point& start,
+                          const std::chrono::steady_clock::time_point& end)
+{
+    return std::chrono::duration<double, std::milli>(end - start).count();
+}
+
+static void LogFramePerfSample(double frameMs, double netMs, double sceneMs, double swapMs)
+{
+    g_framePerfStats.frameCount++;
+    g_framePerfStats.totalFrameMs += frameMs;
+    g_framePerfStats.totalNetMs += netMs;
+    g_framePerfStats.totalSceneMs += sceneMs;
+    g_framePerfStats.totalSwapMs += swapMs;
+
+    const bool slowFrame = frameMs >= 100.0;
+    const bool emitSample = slowFrame || g_framePerfStats.frameCount >= 120;
+    if (!emitSample)
+    {
+        return;
+    }
+
+    const double sampleCount = static_cast<double>(g_framePerfStats.frameCount);
+    const double avgFrameMs = g_framePerfStats.totalFrameMs / sampleCount;
+    const double avgNetMs = g_framePerfStats.totalNetMs / sampleCount;
+    const double avgSceneMs = g_framePerfStats.totalSceneMs / sampleCount;
+    const double avgSwapMs = g_framePerfStats.totalSwapMs / sampleCount;
+    const double avgFps = avgFrameMs > 0.0 ? 1000.0 / avgFrameMs : 0.0;
+
+    __android_log_print(
+        ANDROID_LOG_INFO,
+        "MUPerf",
+        "frames=%d avg_fps=%.2f avg_frame=%.2fms avg_net=%.2fms avg_scene=%.2fms avg_swap=%.2fms last_frame=%.2fms last_scene=%.2fms last_swap=%.2fms scene_flag=%d res=%dx%d",
+        g_framePerfStats.frameCount,
+        avgFps,
+        avgFrameMs,
+        avgNetMs,
+        avgSceneMs,
+        avgSwapMs,
+        frameMs,
+        sceneMs,
+        swapMs,
+        SceneFlag,
+        kAndroidRenderWidth,
+        kAndroidRenderHeight);
+
+    g_framePerfStats = FramePerfStats{};
+}
+
 // Windows initializes this singleton in WinMain(); Android must do it here.
 static CGMCharacter        g_androidCharacterManager;
 static CGMModelManager     g_androidModelManager;
@@ -214,9 +276,10 @@ static void SyncLegacyScreenMetrics(int width, int height)
         return;
     }
 
-    // Force logical resolution to 1280x720 (16:9 HD)
-    WindowWidth = 1280;
-    WindowHeight = 720;
+    // Force a lower internal resolution on Android to keep fill-rate and
+    // overdraw under control on the current GLES path.
+    WindowWidth = kAndroidRenderWidth;
+    WindowHeight = kAndroidRenderHeight;
 
     int screenType = 0;
     if (gmProtect != nullptr)
@@ -695,6 +758,8 @@ static void RenderFrame()
 {
     if (!g_eglWindow || !g_focused) return;
 
+    const auto frameStart = std::chrono::steady_clock::now();
+
     FlushPendingImeToFocusedEdit();
 
     // Win32 uses HACK_TIMER (20s) -> CheckHack() via WM_TIMER.
@@ -711,14 +776,26 @@ static void RenderFrame()
     }
 
     // Process network packets (replaces WSAAsyncSelect / WM_SOCKET)
+    const auto netStart = std::chrono::steady_clock::now();
     PollSocketIO();
     ProtocolCompiler();
+    const auto netEnd = std::chrono::steady_clock::now();
 
     // Game logic + rendering — use full scene dispatcher
+    const auto sceneStart = std::chrono::steady_clock::now();
     Scene(nullptr);
     GameMouseInput::Update();
+    const auto sceneEnd = std::chrono::steady_clock::now();
 
+    const auto swapStart = std::chrono::steady_clock::now();
     g_eglWindow->SwapBuffers();
+    const auto swapEnd = std::chrono::steady_clock::now();
+
+    LogFramePerfSample(
+        PerfMsSince(frameStart, swapEnd),
+        PerfMsSince(netStart, netEnd),
+        PerfMsSince(sceneStart, sceneEnd),
+        PerfMsSince(swapStart, swapEnd));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -740,10 +817,9 @@ static void OnAppCmd(android_app* app, int32_t cmd)
             }
             LegacyClientRuntime::SetWindow(app->window);
 
-            // Force 1280x720 render resolution
-            ANativeWindow_setBuffersGeometry(app->window, 1280, 720, 0);
-            const int width = 1280;
-            const int height = 720;
+            ANativeWindow_setBuffersGeometry(app->window, kAndroidRenderWidth, kAndroidRenderHeight, 0);
+            const int width = kAndroidRenderWidth;
+            const int height = kAndroidRenderHeight;
 
             if (!g_initialized)
             {
@@ -803,8 +879,8 @@ static void OnAppCmd(android_app* app, int32_t cmd)
     case APP_CMD_CONFIG_CHANGED:
         if (app->window && g_renderBackendInitialized)
         {
-            const int width = 1280;
-            const int height = 720;
+            const int width = kAndroidRenderWidth;
+            const int height = kAndroidRenderHeight;
             ANativeWindow_setBuffersGeometry(app->window, width, height, 0);
             RenderBackend::SetScreenSize(width, height);
             SyncLegacyScreenMetrics(width, height);

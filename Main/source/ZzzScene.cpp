@@ -77,6 +77,70 @@
 #ifdef __ANDROID__
 #include "Platform/GameAssetPath.h"
 #include <android/log.h>
+
+struct MainScenePerfStats
+{
+	int sampleCount = 0;
+	double totalMs = 0.0;
+	double setupMs = 0.0;
+	double worldMs = 0.0;
+	double terrainMs = 0.0;
+	double objectsMs = 0.0;
+	double charactersMs = 0.0;
+	double worldMiscMs = 0.0;
+	double effectsMs = 0.0;
+	double uiMs = 0.0;
+};
+
+static MainScenePerfStats g_mainScenePerfStats;
+
+static void LogMainScenePerfSample(double totalMs, double setupMs, double worldMs, double terrainMs, double objectsMs, double charactersMs, double worldMiscMs, double effectsMs, double uiMs)
+{
+	g_mainScenePerfStats.sampleCount++;
+	g_mainScenePerfStats.totalMs += totalMs;
+	g_mainScenePerfStats.setupMs += setupMs;
+	g_mainScenePerfStats.worldMs += worldMs;
+	g_mainScenePerfStats.terrainMs += terrainMs;
+	g_mainScenePerfStats.objectsMs += objectsMs;
+	g_mainScenePerfStats.charactersMs += charactersMs;
+	g_mainScenePerfStats.worldMiscMs += worldMiscMs;
+	g_mainScenePerfStats.effectsMs += effectsMs;
+	g_mainScenePerfStats.uiMs += uiMs;
+
+	const bool slowFrame = totalMs >= 80.0;
+	const bool emitSample = slowFrame || g_mainScenePerfStats.sampleCount >= 60;
+	if (!emitSample)
+	{
+		return;
+	}
+
+	const double samples = static_cast<double>(g_mainScenePerfStats.sampleCount);
+	__android_log_print(
+		ANDROID_LOG_INFO,
+		"MUPerfMain",
+		"samples=%d avg_total=%.2fms avg_setup=%.2fms avg_world=%.2fms avg_terrain=%.2fms avg_objects=%.2fms avg_characters=%.2fms avg_misc=%.2fms avg_effects=%.2fms avg_ui=%.2fms last_total=%.2fms last_world=%.2fms last_terrain=%.2fms last_objects=%.2fms last_characters=%.2fms last_misc=%.2fms last_effects=%.2fms last_ui=%.2fms world=%d",
+		g_mainScenePerfStats.sampleCount,
+		g_mainScenePerfStats.totalMs / samples,
+		g_mainScenePerfStats.setupMs / samples,
+		g_mainScenePerfStats.worldMs / samples,
+		g_mainScenePerfStats.terrainMs / samples,
+		g_mainScenePerfStats.objectsMs / samples,
+		g_mainScenePerfStats.charactersMs / samples,
+		g_mainScenePerfStats.worldMiscMs / samples,
+		g_mainScenePerfStats.effectsMs / samples,
+		g_mainScenePerfStats.uiMs / samples,
+		totalMs,
+		worldMs,
+		terrainMs,
+		objectsMs,
+		charactersMs,
+		worldMiscMs,
+		effectsMs,
+		uiMs,
+		World);
+
+	g_mainScenePerfStats = MainScenePerfStats{};
+}
 #endif
 
 #ifdef __ANDROID__
@@ -2903,6 +2967,18 @@ bool RenderMainScene()
 		return false;
 	}
 
+#ifdef __ANDROID__
+	DWORD mainSceneStartMs = timeGetTime();
+	double setupMs = 0.0;
+	double worldMs = 0.0;
+	double terrainMs = 0.0;
+	double objectsMs = 0.0;
+	double charactersMs = 0.0;
+	double worldMiscMs = 0.0;
+	double effectsMs = 0.0;
+	double uiMs = 0.0;
+#endif
+
 	FogEnable = CameraFactorPtr->IsEnable();
 
 	vec3_t pos;
@@ -3015,6 +3091,12 @@ bool RenderMainScene()
 
 	CreateScreenVector(MouseX, MouseY, MouseTarget);
 
+#ifdef __ANDROID__
+	setupMs = static_cast<double>(timeGetTime() - mainSceneStartMs);
+	DWORD worldStartMs = timeGetTime();
+	DWORD worldPhaseStartMs = worldStartMs;
+#endif
+
 	if (gwinhandle->CheckPerformance())
 	{
 		if (IsWaterTerrain() == false)
@@ -3034,13 +3116,30 @@ bool RenderMainScene()
 			}
 		}
 
+#ifdef __ANDROID__
+		terrainMs = static_cast<double>(timeGetTime() - worldPhaseStartMs);
+		worldPhaseStartMs = timeGetTime();
+#endif
+
 		if (!gMapManager->IsPKField() && !IsDoppelGanger2())
 			RenderObjects();
 
+		#ifndef __ANDROID__
 		RenderEffectShadows();
 		RenderBoids();
+		#endif
+
+#ifdef __ANDROID__
+		objectsMs = static_cast<double>(timeGetTime() - worldPhaseStartMs);
+		worldPhaseStartMs = timeGetTime();
+#endif
 
 		RenderCharactersClient();
+
+#ifdef __ANDROID__
+		charactersMs = static_cast<double>(timeGetTime() - worldPhaseStartMs);
+		worldPhaseStartMs = timeGetTime();
+#endif
 
 		if (EditFlag != EDIT_NONE)
 			RenderTerrain(true);
@@ -3049,14 +3148,24 @@ bool RenderMainScene()
 			RenderItems();
 
 		RenderFishs();
+		#ifndef __ANDROID__
 		gGoboidManager->RenderBugs();
+		#endif
 		RenderLeaves();
 
 		if (!gMapManager->InChaosCastle())
 			ThePetProcess().RenderPets();
 
+		#ifndef __ANDROID__
 		RenderBoids(true);
+		#endif
 		RenderObjects_AfterCharacter();
+
+#ifdef __ANDROID__
+		worldMiscMs = static_cast<double>(timeGetTime() - worldPhaseStartMs);
+		worldMs = static_cast<double>(timeGetTime() - worldStartMs);
+		DWORD effectsStartMs = timeGetTime();
+#endif
 
 		RenderJoints(byWaterMap);
 		RenderEffects();
@@ -3123,7 +3232,15 @@ bool RenderMainScene()
 				battleCastle::EndFog();
 			}
 		}
+
+#ifdef __ANDROID__
+		effectsMs = static_cast<double>(timeGetTime() - effectsStartMs);
+#endif
 	}
+
+	#ifdef __ANDROID__
+	DWORD uiStartMs = timeGetTime();
+	#endif
 
 	SelectObjects();
 	BeginBitmap();
@@ -3157,6 +3274,20 @@ bool RenderMainScene()
 		EndBitmap();
 		EndOpengl();
 	}
+
+#ifdef __ANDROID__
+	uiMs = static_cast<double>(timeGetTime() - uiStartMs);
+	LogMainScenePerfSample(
+		static_cast<double>(timeGetTime() - mainSceneStartMs),
+		setupMs,
+		worldMs,
+		terrainMs,
+		objectsMs,
+		charactersMs,
+		worldMiscMs,
+		effectsMs,
+		uiMs);
+#endif
 
 	return true;
 }

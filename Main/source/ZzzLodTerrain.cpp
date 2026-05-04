@@ -2968,6 +2968,22 @@ void RenderTerrainBlock(float xf, float yf, int xi, int yi, bool EditFlag)
 	//int y = ((yi/4)&63);
 	//int lodi = LodBuffer[y*64+x];
 	int lodi = 1;
+	#ifdef __ANDROID__
+	if (!EditFlag)
+	{
+		const float centerX = (xf + 2.f) * TERRAIN_SCALE;
+		const float centerY = (yf + 2.f) * TERRAIN_SCALE;
+		const float distanceX = CameraPosition[0] - centerX;
+		const float distanceY = CameraPosition[1] - centerY;
+		const float distanceSq = distanceX * distanceX + distanceY * distanceY;
+		const float nearTerrainRadius = 1800.f;
+
+		if (distanceSq > nearTerrainRadius * nearTerrainRadius)
+		{
+			lodi = 2;
+		}
+	}
+	#endif
 	float lodf = (float)lodi;
 	for (int i = 0; i < 4; i += lodi)
 	{

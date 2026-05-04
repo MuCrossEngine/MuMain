@@ -14,6 +14,19 @@
 
 #include "CGMFontLayer.h"
 
+template <size_t N>
+static void CopyChatBuffer(char (&destination)[N], const char* source)
+{
+	if (source == NULL)
+	{
+		destination[0] = '\0';
+		return;
+	}
+
+	strncpy(destination, source, N - 1);
+	destination[N - 1] = '\0';
+}
+
 CGMHeadChat::CGMHeadChat() :Chat(MAX_CHAT)
 {
 }
@@ -151,7 +164,7 @@ void CGMHeadChat::AddChat(CHAT* c, const char* Text, int Flag)
 	}
 	else
 	{
-		strcpy(c->Text[0], Text);
+		CopyChatBuffer(c->Text[0], Text);
 		c->LifeTime[0] = Time;
 
 		if (c->LifeTime[1] > 0)
@@ -184,7 +197,7 @@ void CGMHeadChat::AddChat(CHAT* c, const char* Text, int Flag)
 	}
 	else
 	{
-		strcpy(c->Text[0], Text);
+		CopyChatBuffer(c->Text[0], Text);
 		c->LifeTime[0] = Time;
 	}
 
@@ -237,7 +250,7 @@ void CGMHeadChat::CreateChat(char* ID, const char* Text, CHARACTER* Owner, int F
 
 		if (c->Owner == Owner)
 		{
-			strcpy(c->ID, ID);
+			CopyChatBuffer(c->ID, ID);
 			c->Color = Color;
 
 			AddGuildName(c, Owner);
@@ -263,7 +276,7 @@ void CGMHeadChat::CreateChat(char* ID, const char* Text, CHARACTER* Owner, int F
 			{
 				if (c->LifeTime[0] > 0)
 				{
-					strcpy(c->Text[1], c->Text[0]);
+					CopyChatBuffer(c->Text[1], c->Text[0]);
 					c->LifeTime[1] = c->LifeTime[0];
 				}
 
@@ -282,7 +295,7 @@ void CGMHeadChat::CreateChat(char* ID, const char* Text, CHARACTER* Owner, int F
 		if (c->IDLifeTime <= 0 && c->LifeTime[0] <= 0)
 		{
 			c->Owner = Owner;
-			strcpy(c->ID, ID);
+			CopyChatBuffer(c->ID, ID);
 			c->Color = Color;
 			AddGuildName(c, Owner);
 
