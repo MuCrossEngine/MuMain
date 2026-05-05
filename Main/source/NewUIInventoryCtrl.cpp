@@ -1584,6 +1584,11 @@ bool SEASON3B::CNewUIInventoryCtrl::IsRepairMode()
 
 void SEASON3B::CNewUIInventoryCtrl::RenderNumberOfItem()
 {
+	if (!IsVisible())
+	{
+		return;
+	}
+
 	EnableAlphaTest();
 	glColor3f(1.f, 1.f, 1.f);
 	type_vec_item::iterator li = m_vecItem.begin();
@@ -1664,6 +1669,11 @@ void SEASON3B::CNewUIInventoryCtrl::RenderNumberOfItem()
 
 void SEASON3B::CNewUIInventoryCtrl::RenderItemToolTip()
 {
+	if (!IsVisible())
+	{
+		return;
+	}
+
 	if (m_pToolTipItem)
 	{
 		Script_Item* pItemAttr = GMItemMng->find(m_pToolTipItem->Type);
@@ -1787,6 +1797,11 @@ void SEASON3B::CNewUIInventoryCtrl::SetEventState(EVENT_STATE es)
 
 void SEASON3B::CNewUIInventoryCtrl::Render3D()
 {
+	if (!IsVisible())
+	{
+		return;
+	}
+
 	type_vec_item::iterator li = m_vecItem.begin();
 	for (; li != m_vecItem.end(); li++)
 	{

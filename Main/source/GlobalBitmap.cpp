@@ -1455,9 +1455,9 @@ bool CGlobalBitmap::OpenTga(GLuint uiBitmapIndex, const std::string& filename, G
 
 	this->CreateMipmappedTexture(&pNewBitmap->TextureNumber, finalComponents, textureWidth, textureHeight, textureBuffer, uiFilter, uiWrapMode);
 #ifdef __ANDROID__
-	// Track usable transparency, not storage format.
-	// Some assets are uploaded as RGBA for compatibility but have fully opaque alpha.
-	GLESFF::RegisterTextureFormat(pNewBitmap->TextureNumber, hasTransparentAlpha);
+	// Use the uploaded storage format to drive shader alpha handling.
+	// Opaque RGBA UI textures must not fall back to RGB black color-keying.
+	GLESFF::RegisterTextureFormat(pNewBitmap->TextureNumber, finalComponents == 4);
 #endif
 
 	m_mapBitmap.insert(type_bitmap_map::value_type(uiBitmapIndex, pNewBitmap));
@@ -1562,9 +1562,9 @@ bool CGlobalBitmap::OpenBmp(GLuint uiBitmapIndex, const std::string& filename, G
 
 	this->CreateMipmappedTexture(&pNewBitmap->TextureNumber, finalComponents, textureWidth, textureHeight, textureBuffer, uiFilter, uiWrapMode);
 #ifdef __ANDROID__
-	// Track usable transparency, not storage format.
-	// Some assets are uploaded as RGBA for compatibility but have fully opaque alpha.
-	GLESFF::RegisterTextureFormat(pNewBitmap->TextureNumber, hasTransparentAlpha);
+	// Use the uploaded storage format to drive shader alpha handling.
+	// Opaque RGBA UI textures must not fall back to RGB black color-keying.
+	GLESFF::RegisterTextureFormat(pNewBitmap->TextureNumber, finalComponents == 4);
 #endif
 	m_mapBitmap.insert(type_bitmap_map::value_type(uiBitmapIndex, pNewBitmap));
 	m_BitmapName.push_back(std::pair<std::string, GLuint>(pNewBitmap->FileName, uiBitmapIndex));
@@ -1667,9 +1667,9 @@ bool CGlobalBitmap::OpenDDS_DXT5(GLuint uiBitmapIndex, const std::string& filena
 
 	this->CreateMipmappedTexture(&pNewBitmap->TextureNumber, finalComponents, textureWidth, textureHeight, textureBuffer, uiFilter, uiWrapMode);
 #ifdef __ANDROID__
-	// Track usable transparency, not storage format.
-	// Some assets are uploaded as RGBA for compatibility but have fully opaque alpha.
-	GLESFF::RegisterTextureFormat(pNewBitmap->TextureNumber, hasTransparentAlpha);
+	// Use the uploaded storage format to drive shader alpha handling.
+	// Opaque RGBA UI textures must not fall back to RGB black color-keying.
+	GLESFF::RegisterTextureFormat(pNewBitmap->TextureNumber, finalComponents == 4);
 #endif
 	m_mapBitmap.insert(type_bitmap_map::value_type(uiBitmapIndex, pNewBitmap));
 	m_BitmapName.push_back(std::pair<std::string, GLuint>(pNewBitmap->FileName, uiBitmapIndex));

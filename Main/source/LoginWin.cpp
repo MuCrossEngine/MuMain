@@ -451,14 +451,22 @@ void CLoginWin::RenderControls()
 	g_pRenderText->SetBgColor(0);
 	g_pRenderText->SetFont(g_hFixFont);
 	g_pRenderText->SetTextColor(CLRDW_WHITE);
-	g_pRenderText->RenderText(int((CWin::GetXPos() + 30) / g_fScreenRate_x), int((CWin::GetYPos() + 113) / g_fScreenRate_y), GlobalText[450]);
-	g_pRenderText->RenderText(int((CWin::GetXPos() + 30) / g_fScreenRate_x), int((CWin::GetYPos() + 139) / g_fScreenRate_y), GlobalText[451]);
+	const char* szLoginLabelAccount = (GlobalText[450] && GlobalText[450][0]) ? GlobalText[450] : "Account";
+	const char* szLoginLabelPassword = (GlobalText[451] && GlobalText[451][0]) ? GlobalText[451] : "Password";
+	g_pRenderText->RenderText(int((CWin::GetXPos() + 30) / g_fScreenRate_x), int((CWin::GetYPos() + 113) / g_fScreenRate_y), szLoginLabelAccount);
+	g_pRenderText->RenderText(int((CWin::GetXPos() + 30) / g_fScreenRate_x), int((CWin::GetYPos() + 139) / g_fScreenRate_y), szLoginLabelPassword);
 
 	unicode::t_char szServerName[MAX_TEXT_LENGTH];
 
 	if (gmProtect->ServerNameDefault)
 	{
-		const char* apszGlobalText[4] = { GlobalText[461], GlobalText[460], GlobalText[3130], GlobalText[3131] };
+		const char* apszGlobalText[4] =
+		{
+			(GlobalText[461] && GlobalText[461][0]) ? GlobalText[461] : "[Server %s-%d]",
+			(GlobalText[460] && GlobalText[460][0]) ? GlobalText[460] : "[Server %s-%d (Non-PvP)]",
+			(GlobalText[3130] && GlobalText[3130][0]) ? GlobalText[3130] : "[Server %s-%d (PvP)]",
+			(GlobalText[3131] && GlobalText[3131][0]) ? GlobalText[3131] : "[Server %s-%d (No PK)]"
+		};
 
 		sprintf(szServerName, apszGlobalText[g_ServerListManager->GetNonPVPInfo()], g_ServerListManager->GetSelectServerName(), g_ServerListManager->GetSelectServerIndex());
 	}

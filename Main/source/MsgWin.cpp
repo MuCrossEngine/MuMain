@@ -29,6 +29,58 @@ extern float g_fScreenRate_y;
 extern int g_iChatInputType;
 extern CUITextInputBox* g_pSinglePasswdInputBox;
 
+namespace
+{
+const char* FallbackLoginPopupMessage(int msgCode)
+{
+	switch (msgCode)
+	{
+	case MESSAGE_INPUT_ID:
+		return "Please enter account.";
+	case MESSAGE_INPUT_PASSWORD:
+		return "Please enter password.";
+	case RECEIVE_LOG_IN_FAIL_ID:
+		return "Account does not exist.";
+	case RECEIVE_LOG_IN_FAIL_PASSWORD:
+		return "Invalid password.";
+	case RECEIVE_LOG_IN_FAIL_ID_CONNECTED:
+		return "Account is already connected.";
+	case RECEIVE_LOG_IN_FAIL_ID_BLOCK:
+		return "Account is blocked.";
+	case RECEIVE_LOG_IN_FAIL_CONNECT:
+		return "Connection failed.";
+	case RECEIVE_LOG_IN_FAIL_ERROR:
+		return "Login failed.";
+	case RECEIVE_LOG_IN_FAIL_NO_PAYMENT_INFO:
+		return "No payment information available.";
+	case RECEIVE_LOG_IN_FAIL_USER_TIME1:
+		return "User time restriction.";
+	case RECEIVE_LOG_IN_FAIL_USER_TIME2:
+		return "User time expired.";
+	case RECEIVE_LOG_IN_FAIL_PC_TIME1:
+		return "PC time restriction.";
+	case RECEIVE_LOG_IN_FAIL_PC_TIME2:
+		return "PC time expired.";
+	case RECEIVE_LOG_IN_FAIL_ONLY_OVER_15:
+		return "Only users over 15 can connect.";
+	case RECEIVE_LOG_IN_FAIL_CHARGED_CHANNEL:
+		return "This channel requires payment.";
+	case RECEIVE_LOG_IN_FAIL_POINT_DATE:
+		return "Point date restriction.";
+	case RECEIVE_LOG_IN_FAIL_POINT_HOUR:
+		return "Point hour restriction.";
+	case RECEIVE_LOG_IN_FAIL_INVALID_IP:
+		return "Invalid IP.";
+	case RECEIVE_LOG_IN_FAIL_SERVER_BUSY:
+		return "Server is busy.";
+	default:
+		break;
+	}
+
+	return NULL;
+}
+}
+
 CMsgWin::CMsgWin()
 {
 }
@@ -95,7 +147,7 @@ void CMsgWin::SetCtrlPosition()
 		m_sprInput.SetPosition(nBaseXPos + 32, nBtnYPos + 4);
 		m_aBtn[MW_OK].SetPosition(nBaseXPos + 209, nBtnYPos);
 		m_aBtn[MW_CANCEL].SetPosition(nBaseXPos + 264, nBtnYPos);
-		// ÀÔ·Â ÅØ½ºÆ® À§Ä¡ ÁöÁ¤.
+		// ï¿½Ô·ï¿½ ï¿½Ø½ï¿½Æ® ï¿½ï¿½Ä¡ ï¿½ï¿½ï¿½ï¿½.
 		if (m_nMsgCode == MESSAGE_DELETE_CHARACTER_RESIDENT)
 			if (g_iChatInputType == 1)
 				g_pSinglePasswdInputBox->SetPosition(
@@ -459,6 +511,20 @@ void CMsgWin::PopUp(int nMsgCode, char* pszMsg)
 
 	if (lpszMsg)
 	{
+		if (lpszMsg[0] == '\0')
+		{
+			const char* szFallback = FallbackLoginPopupMessage(m_nMsgCode);
+			if (szFallback)
+			{
+				lpszMsg = szFallback;
+			}
+		}
+
+		if (lpszMsg2 && lpszMsg2[0] == '\0')
+		{
+			lpszMsg2 = NULL;
+		}
+
 		SetMsg(eType, lpszMsg, lpszMsg2);
 	}
 	rUIMng.ShowWin(this);

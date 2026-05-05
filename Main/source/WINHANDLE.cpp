@@ -181,6 +181,26 @@ void CWINHANDLE::InitSize(mu_uint32 RenderSizeX, mu_uint32 RenderSizeY)
 		g_fScreenRate_y = uniScale;
 	}
 
+#ifdef __ANDROID__
+	// Keep Android UI scale uniform and capped so 190x429 legacy windows
+	// (inventory/modal family) do not become nearly full-screen on tall devices.
+	float uiScale = (g_fScreenRate_x < g_fScreenRate_y) ? g_fScreenRate_x : g_fScreenRate_y;
+	const float androidUiScaleTighten = 0.82f;
+	float maxAndroidUiScale = ((float)WindowHeight / 600.0f) * androidUiScaleTighten;
+
+	if (maxAndroidUiScale < 1.0f)
+		maxAndroidUiScale = 1.0f;
+
+	if (uiScale > maxAndroidUiScale)
+		uiScale = maxAndroidUiScale;
+
+	if (uiScale < 1.0f)
+		uiScale = 1.0f;
+
+	g_fScreenRate_x = uiScale;
+	g_fScreenRate_y = uiScale;
+#endif
+
 	iWinWidth = ((float)WindowWidth / g_fScreenRate_x);
 
 	iWinHight = ((float)WindowHeight / g_fScreenRate_y);

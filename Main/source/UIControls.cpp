@@ -2813,6 +2813,13 @@ void CUIRenderTextOriginal::SetTextColor(BYTE byRed, BYTE byGreen, BYTE byBlue, 
 
 void CUIRenderTextOriginal::SetTextColor(DWORD dwColor)
 {
+	#ifdef __ANDROID__
+	if (dwColor != 0 && ((dwColor >> 24) & 0xFF) == 0)
+	{
+		dwColor |= 0xFF000000;
+	}
+	#endif
+
 	m_dwTextColor = dwColor;
 }
 
@@ -2823,6 +2830,13 @@ void CUIRenderTextOriginal::SetBgColor(BYTE byRed, BYTE byGreen, BYTE byBlue, BY
 
 void CUIRenderTextOriginal::SetBgColor(DWORD dwColor)
 {
+	#ifdef __ANDROID__
+	if (dwColor != 0 && ((dwColor >> 24) & 0xFF) == 0)
+	{
+		dwColor |= 0xFF000000;
+	}
+	#endif
+
 	m_dwBackColor = dwColor;
 }
 

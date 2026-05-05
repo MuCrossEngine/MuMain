@@ -1138,6 +1138,14 @@ void SEASON3B::CNewUIMyInventory::OpenningProcess()
 {
 	m_CurButtonIndex = 0;
 
+	// Keep extension UI state in sync with the main inventory window so
+	// expansion markers don't remain rendered out of place after reopen.
+	if (g_pNewUISystem->IsVisible(SEASON3B::INTERFACE_INVENTORY_EXTENSION))
+	{
+		this->SetExpansionCloseState();
+		g_pNewUISystem->Hide(SEASON3B::INTERFACE_INVENTORY_EXTENSION);
+	}
+
 	for (int i : EquipmentInven)
 	{
 		this->SetEquipementRender(i, true);

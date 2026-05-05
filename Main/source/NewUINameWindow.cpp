@@ -31,7 +31,11 @@ SEASON3B::CNewUINameWindow::CNewUINameWindow()
 	m_pNewUIMng = NULL;
 	m_Pos.x = m_Pos.y = 0;
 
+	#ifdef __ANDROID__
+	m_bShowItemName = true;
+	#else
 	m_bShowItemName = false;
+	#endif
 }
 
 SEASON3B::CNewUINameWindow::~CNewUINameWindow()
@@ -89,11 +93,13 @@ bool SEASON3B::CNewUINameWindow::UpdateMouseEvent()
 
 bool SEASON3B::CNewUINameWindow::UpdateKeyEvent()
 {
+#ifndef __ANDROID__
 	if (SEASON3B::IsPress(VK_MENU) == true)
 	{
 		m_bShowItemName = !m_bShowItemName;
 		//GMItemDropName->SetVisibleInfo(-1, m_bShowItemName);
 	}
+#endif
 
 	return true;
 }
@@ -229,7 +235,12 @@ void SEASON3B::CNewUINameWindow::RenderName()
 		}
 	}
 
-	if (m_bShowItemName || SEASON3B::IsRepeat(VK_MENU))
+	bool bShowAllItemNames = (m_bShowItemName || SEASON3B::IsRepeat(VK_MENU));
+	#ifdef __ANDROID__
+	bShowAllItemNames = true;
+	#endif
+
+	if (bShowAllItemNames)
 	{
 		for (int i = 0; i < MAX_ITEMS; i++)
 		{
